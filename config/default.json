@@ -59,8 +59,8 @@
   },
   "bridges": {
     "telegram": {
-      "enabled": false,
-      "allowedUsers": [],
+      "enabled": true,
+      "allowedUsers": ["8768701081"],
       "pairingEnabled": true
     },
     "discord": {

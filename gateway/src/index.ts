@@ -202,6 +202,18 @@ class AuthorClawGateway {
     await this.vault.initialize();
     console.log('  ✓ Encrypted vault initialized (AES-256-GCM)');
 
+    // Seed secrets from environment variables (production / Render)
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      const existing = await this.vault.get('telegram_bot_token');
+      if (!existing) await this.vault.set('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
+    }
+    if (process.env.TELEGRAM_ALLOWED_USERS) {
+      const ids = process.env.TELEGRAM_ALLOWED_USERS.split(',').map(s => s.trim()).filter(Boolean);
+      const current: string[] = this.config.get('bridges.telegram.allowedUsers', []);
+      const merged = [...new Set([...current, ...ids])];
+      this.config.set('bridges.telegram.allowedUsers', merged);
+    }
+
     this.permissions = new PermissionManager(this.config.get('security.permissionPreset', 'standard'));
     console.log(`  ✓ Permissions: ${this.permissions.preset} mode`);
 
