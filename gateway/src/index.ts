@@ -202,10 +202,23 @@ class AuthorClawGateway {
     await this.vault.initialize();
     console.log('  ✓ Encrypted vault initialized (AES-256-GCM)');
 
-    // Seed secrets from environment variables (production / Render)
-    if (process.env.TELEGRAM_BOT_TOKEN) {
-      const existing = await this.vault.get('telegram_bot_token');
-      if (!existing) await this.vault.set('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
+    // Seed secrets from environment variables (production / Render).
+    // On ephemeral filesystems the vault is recreated on every deploy, so we
+    // always overwrite from env vars when they are present — they are the
+    // source of truth in production.
+    const envVaultSeeds: Array<[string, string | undefined]> = [
+      ['anthropic_api_key',  process.env.ANTHROPIC_API_KEY],
+      ['gemini_api_key',     process.env.GEMINI_API_KEY],
+      ['openai_api_key',     process.env.OPENAI_API_KEY],
+      ['openrouter_api_key', process.env.OPENROUTER_API_KEY],
+      ['deepseek_api_key',   process.env.DEEPSEEK_API_KEY],
+      ['together_api_key',   process.env.TOGETHER_API_KEY],
+      ['elevenlabs_api_key', process.env.ELEVENLABS_API_KEY],
+      ['telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN],
+      ['discord_bot_token',  process.env.DISCORD_BOT_TOKEN],
+    ];
+    for (const [vaultKey, envVal] of envVaultSeeds) {
+      if (envVal) await this.vault.set(vaultKey, envVal);
     }
     if (process.env.TELEGRAM_ALLOWED_USERS) {
       const ids = process.env.TELEGRAM_ALLOWED_USERS.split(',').map(s => s.trim()).filter(Boolean);
