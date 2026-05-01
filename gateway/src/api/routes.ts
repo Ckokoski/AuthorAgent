@@ -1078,6 +1078,11 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
           const qualityLoopEnabled = currentProject.context?.qualityLoopEnabled !== false;
           const qualityThreshold = Number(currentProject.context?.qualityThreshold) || 70;
           const maxRetries = Number(currentProject.context?.qualityMaxRetries) ?? 1;
+          // Per-project flag for the dual Craft + Market judge mode.
+          // Doubles the judge AI cost (one extra call per attempt) but
+          // surfaces craft↔market disagreement, which is the most
+          // actionable signal. Off by default — opt-in per project.
+          const dualJudgeEnabled = currentProject.context?.dualJudge === true;
 
           if (judge && isQualityCandidate && qualityLoopEnabled && response.length > 500) {
             let attempt = 0;
@@ -1088,6 +1093,7 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
                 aiComplete: (r: any) => services.aiRouter.complete(r),
                 aiSelectProvider: (taskType: string) => services.aiRouter.selectProvider(taskType),
                 threshold: qualityThreshold,
+                dualJudge: dualJudgeEnabled,
               });
               console.log(`  [judge] "${activeStep.label}" attempt ${attempt + 1}: ${verdict.summary}`);
               if (verdict.score > bestScore) {
@@ -4498,7 +4504,7 @@ ${sourceCode.substring(0, 15000)}
    */
   app.post('/api/judge', async (req: Request, res: Response) => {
     if (!services.writingJudge) return res.status(503).json({ error: 'Writing judge not initialized' });
-    const { text, runLLMJudge, threshold, mechanicalWeight } = req.body || {};
+    const { text, runLLMJudge, threshold, mechanicalWeight, dualJudge } = req.body || {};
     if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text (string) required' });
     try {
       const verdict = await services.writingJudge.evaluate(text, {
@@ -4507,10 +4513,69 @@ ${sourceCode.substring(0, 15000)}
         threshold,
         mechanicalWeight,
         runLLMJudge: runLLMJudge !== false,
+        dualJudge: dualJudge === true,
       });
       res.json(verdict);
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Evaluation failed' });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Per-character voice fingerprinting + drift detection
+  // ═══════════════════════════════════════════════════════════
+
+  app.get('/api/projects/:id/character-voices', async (req: Request, res: Response) => {
+    if (!services.characterVoices) return res.status(503).json({ error: 'Not initialized' });
+    res.json(await services.characterVoices.getProjectVoices(req.params.id));
+  });
+
+  /** Ingest a chapter's dialogue into the per-character corpus, refresh
+   *  fingerprints if any character crossed the threshold. */
+  app.post('/api/projects/:id/character-voices/ingest', async (req: Request, res: Response) => {
+    if (!services.characterVoices) return res.status(503).json({ error: 'Not initialized' });
+    const { chapterNumber, chapterText, characterNames, characterAliases } = req.body || {};
+    if (!chapterText || typeof chapterText !== 'string') {
+      return res.status(400).json({ error: 'chapterText (string) required' });
+    }
+    if (!Array.isArray(characterNames)) {
+      return res.status(400).json({ error: 'characterNames (array) required' });
+    }
+    try {
+      const result = await services.characterVoices.ingestChapter({
+        projectId: req.params.id,
+        chapterNumber: Number(chapterNumber) || 1,
+        chapterText,
+        characterNames,
+        characterAliases: characterAliases || {},
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Ingestion failed' });
+    }
+  });
+
+  /** Score a single chapter for character-voice drift against built fingerprints. */
+  app.post('/api/projects/:id/character-voices/detect-drift', async (req: Request, res: Response) => {
+    if (!services.characterVoices) return res.status(503).json({ error: 'Not initialized' });
+    const { chapterNumber, chapterText, characterNames, characterAliases } = req.body || {};
+    if (!chapterText || typeof chapterText !== 'string') {
+      return res.status(400).json({ error: 'chapterText (string) required' });
+    }
+    if (!Array.isArray(characterNames)) {
+      return res.status(400).json({ error: 'characterNames (array) required' });
+    }
+    try {
+      const report = await services.characterVoices.detectDrift({
+        projectId: req.params.id,
+        chapterNumber: Number(chapterNumber) || 1,
+        chapterText,
+        characterNames,
+        characterAliases: characterAliases || {},
+      });
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Drift detection failed' });
     }
   });
 

@@ -48,6 +48,7 @@ import { ResearchLookupService } from './services/research-lookup.js';
 import { VideoResearchService } from './services/video-research.js';
 import { StoryStructureService } from './services/story-structures.js';
 import { PlotPromisesService } from './services/plot-promises.js';
+import { CharacterVoicesService } from './services/character-voices.js';
 import { LessonStore } from './services/lessons.js';
 import { PreferenceStore } from './services/preferences.js';
 import { OrchestratorService } from './services/orchestrator.js';
@@ -125,6 +126,7 @@ class AuthorClawGateway {
   private videoResearch!: VideoResearchService;
   private storyStructures!: StoryStructureService;
   private plotPromises!: PlotPromisesService;
+  private characterVoices!: CharacterVoicesService;
   private lessons!: LessonStore;
   private preferences!: PreferenceStore;
   private orchestrator!: OrchestratorService;
@@ -451,12 +453,18 @@ class AuthorClawGateway {
 
     // ── Phase 6g7: Story Structures (smart-recommend, not forced) ──
     this.storyStructures = new StoryStructureService();
-    console.log(`  ✓ Story structures: ${this.storyStructures.list().length} structures available (Save the Cat, three-act, Hero's Journey, Romancing the Beat, Story Circle, Mystery, none)`);
+    console.log(`  ✓ Story structures: ${this.storyStructures.list().length} structures available (Save the Cat, three-act, five-act / Freytag, Seven-Point / Wells, Hero's Journey, Romancing the Beat, Story Circle, Mystery 5-Stage, Martell Thematic, none)`);
 
     // ── Phase 6g8: Plot Promises (Sanderson-style promises + payoffs) ──
     this.plotPromises = new PlotPromisesService(join(ROOT_DIR, 'workspace'));
     await this.plotPromises.initialize();
     console.log(`  ✓ Plot promises: tracker ready`);
+
+    // ── Phase 6g9: Character voices (per-character StyleClone fingerprinting) ──
+    this.characterVoices = new CharacterVoicesService(join(ROOT_DIR, 'workspace'));
+    this.characterVoices.setStyleClone(this.styleClone);
+    await this.characterVoices.initialize();
+    console.log(`  ✓ Character voices: per-character voice drift tracker ready`);
 
     // ── Wire project-completion hooks ──
     // When a project finishes, observe the event for the user model AND
@@ -1388,6 +1396,7 @@ class AuthorClawGateway {
       videoResearch: this.videoResearch,
       storyStructures: this.storyStructures,
       plotPromises: this.plotPromises,
+      characterVoices: this.characterVoices,
       lessons: this.lessons,
       preferences: this.preferences,
       orchestrator: this.orchestrator,

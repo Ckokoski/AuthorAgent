@@ -31,10 +31,13 @@
 export type StructureId =
   | 'save_the_cat'
   | 'three_act'
+  | 'five_act'
+  | 'seven_point'
   | 'heros_journey'
   | 'romancing_the_beat'
   | 'story_circle'
   | 'mystery_5_stage'
+  | 'martell_thematic'
   | 'none';
 
 export interface Beat {
@@ -157,6 +160,41 @@ const STRUCTURES: StoryStructure[] = [
     ],
   },
   {
+    id: 'five_act',
+    name: 'Five-Act Structure (Freytag\'s Pyramid)',
+    oneLiner: 'Exposition → Rising Action → Climax → Falling Action → Dénouement. The classic stage-drama and literary-tragedy structure.',
+    recommendedFor: ['literary fiction', 'tragedy', 'historical fiction', 'stage drama adaptation', 'period drama', 'family saga'],
+    worksLessWellFor: ['romance', 'thriller', 'cozy mystery'],
+    alsoConsiderWhen: 'When the story has substantial falling action and aftermath — character-driven literary work where the climax happens earlier and the consequences carry the back third.',
+    why: 'Gustav Freytag\'s 1863 analysis of classical drama. Distinct from three-act in that the climax sits at the centerpoint (around 50%), with substantial "falling action" and dénouement on the back half. Useful when the cost / aftermath of the climax is what the book is actually about.',
+    beats: [
+      { name: 'Exposition', expectedPct: 5, pctRange: [0, 15], description: 'Introduce protagonist, world, and the dramatic question.', keywords: ['opens', 'introduce', 'world', 'home'], mustHave: true },
+      { name: 'Inciting Force', expectedPct: 15, pctRange: [10, 25], description: 'The disturbance that propels the story.', keywords: ['inciting', 'incident', 'disrupt', 'arrive'], mustHave: true },
+      { name: 'Rising Action', expectedPct: 35, pctRange: [20, 50], description: 'Complications mount; protagonist commits more deeply.', keywords: ['complication', 'pursue', 'escalate', 'oppose'], mustHave: true },
+      { name: 'Climax', expectedPct: 50, pctRange: [45, 60], description: 'The turning point — a choice, confrontation, or revelation that changes the trajectory.', keywords: ['climax', 'confront', 'reveal', 'decision', 'choice'], mustHave: true },
+      { name: 'Falling Action', expectedPct: 70, pctRange: [55, 85], description: 'Consequences of the climax play out; tension drains as the new reality settles.', keywords: ['consequence', 'aftermath', 'fall', 'unravel'], mustHave: true },
+      { name: 'Dénouement / Resolution', expectedPct: 95, pctRange: [85, 100], description: 'The new normal; threads tied off; meaning crystalizes.', keywords: ['ending', 'resolution', 'after', 'final'], mustHave: true },
+    ],
+  },
+  {
+    id: 'seven_point',
+    name: 'Seven-Point Story Structure (Dan Wells)',
+    oneLiner: 'Hook → Plot Turn 1 → Pinch 1 → Midpoint → Pinch 2 → Plot Turn 2 → Resolution. Cleaner than Save the Cat, designed for genre fiction.',
+    recommendedFor: ['genre fiction', 'fantasy', 'sci-fi', 'thriller', 'YA', 'urban fantasy', 'space opera'],
+    worksLessWellFor: ['memoir', 'experimental literary'],
+    alsoConsiderWhen: 'When Save the Cat\'s 15 beats feel over-prescribed but you still want explicit turning points. Especially good for plotting BACKWARD — Wells\' method is to write the resolution first, then plot turn 2, etc.',
+    why: 'Dan Wells\' framework (popularized in his Storymakers podcast). Two "plot turns" + two "pinches" + a midpoint give you five forced turning points across the manuscript — enough structure to keep momentum, fewer beats to game. Especially loved by genre-fiction plotters.',
+    beats: [
+      { name: 'Hook', expectedPct: 1, pctRange: [0, 5], description: 'The protagonist\'s starting state — the OPPOSITE of where they\'ll end up.', keywords: ['opens', 'beginning', 'starting'], mustHave: true },
+      { name: 'Plot Turn 1', expectedPct: 25, pctRange: [20, 30], description: 'The disruption that sets the protagonist on the path of the story.', keywords: ['turn', 'disrupt', 'inciting', 'change'], mustHave: true },
+      { name: 'Pinch Point 1', expectedPct: 38, pctRange: [33, 45], description: 'Antagonist applies pressure — protagonist learns the stakes are real.', keywords: ['pressure', 'attack', 'threat', 'pinch'], mustHave: true },
+      { name: 'Midpoint', expectedPct: 50, pctRange: [45, 55], description: 'A revelation or decision that flips the story\'s direction. Protagonist shifts from reactive to proactive.', keywords: ['midpoint', 'reveal', 'shift', 'turn'], mustHave: true },
+      { name: 'Pinch Point 2', expectedPct: 62, pctRange: [58, 70], description: 'Bigger, harder pressure — often someone close is lost or betrayed.', keywords: ['loss', 'betrayal', 'fail', 'pinch'], mustHave: true },
+      { name: 'Plot Turn 2', expectedPct: 75, pctRange: [70, 82], description: 'The protagonist gets the final piece they need to confront the antagonist.', keywords: ['discover', 'realize', 'understand', 'turn'], mustHave: true },
+      { name: 'Resolution', expectedPct: 95, pctRange: [85, 100], description: 'Climax + new state. The protagonist is the OPPOSITE of who they were at the Hook.', keywords: ['climax', 'resolution', 'end', 'final'], mustHave: true },
+    ],
+  },
+  {
     id: 'heros_journey',
     name: 'The Hero\'s Journey (simplified, 12 stages)',
     oneLiner: 'Joseph Campbell\'s monomyth. Best for fantasy, myth, epic, and coming-of-age stories where the hero physically OR metaphorically leaves home.',
@@ -236,6 +274,26 @@ const STRUCTURES: StoryStructure[] = [
       { name: 'The Realization', expectedPct: 82, pctRange: [78, 88], description: 'Detective sees what they missed.', keywords: ['realize', 'recognize', 'understand', 'piece'], mustHave: true },
       { name: 'Confrontation / True Reveal', expectedPct: 92, pctRange: [88, 96], description: 'The real culprit is unmasked.', keywords: ['reveal', 'confront', 'expose', 'truth'], mustHave: true },
       { name: 'Resolution', expectedPct: 98, pctRange: [95, 100], description: 'Justice / consequence / new normal.', keywords: ['resolution', 'justice', 'aftermath'], mustHave: true },
+    ],
+  },
+  {
+    id: 'martell_thematic',
+    name: 'Martell Thematic Approach (theme-as-spine)',
+    oneLiner: 'William C. Martell\'s framework: THEME is the spine; protagonist embodies a flawed worldview, antagonist embodies the opposite extreme, climax forces a synthesis. Every scene tested against theme.',
+    recommendedFor: ['literary thriller', 'character-driven fiction', 'crime fiction', 'screenplay-adjacent novels', 'psychological thriller', 'noir', 'literary fiction with hooks'],
+    worksLessWellFor: ['plot-puzzle mystery', 'cozy fiction', 'pure adventure'],
+    alsoConsiderWhen: 'When you can answer "what is this story ARGUING about life?" in one sentence. If you can\'t, this approach won\'t help you yet — pick a beat sheet and find the theme later.',
+    why: 'William C. Martell (screenwriting blog at Scriptsecrets.net, "The Secrets of Action Screenwriting") teaches that theme is the SPINE every scene hangs from. Protagonist starts with a flawed worldview that has worked for them but is incomplete. Antagonist is not "evil" — they\'re the opposite extreme of the same thematic question, taken to a destructive end. The climax forces the protagonist to confront, reject the false binary, and synthesize. Useful when "plot" alone feels mechanical — gives every scene a reason to exist.',
+    beats: [
+      { name: 'Theme Statement (Implicit)', expectedPct: 5, pctRange: [0, 10], description: 'Opening establishes the thematic question — usually as a contradiction in the protagonist\'s starting beliefs or behavior.', keywords: ['theme', 'belief', 'contradiction', 'flaw'], mustHave: true },
+      { name: 'Protagonist\'s Flawed Worldview', expectedPct: 10, pctRange: [5, 18], description: 'Show the protagonist\'s thematic stance in action — and why it has worked for them so far.', keywords: ['ordinary', 'belief', 'pattern', 'comfort', 'routine'], mustHave: true },
+      { name: 'Antagonist Introduction (Opposite Extreme)', expectedPct: 18, pctRange: [12, 30], description: 'Antagonist embodies the opposite thematic position, taken to a destructive end. Their worldview is a mirror, not a foreign concept.', keywords: ['antagonist', 'opposite', 'enemy', 'rival'], mustHave: true },
+      { name: 'Thematic Test 1', expectedPct: 30, pctRange: [22, 40], description: 'Protagonist\'s flawed worldview is challenged — they double down because it has always worked.', keywords: ['challenge', 'test', 'doubt', 'resist'], mustHave: true },
+      { name: 'False Synthesis (Midpoint)', expectedPct: 50, pctRange: [42, 58], description: 'Protagonist appears to evolve thematically, but they\'re still operating from their flawed frame. Often a partial victory that exposes a deeper problem.', keywords: ['midpoint', 'reveal', 'shift', 'partial'], mustHave: true },
+      { name: 'Thematic Test 2 (Painful)', expectedPct: 65, pctRange: [55, 75], description: 'Bigger challenge that the protagonist\'s old worldview can\'t handle. Costs them dearly.', keywords: ['cost', 'loss', 'fail', 'pain'], mustHave: true },
+      { name: 'Thematic Crisis', expectedPct: 78, pctRange: [70, 85], description: 'The dark night of the soul — protagonist sees that BOTH their old worldview and the antagonist\'s extreme are wrong.', keywords: ['crisis', 'realize', 'collapse', 'truth'], mustHave: true },
+      { name: 'Synthesis (Climax)', expectedPct: 90, pctRange: [85, 95], description: 'Protagonist forges a third path that rejects the false binary. Defeats antagonist using the integrated truth.', keywords: ['synthesis', 'integrate', 'climax', 'transform'], mustHave: true },
+      { name: 'Theme Confirmed', expectedPct: 98, pctRange: [95, 100], description: 'The new state — the thematic argument is paid off. The protagonist embodies the synthesis.', keywords: ['ending', 'transformed', 'new', 'confirm'], mustHave: true },
     ],
   },
   {
@@ -324,6 +382,18 @@ export class StoryStructureService {
           if (s.id === 'three_act' && /(family|coming of age|memoir|grief|literary)/.test(descLower)) {
             score += 0.1;
             reasons.push('description suggests character-driven narrative');
+          }
+          if (s.id === 'five_act' && /(tragedy|aftermath|fall|consequence|saga|generational|period drama)/.test(descLower)) {
+            score += 0.15;
+            reasons.push('description signals tragedy / extensive aftermath');
+          }
+          if (s.id === 'seven_point' && /(genre|epic|adventure|chosen one|rebellion)/.test(descLower)) {
+            score += 0.1;
+            reasons.push('clean turning-point structure suits the genre');
+          }
+          if (s.id === 'martell_thematic' && /(theme|argument|moral|worldview|belief|contradiction|flaw)/.test(descLower)) {
+            score += 0.2;
+            reasons.push('description foregrounds a thematic argument');
           }
         }
 
