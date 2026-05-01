@@ -22,7 +22,7 @@ export interface ImageResult {
 }
 
 export interface ImageGenOptions {
-  provider?: 'together' | 'openai' | 'openrouter' | 'auto';
+  provider?: 'together' | 'openai' | 'gemini' | 'openrouter' | 'auto';
   width?: number;
   height?: number;
   style?: 'realistic' | 'illustrated' | 'minimalist';
@@ -91,6 +91,18 @@ export class ImageGenService {
   private static readonly TOGETHER_PRO = 'black-forest-labs/FLUX.1.1-pro';
   // OpenAI model
   private static readonly OPENAI_MODEL = 'gpt-image-1';
+  // Gemini "Nano Banana" — Gemini's image-generation models. Decent text
+  // rendering, free tier, uses the same gemini_api_key the AI router needs.
+  // Model availability shifts month-to-month (Google rotates preview slugs),
+  // so we try several known names and cache the first one that works on the
+  // user's key. New names get added as Google releases them.
+  private static readonly GEMINI_IMAGE_CANDIDATES = [
+    'gemini-2.5-flash-image',                    // stable promotion (Nov 2025+)
+    'gemini-2.5-flash-image-preview',            // public preview slug
+    'gemini-2.0-flash-preview-image-generation', // older preview slug
+    'gemini-2.0-flash-exp-image-generation',     // experimental slug
+  ];
+  private cachedGeminiImageModel: string | null = null;
 
   constructor(workspaceDir: string, vault: Vault) {
     this.imageDir = join(workspaceDir, 'images');
@@ -102,14 +114,17 @@ export class ImageGenService {
   }
 
   /**
-   * Check which image providers are available (have API keys)
+   * Check which image providers are available (have API keys).
+   * Returned in PREFERENCE order so the dashboard can show the active fallback chain.
    */
   async getAvailableProviders(): Promise<string[]> {
     const providers: string[] = [];
-    const togetherKey = await this.vault.get('together_api_key');
-    if (togetherKey) providers.push('together');
     const openaiKey = await this.vault.get('openai_api_key');
     if (openaiKey) providers.push('openai');
+    const geminiKey = await this.vault.get('gemini_api_key');
+    if (geminiKey) providers.push('gemini');
+    const togetherKey = await this.vault.get('together_api_key');
+    if (togetherKey) providers.push('together');
     return providers;
   }
 
@@ -133,21 +148,31 @@ export class ImageGenService {
       styledPrompt = `Photorealistic, cinematic lighting, high-detail. ${prompt}`;
     }
 
-    // ── Provider preference order ──
-    // For 'auto' we now prefer OpenAI gpt-image-1 because it produces the best
-    // book covers for most genres (per author feedback). Together AI is the
-    // free fallback when no OpenAI key is configured. Explicit `provider:`
-    // values still override this preference.
-    const preferenceChain: Array<'openai' | 'together'> =
-      preferredProvider === 'openai' ? ['openai']
+    // ── Provider preference order (auto) ──
+    //   1. OpenAI gpt-image-1     — best text rendering, paid
+    //   2. Gemini Nano Banana     — solid text rendering, free tier, uses
+    //                                the same gemini_api_key the AI router
+    //                                already needs (so authors usually
+    //                                already have it)
+    //   3. Together AI Flux       — free fallback, weaker text rendering
+    //
+    // Explicit `provider:` values still override this preference.
+    const preferenceChain: Array<'openai' | 'gemini' | 'together'> =
+      preferredProvider === 'openai'   ? ['openai']
+      : preferredProvider === 'gemini'   ? ['gemini']
       : preferredProvider === 'together' ? ['together']
-      : ['openai', 'together']; // 'auto'
+      : ['openai', 'gemini', 'together']; // 'auto'
 
     let lastError = '';
     for (const provider of preferenceChain) {
-      const result = provider === 'openai'
-        ? await this.generateWithOpenAI(styledPrompt, width, height, quality)
-        : await this.generateWithTogether(styledPrompt, width, height);
+      let result: ImageResult;
+      if (provider === 'openai') {
+        result = await this.generateWithOpenAI(styledPrompt, width, height, quality);
+      } else if (provider === 'gemini') {
+        result = await this.generateWithGemini(styledPrompt, width, height);
+      } else {
+        result = await this.generateWithTogether(styledPrompt, width, height);
+      }
       if (result.success) return result;
       lastError = result.error || `${provider} failed without an error message`;
       // If user explicitly chose this provider, don't fall through.
@@ -156,7 +181,7 @@ export class ImageGenService {
 
     return {
       success: false,
-      error: `No image provider succeeded. Last error: ${lastError}. Add an OpenAI key (preferred) or Together AI key in Settings → API Keys.`,
+      error: `No image provider succeeded. Last error: ${lastError}. Add an OpenAI, Gemini, or Together AI key in Settings → API Keys.`,
     };
   }
 
@@ -443,6 +468,146 @@ export class ImageGenService {
     if (ratio < 0.8) return '1024x1536'; // Portrait (book cover)
     if (ratio > 1.2) return '1536x1024'; // Landscape
     return '1024x1024'; // Square
+  }
+
+  // ── Gemini "Nano Banana" (Gemini 2.5 Flash Image) ──
+
+  private async generateWithGemini(prompt: string, width: number, height: number): Promise<ImageResult> {
+    const apiKey = await this.vault.get('gemini_api_key');
+    if (!apiKey) {
+      return { success: false, error: 'Gemini API key not configured' };
+    }
+
+    // Discover or reuse a working model name. Gemini's image-generation
+    // model slug rotates with Google's preview cycle — we cache the first
+    // one that succeeds on this key.
+    let modelName = this.cachedGeminiImageModel;
+    if (!modelName) {
+      modelName = await this.discoverGeminiImageModel(apiKey);
+      if (!modelName) {
+        return {
+          success: false,
+          error: `Gemini image model not available on this key. None of [${ImageGenService.GEMINI_IMAGE_CANDIDATES.join(', ')}] worked. Check your Gemini API plan — image generation may require a paid tier or a different region.`,
+        };
+      }
+    }
+
+    try {
+      // Gemini doesn't take width/height directly. We hint aspect ratio in
+      // the prompt and (when available) use the imageConfig.aspectRatio
+      // generation-config field. The model picks an output resolution.
+      const aspectRatio = this.getGeminiAspectRatio(width, height);
+      const aspectHint = this.getGeminiAspectHint(width, height);
+      const fullPrompt = `${prompt}\n\nComposition: ${aspectHint}`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+            // imageConfig is the newer field name; older API versions silently ignore it.
+            imageConfig: { aspectRatio },
+          },
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        // Bust the cache if the model that previously worked has been retired.
+        if (response.status === 404) this.cachedGeminiImageModel = null;
+        return { success: false, error: `Gemini image error (model ${modelName}): ${response.status} ${errText.slice(0, 250)}` };
+      }
+
+      const data = await response.json() as any;
+      // Gemini returns image data as inlineData.data (base64) inside one of the parts.
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const imagePart = parts.find((p: any) => p?.inlineData?.data);
+      if (!imagePart) {
+        const textPart = parts.find((p: any) => typeof p?.text === 'string');
+        const hint = textPart ? ` Model returned text instead of image: "${String(textPart.text).slice(0, 120)}…"` : '';
+        return {
+          success: false,
+          error: `Gemini returned no image data from ${modelName}.${hint}`,
+        };
+      }
+
+      return this.saveImage(
+        Buffer.from(imagePart.inlineData.data, 'base64'),
+        'gemini',
+        modelName,
+        width,
+        height,
+      );
+    } catch (err) {
+      return { success: false, error: `Gemini image request failed: ${String(err)}` };
+    }
+  }
+
+  /**
+   * Probe each candidate model with a tiny "ping" generateContent call.
+   * Returns the first slug that does NOT 404. Cached per ImageGenService
+   * instance — re-discovers automatically if the cached slug starts 404ing
+   * (Google retires the preview).
+   */
+  private async discoverGeminiImageModel(apiKey: string): Promise<string | null> {
+    for (const candidate of ImageGenService.GEMINI_IMAGE_CANDIDATES) {
+      try {
+        // Use a 1-character ping — enough to validate the slug + permissions
+        // without burning a real generation.
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'a small dot' }] }],
+            generationConfig: { responseModalities: ['IMAGE'] },
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+        if (response.status === 404) continue;       // try next candidate
+        if (response.status === 400) {
+          // 400 might be a parameter problem rather than missing model.
+          // Treat it as "model exists" — the next real call will succeed
+          // or surface a more useful error.
+          this.cachedGeminiImageModel = candidate;
+          return candidate;
+        }
+        if (response.ok) {
+          this.cachedGeminiImageModel = candidate;
+          return candidate;
+        }
+        // Other errors (403 quota, 429 rate-limit, 500): the model is
+        // likely valid but unusable right now. Cache anyway so subsequent
+        // calls fail fast with the right error.
+        this.cachedGeminiImageModel = candidate;
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  /** Map our (width, height) to a Gemini-supported aspect ratio string. */
+  private getGeminiAspectRatio(width: number, height: number): string {
+    const ratio = width / height;
+    if (ratio < 0.7) return '9:16';   // tall vertical
+    if (ratio < 0.9) return '2:3';    // book-cover vertical
+    if (ratio > 1.3) return '16:9';   // landscape
+    if (ratio > 1.1) return '3:2';    // landscape book promo
+    return '1:1';                      // square
+  }
+
+  /** Plain-English aspect hint for the prompt. */
+  private getGeminiAspectHint(width: number, height: number): string {
+    const ratio = width / height;
+    if (ratio < 0.9) return 'Vertical 2:3 portrait composition (classic book cover layout — taller than wide).';
+    if (ratio > 1.1) return 'Wide 3:2 landscape composition (banner-style, wider than tall).';
+    return 'Square 1:1 composition (audiobook thumbnail-friendly).';
   }
 
   // ── Shared ──
