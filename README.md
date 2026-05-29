@@ -457,6 +457,7 @@ All supporting guides live in [`docs/`](docs/). Start with whichever matches wha
 
 ### 🗺 Roadmap & planning
 - **[docs/OPENCLAW-UPDATES.md](docs/OPENCLAW-UPDATES.md)** ✨ *new* — Audit of OpenClaw upstream features (releases 2026.5.26 → 2026.5.27) that would benefit AuthorClaw, ranked by author-workflow value across 4 tiers, with a suggested sprint order.
+- **[docs/STORYHACKERAI-PORTING.md](docs/STORYHACKERAI-PORTING.md)** ✨ *new* — Audit of StoryHackerAI (n8n-based author pipeline) for patterns to port. Top item: **make OpenRouter the canonical AI gateway** instead of one provider among five. Also covers the Selector → Brief → Draft → Check multi-pass chapter pattern, genre templates as reusable artifacts, and explicit Chronology / Style / Wordcount checks.
 - **[docs/GOD-CLASS-REFACTOR.md](docs/GOD-CLASS-REFACTOR.md)** ✨ *new* — Analysis of the `index.ts` (2,649 lines, 61 services, 35 init phases) and `routes.ts` (5,516 lines, 234 endpoints in one function) god classes. Compares against OpenClaw's plugin architecture and lays out a three-level incremental refactor plan (phase extraction → service registry → plugin contracts).
 - **[docs/TODO.md](docs/TODO.md)** — Tracked work items: security review, quick cleanups, larger refactors, and standing constraints not to "fix."
 - **[docs/RENAME-PLAN.md](docs/RENAME-PLAN.md)** — Runbook for the AuthorClaw → BookClaw rename. Decisions captured; not yet executed.
