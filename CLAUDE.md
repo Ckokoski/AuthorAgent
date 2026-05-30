@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What AuthorClaw is
 
-A localhost-only Node.js/TypeScript writing-agent gateway. One process runs an Express + Socket.IO server on `127.0.0.1:3847`, serves a single-file dashboard, exposes a REST + WebSocket API, and optionally bridges to Telegram/Discord. The agent autonomously executes "projects" (multi-step writing pipelines: planning → bible → production → revision → format → launch) by chaining AI calls and injecting skill content into each step's prompt.
+A Node.js/TypeScript writing-agent gateway. One process runs an Express + Socket.IO server on port `3847`, serves a single-file dashboard, exposes a REST + WebSocket API, and optionally bridges to Telegram/Discord. The agent autonomously executes "projects" (multi-step writing pipelines: planning → bible → production → revision → format → launch) by chaining AI calls and injecting skill content into each step's prompt.
+
+**Primary deployment focus: this app is designed to run locally or over a trusted local-area network via Docker.** It is not built or hardened for exposure to the public internet. The bind defaults to `0.0.0.0` so the published Docker port is reachable across the LAN; the security perimeter (bearer auth, deny-by-default CORS, optional source-IP allowlist, tightened CSP — see [Conventions](#conventions-specific-to-this-repo) and `docs/SECURITY.md`) targets a single-user home-LAN threat model. For any internet-facing or untrusted-network deployment, front it with a reverse proxy enforcing TLS and authentication — design and review decisions should weigh against the local/LAN threat model, not a hostile-internet one.
 
 There is **no unit-test suite** (the only automated test is a startup + auth **smoke test**, `tests/smoke-test.sh` — see [Testing](#testing)), no compile step in dev (TypeScript runs through `tsx`), and **no `git push` workflow** — the parent `/home/paul/data/dev/CLAUDE.md` requires writing commit messages to a `commit_message` file in the repo root and letting the user handle pushes.
 
@@ -173,7 +175,7 @@ Everything user-generated lives under `workspace/` (entirely gitignored except t
 
 - **Imports use `.js` extensions** even though source is `.ts` — required by the `NodeNext` module resolution in `tsconfig.json`. Match this when adding files.
 - **Node 22+** required (`engines` in `package.json`); `--import tsx` is how TS is loaded — don't switch to `ts-node`.
-- **Server bind is configurable via `AUTHORCLAW_BIND` env var, defaulting to `0.0.0.0`** (changed from hardcoded `127.0.0.1` so the published Docker port is reachable on the LAN). To restore the old behavior, set `AUTHORCLAW_BIND=127.0.0.1`. (Helmet `connectSrc` is still permissive `*` pending the Helmet-CSP security item; `SECURITY.md`/README localhost-only language is stale — update when next touched.)
+- **Server bind is configurable via `AUTHORCLAW_BIND` env var, defaulting to `0.0.0.0`** (changed from hardcoded `127.0.0.1` so the published Docker port is reachable on the LAN). To restore the old behavior, set `AUTHORCLAW_BIND=127.0.0.1`. (Helmet `connectSrc` was tightened to `'self'` on 2026-05-30 — the dashboard is same-origin only; `SECURITY.md`/README localhost-only language is stale — update when next touched.)
 - **Security perimeter env vars** (from the security review — see `docs/COMPLETED.md`). Each is opt-out or opt-in via env; the constructor wires them and startup logs the posture:
   - `AUTHORCLAW_AUTH_TOKEN` — bearer token gating `/api/*` + the Socket.IO handshake. Auto-generated into `.env` on first run; `AUTHORCLAW_AUTH_DISABLED=1` turns auth off (loud warning). Native-element GETs use a `?token=` query fallback.
   - `AUTHORCLAW_CORS_ORIGINS` — comma-separated browser-origin allowlist (Express + Socket.IO). **Unset = deny all cross-origin** (dashboard is same-origin, unaffected); a literal `*` restores permissive CORS (logged).

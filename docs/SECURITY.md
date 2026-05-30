@@ -60,14 +60,18 @@ should be suspicious of any future version or fork that claims otherwise:
 > **Fork note — network exposure.** This fork is configured for LAN-accessible
 > Docker deployment, which is a deliberate departure from the upstream
 > "localhost-only" posture. The bind address is controlled by the
-> `AUTHORCLAW_BIND` env var and defaults to `0.0.0.0` (all interfaces). The
-> Docker image, Express CORS, Socket.IO CORS, and Helmet `connectSrc` are all
-> permissive (`*`) so the published port is reachable from other hosts on the
-> same LAN. **This is suitable only for a trusted single-user LAN.** AuthorClaw
-> has no HTTP/WebSocket authentication and no API-level rate limiting. If the
-> service is reachable from any untrusted network, front it with a reverse
-> proxy (Caddy / Nginx / Traefik) that enforces authentication and TLS — or
-> set `AUTHORCLAW_BIND=127.0.0.1` to restore the upstream loopback default.
+> `AUTHORCLAW_BIND` env var and defaults to `0.0.0.0` (all interfaces) so the
+> published Docker port is reachable from other hosts on the same LAN. A
+> security review (2026-05-30) hardened the perimeter: **bearer-token auth**
+> gates `/api/*` and the Socket.IO handshake (`AUTHORCLAW_AUTH_TOKEN`,
+> auto-generated; `AUTHORCLAW_AUTH_DISABLED=1` to opt out); **CORS denies
+> cross-origin by default** (`AUTHORCLAW_CORS_ORIGINS` allowlist); an optional
+> **source-IP allowlist** (`AUTHORCLAW_ALLOWED_IPS`) gates all clients in front
+> of auth; and Helmet **`connectSrc` is `'self'`** (the dashboard is same-origin
+> only). **Still pending: API-level rate limiting.** This posture suits a
+> trusted single-user LAN. If the service is reachable from any untrusted
+> network, also front it with a reverse proxy (Caddy / Nginx / Traefik) for TLS
+> — or set `AUTHORCLAW_BIND=127.0.0.1` to restore the upstream loopback default.
 
 | Concern | Status |
 |---|---|

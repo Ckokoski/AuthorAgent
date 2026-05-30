@@ -12,8 +12,8 @@ The actual feature backlog lives in [`docs/TODO.md`](docs/TODO.md) and [`docs/CO
 
 1. Read this file.
 2. Read [`docs/TODO.md`](docs/TODO.md) and [`docs/COMPLETED.md`](docs/COMPLETED.md) to confirm state.
-3. Security review **items #1 (auth), #2 (CORS), and the source-IP allowlist (`AUTHORCLAW_ALLOWED_IPS`) are DONE** (2026-05-30) — see [`docs/COMPLETED.md`](docs/COMPLETED.md). The current in-flight task is **Helmet CSP** (original item #3).
-4. Next item (Helmet CSP): replace `connectSrc: ["'self'", "*"]` with an allowlist matching the configured origins; reconsider `upgradeInsecureRequests: null` (keep off only while HTTP-on-LAN; flip on once a reverse-proxy/HTTPS path is recommended). Investigate which inline/script/connect sources the dashboard actually needs before tightening (the dashboard is one inline-JS HTML file). Same investigate → present options → implement pattern; add smoke-test assertions if feasible.
+3. Security review **6 items DONE** (2026-05-30): auth, CORS, source-IP allowlist (`AUTHORCLAW_ALLOWED_IPS`), Helmet CSP, the confirmation-gate "local requester" audit, and the hardcoded-`127.0.0.1`/`localhost` re-audit — see [`docs/COMPLETED.md`](docs/COMPLETED.md). **Two items investigated then deferred** (2026-05-30): API-level rate limiting, and audit logging (source IP + native Linux log manager) — designs captured in `docs/TODO.md`, implementations parked at the user's direction.
+4. **No item is currently in-flight.** Remaining actionable items (user to pick): **outbound egress posture** and **vault key on a multi-host Docker volume** — both audits. The token-readable-from-dashboard finding is **accepted** for the home-LAN threat model (no work unless the deployment posture changes). Resume any item via the investigate → present options → implement pattern.
 
 ## Current phase
 
@@ -30,8 +30,13 @@ The actual feature backlog lives in [`docs/TODO.md`](docs/TODO.md) and [`docs/CO
 | **Security review item #1 — auth** | ✅ **done (2026-05-30)** | Bearer token; implemented + smoke-tested. See `docs/COMPLETED.md` |
 | **Security review item #2 — CORS** | ✅ **done (2026-05-30)** | Deny-by-default + `AUTHORCLAW_CORS_ORIGINS` allowlist + logged `*` escape hatch; smoke-tested (Phase 3) |
 | **Source-IP allowlist (`AUTHORCLAW_ALLOWED_IPS`)** | ✅ **done (2026-05-30)** | Unset=allow-all + notice; loopback always allowed; opt-in `AUTHORCLAW_TRUST_PROXY`; `ipaddr.js` CIDR matching; gate in front of auth; smoke-tested (Phase 4) |
-| **Helmet CSP** | 🟡 **next (in-flight task)** | Tighten `connectSrc: ["'self'","*"]`; reconsider `upgradeInsecureRequests` |
-| Security review remaining items (rate limiting, gate audit, source-IP audit-log, vault volume, egress, localhost re-audit) | ⬜ pending | See `docs/TODO.md` "Full security review" section |
+| **Helmet CSP** | ✅ **done (2026-05-30)** | `connectSrc: ["'self'"]` (dashboard is same-origin only); `upgradeInsecureRequests` kept off (HTTP-on-LAN); smoke-tested (Phase 1, +2 checks → 18) |
+| **Confirmation-gate "local requester" audit** | ✅ **done (2026-05-30)** | No active vuln (gate never trusts IP/loopback; approval only via auth-gated `/api/*`, no bridge/WS path). Fixed one stale docstring asserting the old `127.0.0.1`-bind protection. See `docs/COMPLETED.md` |
+| **Hardcoded `127.0.0.1`/`localhost` re-audit** | ✅ **done (2026-05-30)** | Fixed 2 findings: stale "unauthenticated/localhost is acceptable" comment in `routes.ts`; **Telegram bridge self-calls to `/api/*` sent no token → 401 under auth (functional regression from item #1)** — added `apiHeaders()` token injection to all 6 + the `index.ts` /export self-call. tsc clean; 18 smoke checks pass. See `docs/COMPLETED.md` |
+| **Audit logging (source IP + native Linux log manager)** | ⏸️ **deferred (2026-05-30)** | Design captured. Docker has no in-container journald/syslog → stdout-to-platform-driver is the cross-env mechanism; add as a 2nd sink beside the hash-chained JSONL; off-switch on the native sink. See `docs/TODO.md` |
+| **API-level rate limiting** | ⏸️ **deferred (2026-05-30)** | Design settled (auth-aware + exempt trusted IPs; won't throttle MCP), implementation parked. Chat path already limited 30/min/channel via `permissions.ts` (inherited from OpenClaw); gap is REST `/api/*`. OpenClaw has no `/api/*` limiting. See `docs/TODO.md` |
+| Security review remaining (actionable) items: egress, vault volume | ⬜ pending | User to pick next. See `docs/TODO.md` "Full security review" section |
+| Security review accepted (no work): token-readable-from-dashboard | ✅ accepted | Within home-LAN threat model; close via `AUTHORCLAW_ALLOWED_IPS`/firewall if posture changes |
 | Pending plans, Larger items | ⬜ pending | See `docs/TODO.md` |
 
 ## Open questions (security item #1) — ANSWERED 2026-05-30
@@ -82,13 +87,34 @@ Full notes in [`docs/COMPLETED.md`](docs/COMPLETED.md). Key facts for follow-on 
 - **Docker caveat (important):** default bridge + published port masks source IPs (container sees `172.x` for all external clients). For real per-IP enforcement use the host firewall / provider security group, or run host-net / behind a proxy with `AUTHORCLAW_TRUST_PROXY=1`. This is the most robust control for the VPS "only my home IP" case.
 - Smoke test Phase 4 (trust-proxy on) asserts exact-IP allow, CIDR allow, unlisted → 403 (proving the gate precedes auth), loopback recovery, and the enforcement log.
 
-## What still ought to happen (next session) — Helmet CSP (original item #3)
+## Helmet CSP — DONE (2026-05-30)
 
-1. **Investigate** what the dashboard actually loads: it's one inline-JS HTML file served same-origin, so it needs `script-src 'unsafe-inline'` (already present) and `connect-src` only for same-origin XHR/fetch (and the WebSocket, if ever used). Confirm no external script/style/font/image CDNs are referenced before tightening.
-2. **Present options** before coding: replace `connectSrc: ["'self'", "*"]` with `'self'` (+ any genuinely-needed origins, perhaps driven by the same `AUTHORCLAW_CORS_ORIGINS` set); decide `upgradeInsecureRequests` (keep `null`/off while HTTP-on-LAN, document flipping it on once an HTTPS/reverse-proxy path is recommended).
-3. **Implement** the tightened CSP in the constructor `helmet({ contentSecurityPolicy: … })` block (`gateway/src/index.ts`).
-4. **Add a smoke-test assertion** if feasible (e.g. assert the `Content-Security-Policy` response header no longer contains `*` in `connect-src`).
-5. **Move the item to `docs/COMPLETED.md`** and advance to the next item (API-level rate limiting).
+Full notes in [`docs/COMPLETED.md`](docs/COMPLETED.md). Key facts:
+
+- `connectSrc: ["'self'"]` in the constructor `helmet({ contentSecurityPolicy: … })` block (`gateway/src/index.ts`). Investigation confirmed the dashboard is same-origin only (`var API = ''`), loads no external subresources, and opens no browser WebSocket — so `'self'` is exact, not a compromise. **CSP governs the browser dashboard only; MCP/server-to-server clients are unaffected by it** (relevant to the planned AuthorClaw MCP server — see TODO).
+- `upgradeInsecureRequests: null` (off) kept deliberately — the server speaks plain HTTP on the LAN; flip to `{}` once an HTTPS/reverse-proxy deployment is recommended.
+- Smoke test Phase 1 (+2 checks, now 18): `connect-src` is exactly `'self'` and has no permissive `*`. New `rheader` helper reads arbitrary response headers.
+
+## API-level rate limiting — DEFERRED (2026-05-30)
+
+Investigated and parked at lower priority. Full context (what already exists, OpenClaw provenance, the settled design, the one open implementation choice) is in `docs/TODO.md` under the deferred bullet. Short version: the chat path is already limited (30/min/channel, `permissions.ts`, inherited from OpenClaw); the gap is REST `/api/*`, which OpenClaw never limited either (localhost-only design). Design is decided (auth-aware + exempt trusted IPs, won't throttle MCP); only `express-rate-limit`-vs-hand-rolled remains open.
+
+## Confirmation-gate "local requester" audit — DONE (2026-05-30)
+
+No active vulnerability. The gate never grants on source IP / loopback (no `req.ip`/`127.0.0.1` check anywhere); approval is reachable only via the auth-gated `POST /api/confirmations/:id/approve` (sole caller), with no bridge or WebSocket approval path. One stale docstring (`confirmation-gate.ts:194`) claimed approval was safe because the server "binds to 127.0.0.1" — corrected to state the real model (bearer token is the trust boundary, not the bind address). Full notes + two cross-references (`decidedBy` hardcoded `'user'`; gate protection rests on the `/`-extractable token) in `docs/COMPLETED.md`.
+
+## Audit logging (source IP + native Linux log manager) — DEFERRED (2026-05-30)
+
+Investigated and parked at the user's direction. Full context in `docs/TODO.md` under the deferred bullet. Short version: the new ask is to route audit events to the native Linux log manager (journald/syslog) with an off switch, plus the original source-IP enrichment. **Key finding:** Docker (`node:22-slim`) has no in-container journald/syslog, so the cross-environment mechanism is **structured stdout/stderr → platform log driver** (journald under systemd; Docker `logging: driver: journald|syslog` forwards to the host). Add it as a **second sink** beside the existing hash-chained JSONL (`gateway/src/security/audit.ts`), with an off-switch on the native sink. Open decisions (mechanism, JSONL fate, off-switch scope) recorded in TODO.
+
+## What still ought to happen (next session) — user picks the next item
+
+No item is in-flight. Both audit logging and rate limiting are deferred (designs captured). Two actionable security items remain, either resumable via investigate → present options → implement:
+
+1. **Outbound egress posture** — audit the server-side AI/research egress path (not CSP): which outbound hosts the AI router + `ResearchGate` reach, and whether anything constrains them.
+2. **Vault key on a multi-host Docker volume** — verify `vault.enc` perms survive volume mounts; document `AUTHORCLAW_VAULT_KEY` backup/restore (mostly operational/docs).
+
+Everything done this session is committed-message-ready in `commit_message` (working tree; user handles `git push`).
 
 ## Side flags not in TODO yet (decide whether to add)
 

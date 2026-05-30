@@ -398,7 +398,7 @@ export class TelegramBridge {
 
         const exportRes = await fetch('http://localhost:3847/api/author-os/format', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             inputFile: filename,
             title,
@@ -429,7 +429,7 @@ export class TelegramBridge {
       if (!target) {
         // Show workspace stats
         try {
-          const statsRes = await fetch('http://localhost:3847/api/workspace/stats');
+          const statsRes = await fetch('http://localhost:3847/api/workspace/stats', { headers: this.apiHeaders() });
           const stats = await statsRes.json() as any;
           let msg = `📊 *Workspace Usage:* ${stats.totalSizeFormatted} (${stats.totalFiles} files)\n\n`;
           for (const [name, info] of Object.entries(stats.breakdown) as any) {
@@ -451,7 +451,7 @@ export class TelegramBridge {
       }
 
       try {
-        const cleanRes = await fetch(`http://localhost:3847/api/workspace/clean?target=${target}`, { method: 'DELETE' });
+        const cleanRes = await fetch(`http://localhost:3847/api/workspace/clean?target=${target}`, { method: 'DELETE', headers: this.apiHeaders() });
         const result = await cleanRes.json() as any;
         if (result.success) {
           await this.sendMessage(chatId, `🧹 Cleaned ${target}: ${result.deleted} items removed.`);
@@ -540,7 +540,7 @@ export class TelegramBridge {
         // Call the TTS API
         const ttsRes = await fetch('http://localhost:3847/api/audio/generate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ text: speakText, voice }),
         });
         const ttsData = await ttsRes.json() as any;
@@ -574,7 +574,7 @@ export class TelegramBridge {
       if (activeProject) {
         this.pauseRequested = true;
         try {
-          await fetch(`http://localhost:3847/api/projects/${activeProject.id}/pause`, { method: 'POST' });
+          await fetch(`http://localhost:3847/api/projects/${activeProject.id}/pause`, { method: 'POST', headers: this.apiHeaders() });
         } catch { /* silent */ }
         await this.sendMessage(chatId, `⏸ Paused "${activeProject.title}". Say "continue" to resume.`);
       } else {
@@ -741,7 +741,7 @@ export class TelegramBridge {
       const voice = typeof voiceSetting === 'string' ? voiceSetting : undefined;
       const ttsRes = await fetch('http://localhost:3847/api/audio/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text: cleanText, voice }),
       });
       const ttsData = await ttsRes.json() as any;
@@ -753,6 +753,19 @@ export class TelegramBridge {
       // Voice generation failure is non-critical — don't spam the user
       console.error('Voice mode TTS error:', e);
     }
+  }
+
+  /**
+   * Headers for the bridge's calls to its own /api/* endpoints. The bridge runs
+   * in-process but reaches the API over HTTP, so it must pass the bearer-auth
+   * gate like any other client. The token is read from the env the gateway
+   * populates (AUTHORCLAW_AUTH_TOKEN); when auth is disabled it is absent and no
+   * Authorization header is sent. Do NOT special-case loopback to skip auth —
+   * that would reinstate the localhost-as-trust-boundary the gate removed.
+   */
+  private apiHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    const token = (process.env.AUTHORCLAW_AUTH_TOKEN || '').trim();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
   }
 
   private splitMessage(text: string, maxLength: number): string[] {

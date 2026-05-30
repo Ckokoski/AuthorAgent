@@ -59,6 +59,14 @@ acao() {
     | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}'
 }
 
+# rheader <name> <curl-args...> : print the named response header's value (empty if absent)
+rheader() {
+  local name="$1"; shift
+  curl -s -D - -o /dev/null --max-time 5 "$@" \
+    | tr -d '\r' | awk -v n="$(printf '%s' "$name" | tr 'A-Z' 'a-z')" \
+        -F': ' 'tolower($1)==n{sub(/^[^:]*: /,"");print}'
+}
+
 # start_server <extra-env=val...> : launch the gateway and wait until it serves
 start_server() {
   : > "$SERVER_LOG"
@@ -121,6 +129,18 @@ esac
 [ -z "$(acao "http://evil.example" -H "Authorization: Bearer $TEST_TOKEN" "$BASE/api/status")" ] \
   && pass "CORS: cross-origin denied by default (no Access-Control-Allow-Origin)" \
   || fail "CORS: disallowed origin unexpectedly got an Access-Control-Allow-Origin"
+
+# CSP: connect-src is tightened to 'self' (no permissive "*"). The dashboard only
+# ever fetches its own origin, so the directive must be exactly "connect-src 'self'".
+CSP="$(rheader content-security-policy "$BASE/")"
+case "$CSP" in
+  *"connect-src 'self';"*|*"connect-src 'self'") pass "CSP: connect-src is 'self'" ;;
+  *)                                             fail "CSP: connect-src not tightened to 'self' (got: $CSP)" ;;
+esac
+case "$CSP" in
+  *"connect-src"*"*"*) fail "CSP: connect-src still contains a permissive '*'" ;;
+  *)                   pass "CSP: connect-src has no permissive '*'" ;;
+esac
 
 stop_server
 

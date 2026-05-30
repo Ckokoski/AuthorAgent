@@ -3,9 +3,11 @@
  * REST API for the dashboard and external integrations
  */
 
-// NOTE: All endpoints are currently unauthenticated.
-// This is acceptable because the server binds to 127.0.0.1 only (localhost).
-// For remote access, implement Bearer token auth using the vault.
+// NOTE: All /api/* endpoints are gated by bearer-token auth (and an optional
+// source-IP allowlist) wired in gateway/src/index.ts — see the auth middleware
+// there. The server bind defaults to 0.0.0.0 (LAN/Docker), NOT loopback, so
+// do not assume localhost is a trust boundary. Auth can be disabled explicitly
+// via AUTHORCLAW_AUTH_DISABLED=1 (loud startup warning).
 
 import { Application, Request, Response } from 'express';
 import multer from 'multer';

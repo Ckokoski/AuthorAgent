@@ -192,9 +192,14 @@ export class ConfirmationGateService {
   }
 
   /**
-   * User approval — ONLY called from a dashboard endpoint authenticated
-   * against the local server (AuthorClaw binds to 127.0.0.1). Can't be
-   * triggered from observed content.
+   * User approval. Reachable ONLY via POST /api/confirmations/:id/approve,
+   * which sits behind the bearer-auth gate (and the optional source-IP
+   * allowlist) on /api/* — see gateway/src/index.ts. No bridge or WebSocket
+   * approval path exists, by design, so observed/injected content cannot reach
+   * this method. NOTE: the server no longer binds to loopback only (bind
+   * defaults to 0.0.0.0 for LAN/Docker), so the bearer token — not the bind
+   * address — is the trust boundary. Never expose approval on an
+   * unauthenticated route or a non-HTTP channel.
    */
   async approve(id: string, decidedBy: string = 'user'): Promise<ConfirmationRequest | null> {
     const req = this.requests.get(id);

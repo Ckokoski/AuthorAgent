@@ -232,9 +232,18 @@ class AuthorClawGateway {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
+          // The dashboard is one inline-JS HTML file, so 'unsafe-inline' is required
+          // for script/style. It has no external subresources (no CDN scripts, fonts,
+          // images, or data:/blob: URIs).
           scriptSrc: ["'self'", "'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          connectSrc: ["'self'", "*"],
+          // The dashboard fetches only its own origin (API base is a relative '') and
+          // opens no browser WebSocket, so 'self' is exact. CSP governs the browser
+          // page only — server-to-server / MCP clients are unaffected by this.
+          connectSrc: ["'self'"],
+          // Off by deliberate choice: the server speaks plain HTTP on the LAN, so
+          // forcing https:// rewrites would break the same-origin dashboard. Flip on
+          // (set to {}) once an HTTPS / reverse-proxy deployment is the recommended path.
           upgradeInsecureRequests: null,
         },
       },
@@ -1959,7 +1968,9 @@ class AuthorClawGateway {
 
           const exportRes = await fetch('http://localhost:3847/api/author-os/format', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            // Self-call to our own /api/* — must pass the bearer-auth gate. Token
+            // is absent when auth is disabled, in which case no header is sent.
+            headers: { 'Content-Type': 'application/json', ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}) },
             body: JSON.stringify({
               inputFile: filename,
               title,
