@@ -8,6 +8,13 @@ Tracked for later execution. Captures decisions, runbook, and verification steps
 - **Execution:** _not started._
 - **Reversible?** Yes. Git history preserves the old name; `gh repo rename` works both directions; the directory can be moved back. Cost of changing again later is the same as this first rename.
 
+## Why "BookClaw" — alignment with the North Star
+
+The rename is not just cosmetic. The project's **North Star** (TODO.md → "North Star — the ultimate goal") is a **multi-author, multi-book studio**: many books in flight, each with its own author profile, genre, and customizable pipeline. "AuthorClaw" centers a single author; "**BookClaw**" centers the **book** — which is exactly the first-class entity the North Star introduces. So this rename should be treated as a small down-payment on that model, not a pure find-and-replace:
+
+- When updating operator-facing copy (banner, `console.log` posture lines, setup-wizard prompts, README), phrase things in **book / author-profile** terms where it's natural, rather than re-cementing "the author" as a singleton. Don't over-engineer — no new entities are built here — but don't write new copy that the multi-author model will immediately contradict.
+- The brand and the eventual data model should agree: a tool called *BookClaw* that can only ever hold one author/one book is a naming mismatch waiting to happen. Keep that in mind for any judgement call the runbook doesn't cover.
+
 ## Context
 
 - **Current remote:** `https://github.com/pshort05/authorclaw.git` (already a personal fork, not upstream).

@@ -1,44 +1,7 @@
-Security review: Helmet CSP, confirmation-gate audit, localhost re-audit
+Establish multi-author/multi-book North Star as a guiding goal
 
-CSP (item #3):
-- gateway/src/index.ts: connectSrc ["'self'", "*"] -> ["'self'"]; the
-  dashboard is same-origin only (relative API base, no external subresources,
-  no browser WebSocket), so 'self' is exact. upgradeInsecureRequests kept off
-  (plain HTTP on the LAN). Added comments explaining both choices.
-- tests/smoke-test.sh: new rheader helper; Phase 1 asserts connect-src is
-  'self' and carries no permissive '*' (16 -> 18 checks).
-
-Confirmation-gate "local requester" audit:
-- No active vulnerability: the gate never grants on source IP/loopback, and
-  approval is reachable only via the auth-gated POST /api/confirmations/:id/
-  approve (no bridge or WebSocket path).
-- gateway/src/services/confirmation-gate.ts: corrected the approve() docstring,
-  which still claimed approval was safe because the server "binds to 127.0.0.1"
-  — false since the LAN patch. Now states the bearer token is the trust
-  boundary. Comment-only; no behavioral change.
-
-Hardcoded localhost re-audit:
-- Audited all 127.0.0.1/localhost source references for stale trust-boundary
-  assumptions. Two findings, both fixed:
-- gateway/src/api/routes.ts: corrected the file-header comment that claimed
-  "/api/* is unauthenticated and that's acceptable because we bind to
-  127.0.0.1" — false on both counts now; describes the real model.
-- gateway/src/bridges/telegram.ts + index.ts: the Telegram bridge's in-process
-  HTTP self-calls to /api/* sent no bearer token, so they would 401 under the
-  now-default auth (regression from the auth work, breaking /export, /files,
-  /clean, /speak, pause). Added TelegramBridge.apiHeaders() to attach the token
-  from AUTHORCLAW_AUTH_TOKEN (omitted when auth disabled) across all 6 calls;
-  the index.ts /export self-call uses this.authToken. Loopback-skip-auth was
-  rejected (would reinstate the localhost trust boundary).
-
-Docs:
-- CLAUDE.md: state the primary deployment focus (local / trusted LAN via
-  Docker, not public internet); reconcile the stale localhost-only opening.
-- SECURITY.md: corrected the now-false "no auth / permissive *" perimeter note.
-- TODO.md / COMPLETED.md / STATUS.md: moved CSP and the gate audit to
-  COMPLETED; logged the token-readable-from-dashboard finding (accepted for the
-  home-LAN threat model); deferred API rate limiting to lower priority with the
-  settled design + OpenClaw provenance recorded; added an MCP-server backlog
-  item. Next item: audit-log the request source IP.
-
-npx tsc --noEmit clean; npm run test:smoke all 18 checks pass.
+- Add "North Star" section to docs/TODO.md framing the ultimate goal (multi-author, multi-book studio with customizable per-author/genre pipelines) as the lens for weighing other decisions, not a near-term task
+- Define the four first-class entities it implies (book, author profile, genre profile, customizable pipeline) and contrast each with today's single-author / free-text-genre / hardcoded-pipeline state
+- Expand the Larger-items entry with the customizable-pipeline build-out and link it to the North Star
+- Steer GOD-CLASS-REFACTOR.md by the goal: project-engine seam at Level 1, pipelines as a plugin-shaped subsystem at Level 3, anti-goal of hardening single-author assumptions
+- Note in RENAME-PLAN.md why "BookClaw" aligns with the book-centric model

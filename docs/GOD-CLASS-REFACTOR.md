@@ -233,6 +233,14 @@ After this, adding the next provider/channel/backend/voice is **creating a folde
 
 The `TODO.md` entries for both index.ts and routes.ts should reference this document. The standing constraint *"Not a refactor to start without an explicit goal"* in TODO.md is correct — Level 1 alone needs a goal larger than tidiness to justify the change. Pair it with the next non-trivial feature that would touch `index.ts` (likely embeddings per `OPENCLAW-UPDATES.md` item #5, or a new channel per item #7) and do the refactor as a *pre-step* for that feature. That way Level 1's value compounds with the feature work.
 
+### Steer this refactor by the North Star
+
+The project's **North Star** (TODO.md → "North Star — the ultimate goal") is a **multi-author, multi-book studio** where books, author profiles, genre profiles, and **customizable (data-driven) pipelines** are first-class, and adding an author/genre/pipeline is configuration rather than code. That goal is the "explicit goal larger than tidiness" this refactor has been waiting for, and it shapes *how* to refactor:
+
+- **Level 1 (phase split):** `06e-project-engine.ts` is the block most affected — it currently holds the hardcoded 6 templates + `novel-pipeline`. Extract it so there's a clean seam to later swap hardcoded templates for loaded pipeline definitions and to slot in book/author-profile/genre-profile init blocks. In the `routes.ts` split, treat the already-listed `pipeline.routes.ts` as a real feature boundary (plus future `books.routes.ts` / author-profile / genre-profile mounters).
+- **Level 3 (plugin contracts):** add **pipelines as a fifth plugin-shaped subsystem** alongside AI providers, channels, image/video, and TTS. A pipeline definition (ordered steps, per-step prompt/taskType/tier/wordCount/skill) is exactly the data-driven, "new entry = new folder/file, not a code edit" shape the plugin loader exists to serve. Author and genre profiles are likewise registry-resident, not god-class members.
+- **Anti-goal:** do **not** refactor in a way that further hardens the single-author (`workspace/soul/`) or hardcoded-pipeline assumptions — that spends effort moving *away* from the North Star.
+
 ---
 
 ## Related documents
