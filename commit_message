@@ -1,0 +1,14 @@
+v5.0.0 fork bump, feature-tracking workflow, doc and dep cleanup
+
+- Bump version to 5.0.0 in package.json/package-lock/banner/QUICKSTART
+- Add Karpathy AI Coding Guidelines + TODO/COMPLETED workflow to CLAUDE.md
+- Add docs/COMPLETED.md to track finished items
+- New TODOs: multi-book mgmt with author/genre styles; Mercury Docker deploy; Playwright e2e
+- README + LAUNCH-GUIDE: replace stale localhost-only claims with configurable-bind language
+- LAUNCH-GUIDE: replace Windows-direct section with Docker Desktop/WSL2 routing
+- loader.ts: drop stale historical comment about the ops category
+- npm audit fix: resolve 9 transitive CVEs (3 high, 6 moderate); no semver changes
+- CLAUDE.md cleanups: tighten OpenClaw and npm-run-build notes; drop orphaned entries
+- SKILLS.txt: auto-regeneration during smoke test (now reflects 29 skills)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
