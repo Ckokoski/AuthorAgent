@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A localhost-only Node.js/TypeScript writing-agent gateway. One process runs an Express + Socket.IO server on `127.0.0.1:3847`, serves a single-file dashboard, exposes a REST + WebSocket API, and optionally bridges to Telegram/Discord. The agent autonomously executes "projects" (multi-step writing pipelines: planning → bible → production → revision → format → launch) by chaining AI calls and injecting skill content into each step's prompt.
 
-There is **no test suite**, no compile step in dev (TypeScript runs through `tsx`), and **no `git push` workflow** — the parent `/home/paul/data/dev/CLAUDE.md` requires writing commit messages to a `commit_message` file in the repo root and letting the user handle pushes.
+There is **no unit-test suite** (the only automated test is a startup + auth **smoke test**, `tests/smoke-test.sh` — see [Testing](#testing)), no compile step in dev (TypeScript runs through `tsx`), and **no `git push` workflow** — the parent `/home/paul/data/dev/CLAUDE.md` requires writing commit messages to a `commit_message` file in the repo root and letting the user handle pushes.
 
 ## Feature tracking workflow
 
@@ -99,15 +99,26 @@ npm run build          # tsc emit to dist/ — consumed by docker/Dockerfile sta
 npm run setup          # interactive setup wizard
 npm run security-audit # runs scripts/security-check.js
 npm run docker:up      # docker-compose up -d (uses docker/docker-compose.yml)
+npm run test:smoke     # boot the gateway + assert auth is enforced (tests/smoke-test.sh; -v streams the server log)
 ```
 
-No lint or unit-test runner is configured. There is no `tests/` directory. Don't invent test commands.
+No lint runner and no unit-test runner are configured. The scripted tests live in `tests/` (currently just the smoke test) — see [Testing](#testing). Don't invent other test commands.
 
-Smoke checks:
+Ad-hoc liveness checks (the smoke test already covers these as assertions):
 ```bash
-curl http://localhost:3847/api/status        # liveness
+curl http://localhost:3847/api/status        # liveness (401 unless auth disabled or a bearer token is sent)
 curl http://localhost:3847/api/projects/list # project state
 ```
+
+## Testing
+
+**Tests must be scripted so they can be repeated.** Any check worth running is worth committing as a runnable script under `tests/`. When you verify behaviour by hand (curl sequences, startup checks, status-code assertions), capture it as a script before considering the work done — do not leave verification as one-off shell commands in a transcript that the next session can't re-run.
+
+**Debug logging must be available for testing.** Tests and the code they exercise must expose a way to surface verbose/debug output so a failing run can be diagnosed without re-instrumenting the code — for example a `-v` flag on a test script that streams the captured server log, or a debug log level on the service under test.
+
+Current scripted tests:
+
+- `tests/smoke-test.sh` (`npm run test:smoke`) — boots the gateway and asserts the security perimeter across 4 phases (16 checks). **Auth:** `401` without a token, `200` with a valid bearer, `200` via the `?token=` query fallback, `401` on a wrong token, dashboard token injection, and the `AUTHORCLAW_AUTH_DISABLED=1` escape hatch. **CORS:** cross-origin denied by default, and with `AUTHORCLAW_CORS_ORIGINS` set a listed origin is echoed while an unlisted one is not. **Source-IP allowlist** (with `AUTHORCLAW_TRUST_PROXY=1` so the client IP is driven via `X-Forwarded-For`): exact IP and CIDR members allowed, unlisted IP → `403` even with a valid token (the gate sits in front of auth), and loopback always allowed. Hermetic and non-destructive: supplies the token via env (no `.env` write), binds loopback only, and leaves no stray process. Run `tests/smoke-test.sh -v` to stream the server log.
 
 ## High-level architecture
 
@@ -162,7 +173,11 @@ Everything user-generated lives under `workspace/` (entirely gitignored except t
 
 - **Imports use `.js` extensions** even though source is `.ts` — required by the `NodeNext` module resolution in `tsconfig.json`. Match this when adding files.
 - **Node 22+** required (`engines` in `package.json`); `--import tsx` is how TS is loaded — don't switch to `ts-node`.
-- **Server bind is now configurable via `AUTHORCLAW_BIND` env var, defaulting to `0.0.0.0`** (changed from hardcoded `127.0.0.1` so the published Docker port is reachable on the LAN). CORS / Socket.IO / Helmet `connectSrc` are also permissive (`*`) to match. `SECURITY.md` and the README still describe the old localhost-only contract — they're stale and should be updated when next touched. To restore the old behavior, set `AUTHORCLAW_BIND=127.0.0.1`.
+- **Server bind is configurable via `AUTHORCLAW_BIND` env var, defaulting to `0.0.0.0`** (changed from hardcoded `127.0.0.1` so the published Docker port is reachable on the LAN). To restore the old behavior, set `AUTHORCLAW_BIND=127.0.0.1`. (Helmet `connectSrc` is still permissive `*` pending the Helmet-CSP security item; `SECURITY.md`/README localhost-only language is stale — update when next touched.)
+- **Security perimeter env vars** (from the security review — see `docs/COMPLETED.md`). Each is opt-out or opt-in via env; the constructor wires them and startup logs the posture:
+  - `AUTHORCLAW_AUTH_TOKEN` — bearer token gating `/api/*` + the Socket.IO handshake. Auto-generated into `.env` on first run; `AUTHORCLAW_AUTH_DISABLED=1` turns auth off (loud warning). Native-element GETs use a `?token=` query fallback.
+  - `AUTHORCLAW_CORS_ORIGINS` — comma-separated browser-origin allowlist (Express + Socket.IO). **Unset = deny all cross-origin** (dashboard is same-origin, unaffected); a literal `*` restores permissive CORS (logged).
+  - `AUTHORCLAW_ALLOWED_IPS` — comma-separated source IPs/CIDRs gating *all* clients, in front of auth. **Unset = allow all** (notice logged); loopback always allowed. `AUTHORCLAW_TRUST_PROXY=1` reads the client IP from `X-Forwarded-For` (only safe behind a sole-ingress proxy). **Docker caveat:** default bridge + published port masks source IPs — enforce at the host firewall / provider security group, or use host-net / a trusted proxy, for real per-IP control.
 - **Errors during init are logged with `console.log('  ✓ …')` / `'  ⚠ …'` / `'  ℹ …'`** and the gateway continues with degraded capability when a service can't initialize (e.g. memory-search if `better-sqlite3` won't build, video-research if `yt-dlp` is missing). Preserve this fail-soft pattern — don't make startup require optional dependencies.
 - **Premium skills are gitignored** (`skills/premium/*/`) — never commit them. The folder ships only with a `README.md`.
 - **Workspace runtime data is gitignored** but the directory must exist; the gateway creates subdirs on init.

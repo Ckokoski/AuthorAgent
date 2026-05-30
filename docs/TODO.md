@@ -14,8 +14,6 @@ Opening the bind from loopback to LAN turned several previously-defense-in-depth
 assumptions into single points of failure. A proper security review should
 cover at minimum:
 
-- [ ] **Add HTTP/WebSocket authentication.** Current state: any host on the LAN can drive the agent, read the workspace, and trigger confirmation-gate items. Pick a model — bearer token in env var (simplest), shared-secret HMAC on every request, or mTLS — and enforce it on every Express route and on the Socket.IO `connection` handshake (`socket.handshake.auth.token`).
-- [ ] **Tighten CORS once auth lands.** Replace `cors: { origin: '*' }` (both Express and Socket.IO) with an explicit allowlist driven by `AUTHORCLAW_CORS_ORIGINS` env var (comma-separated). Same for the WebSocket origin check that was removed in the LAN patch.
 - [ ] **Restore + tighten Helmet CSP.** Replace `connectSrc: ["'self'", "*"]` with an allowlist that matches the configured origins. Reconsider `upgradeInsecureRequests: null` — keep it off only while the deployment is HTTP-on-LAN; flip it back on once the reverse-proxy path becomes the recommended deployment.
 - [ ] **API-level rate limiting.** Per-channel rate limiting exists for bridges (`bridges/telegram.ts`, `bridges/discord.ts`) but not for HTTP routes. Add per-IP throttling on `/api/*` and on the WebSocket message handler.
 - [ ] **Audit the confirmation-gate's "local requester" assumption.** `ConfirmationGateService` was designed assuming the approver is on the same machine. Confirm nothing in the gate flow trusts source IP / loopback in a way that LAN exposure breaks.

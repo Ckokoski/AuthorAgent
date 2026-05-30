@@ -15,7 +15,8 @@
     "docker:down": "docker-compose -f docker/docker-compose.yml down",
     "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
     "security-audit": "node scripts/security-check.js",
-    "export-book": "bash scripts/export-book.sh"
+    "export-book": "bash scripts/export-book.sh",
+    "test:smoke": "bash tests/smoke-test.sh"
   },
   "keywords": [
     "ai",
@@ -46,6 +47,7 @@
     "dotenv": "^17.3.1",
     "express": "^4.21.0",
     "helmet": "^8.0.0",
+    "ipaddr.js": "^1.9.1",
     "multer": "^2.1.0",
     "node-edge-tts": "^1.2.10",
     "socket.io": "^4.7.0",

@@ -18,6 +18,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
+import { randomBytes, timingSafeEqual } from 'crypto';
+import ipaddr from 'ipaddr.js';
 
 import { ConfigService } from './services/config.js';
 import { MemoryService } from './services/memory.js';
@@ -86,6 +88,14 @@ const ROOT_DIR = __dirname.includes('dist')
   ? join(__dirname, '..', '..', '..')
   : join(__dirname, '..', '..');
 
+// Constant-time comparison of a request's bearer token against the expected token.
+// Length check first because timingSafeEqual throws on unequal-length buffers.
+function bearerEquals(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 // ═══════════════════════════════════════════════════════════
 // AuthorClaw Gateway
 // ═══════════════════════════════════════════════════════════
@@ -111,6 +121,17 @@ class AuthorClawGateway {
   private audit!: AuditLog;
   private sandbox!: SandboxGuard;
   private injectionDetector!: InjectionDetector;
+  // Bearer token gating /api/* and the Socket.IO handshake.
+  // null = auth disabled (AUTHORCLAW_AUTH_DISABLED=1); a string = enforced.
+  private authToken: string | null = null;
+  // CORS posture, computed in the constructor and logged at startup.
+  private corsSummary = '';
+  private corsWildcard = false;
+  // Source-IP allowlist (AUTHORCLAW_ALLOWED_IPS). Empty = enforcement off (allow all).
+  // Each entry is an ipaddr.js [address, prefixLength] CIDR (single IPs become /32 or /128).
+  private allowedIps: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]> = [];
+  private ipAllowlistSummary = '';
+  private trustProxy = false;
 
   // Skills, goals & bridges
   private skills!: SkillLoader;
@@ -178,8 +199,32 @@ class AuthorClawGateway {
   constructor() {
     this.app = express();
     this.server = createServer(this.app);
+
+    // ── CORS allowlist (security review item #2) ──
+    // AUTHORCLAW_CORS_ORIGINS is a comma-separated list of allowed browser origins.
+    // Unset = deny all cross-origin (the dashboard is same-origin, so it is unaffected).
+    // A literal "*" entry restores fully-permissive CORS (escape hatch, logged loudly).
+    // Requests with no Origin header (curl, MCP, server-to-server, same-origin) are
+    // always allowed — CORS only protects browsers; the bearer token is the real gate.
+    const corsEnv = (process.env.AUTHORCLAW_CORS_ORIGINS || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    this.corsWildcard = corsEnv.includes('*');
+    const corsAllowlist = corsEnv.filter((o) => o !== '*');
+    this.corsSummary = this.corsWildcard
+      ? '⚠ CORS: wildcard (all origins allowed) — AUTHORCLAW_CORS_ORIGINS=*'
+      : corsAllowlist.length
+        ? `✓ CORS: ${corsAllowlist.length} allowed origin(s) — ${corsAllowlist.join(', ')}`
+        : '✓ CORS: cross-origin denied (set AUTHORCLAW_CORS_ORIGINS to allow browser origins)';
+    const wildcard = this.corsWildcard;
+    const corsOptions: cors.CorsOptions = {
+      origin: (origin, cb) => {
+        if (wildcard || !origin || corsAllowlist.includes(origin)) return cb(null, true);
+        return cb(null, false);
+      },
+    };
+
     this.io = new SocketIO(this.server, {
-      cors: { origin: '*' },
+      cors: corsOptions,
     });
 
     // Security middleware
@@ -194,8 +239,59 @@ class AuthorClawGateway {
         },
       },
     }));
-    this.app.use(cors({ origin: '*' }));
+    this.app.use(cors(corsOptions));
+
+    // ── Source-IP allowlist (AUTHORCLAW_ALLOWED_IPS) ──
+    // A network-level gate in front of auth: only listed source IPs/CIDRs may reach
+    // the server at all. Unset = allow all (enforcement off) — see startup notice.
+    // AUTHORCLAW_TRUST_PROXY=1 reads the client IP from X-Forwarded-For (only safe
+    // behind a sole-ingress reverse proxy; XFF is otherwise spoofable). Loopback is
+    // always allowed when enforcing, as a recovery path.
+    // NOTE: under Docker bridge networking with a published port, the container sees
+    // the bridge gateway IP for every external client — enforce at the host firewall
+    // (or run host-net / set AUTHORCLAW_TRUST_PROXY behind a proxy) for real IPs.
+    this.trustProxy = process.env.AUTHORCLAW_TRUST_PROXY === '1';
+    this.app.set('trust proxy', this.trustProxy);
+    for (const entry of (process.env.AUTHORCLAW_ALLOWED_IPS || '').split(',').map((s) => s.trim()).filter(Boolean)) {
+      try {
+        if (entry.includes('/')) {
+          this.allowedIps.push(ipaddr.parseCIDR(entry));
+        } else {
+          const addr = ipaddr.parse(entry);
+          this.allowedIps.push([addr, addr.kind() === 'ipv6' ? 128 : 32]);
+        }
+      } catch {
+        console.warn(`  ⚠️  AUTHORCLAW_ALLOWED_IPS: ignoring invalid entry "${entry}"`);
+      }
+    }
+    this.ipAllowlistSummary = this.allowedIps.length === 0
+      ? 'ℹ IP allowlist: not set (all source IPs allowed — rely on AUTHORCLAW_BIND, the host firewall, and bearer auth)'
+      : `✓ IP allowlist: ${this.allowedIps.length} rule(s) enforced${this.trustProxy ? ', trusting X-Forwarded-For' : ''} (loopback always allowed)`;
+
+    this.app.use((req, res, next) => {
+      if (this.allowedIps.length === 0) return next(); // enforcement off
+      if (this.isIpAllowed(req.ip || req.socket.remoteAddress || '')) return next();
+      this.audit?.log('security', 'ip_blocked', { ip: req.ip, path: req.path, method: req.method });
+      return res.status(403).json({ error: 'Forbidden: source IP not allowed' });
+    });
+
     this.app.use(express.json({ limit: '5mb' }));
+
+    // Bearer-token gate on the API. Only /api/* is protected; the dashboard HTML
+    // and its static assets are public (the dashboard receives the token injected
+    // into its HTML at serve time). this.authToken is resolved in Phase 2 before
+    // the server starts listening, so it is always set by the time a request lands.
+    this.app.use((req, res, next) => {
+      if (this.authToken === null) return next();          // auth disabled
+      if (!req.path.startsWith('/api/')) return next();     // public, non-API path
+      const header = String(req.headers['authorization'] || '');
+      const headerToken = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+      // Query fallback for native-element GETs (img/href/Audio) that can't set headers.
+      const queryToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+      const provided = headerToken || queryToken;
+      if (provided && bearerEquals(provided, this.authToken)) return next();
+      return res.status(401).json({ error: 'Unauthorized: missing or invalid bearer token' });
+    });
   }
 
   async initialize(): Promise<void> {
@@ -228,6 +324,45 @@ class AuthorClawGateway {
 
     this.injectionDetector = new InjectionDetector();
     console.log('  ✓ Prompt injection detection active');
+
+    // ── Phase 2c: API auth token ──
+    // Gates /api/* and the Socket.IO handshake. Mirrors the AUTHORCLAW_VAULT_KEY
+    // pattern: read from env (.env already loaded by dotenv), else generate and
+    // persist to .env. AUTHORCLAW_AUTH_DISABLED=1 turns the gate off entirely.
+    if (process.env.AUTHORCLAW_AUTH_DISABLED === '1') {
+      this.authToken = null;
+      console.warn('  ⚠️  AUTH DISABLED — AUTHORCLAW_AUTH_DISABLED=1 is set.');
+      console.warn('     Every host that can reach this server can drive the agent unauthenticated.');
+    } else {
+      let token = (process.env.AUTHORCLAW_AUTH_TOKEN || '').trim();
+      if (!token) {
+        token = randomBytes(32).toString('hex');
+        const envPath = join(ROOT_DIR, '.env');
+        try {
+          await fs.appendFile(
+            envPath,
+            `\n# Auto-generated by AuthorClaw — HTTP/WebSocket auth token\nAUTHORCLAW_AUTH_TOKEN=${token}\n`,
+          );
+          console.log('  🔑 Generated API auth token and saved to .env.');
+        } catch {
+          console.warn('  ⚠️  WARNING: Could not write auth token to .env — using a random session token.');
+          console.warn('     Set AUTHORCLAW_AUTH_TOKEN in the environment for production use.');
+        }
+        process.env.AUTHORCLAW_AUTH_TOKEN = token;
+      }
+      this.authToken = token;
+      console.log('  ✓ API authentication active (bearer token on /api/* and WebSocket)');
+    }
+
+    // CORS posture (computed in the constructor; applied to Express + Socket.IO).
+    if (this.corsWildcard) {
+      console.warn(`  ${this.corsSummary}`);
+    } else {
+      console.log(`  ${this.corsSummary}`);
+    }
+
+    // Source-IP allowlist posture (computed in the constructor).
+    console.log(`  ${this.ipAllowlistSummary}`);
 
     // ── Phase 2b: Activity Log ──
     this.activityLog = new ActivityLog(join(ROOT_DIR, 'workspace'));
@@ -876,7 +1011,25 @@ class AuthorClawGateway {
 
     // ── Phase 11: Static Dashboard ──
     const dashboardPath = join(ROOT_DIR, 'dashboard', 'dist');
-    this.app.use(express.static(dashboardPath));
+    const dashboardHtmlFile = join(dashboardPath, 'index.html');
+
+    // Serve the dashboard HTML with the auth token injected so its fetch calls can
+    // authenticate. The __AUTHORCLAW_AUTH_TOKEN__ placeholder is replaced at serve
+    // time (empty string when auth is disabled). index:false on express.static below
+    // ensures "/" reaches this handler instead of the raw file.
+    const serveDashboard = async (_req: any, res: any) => {
+      try {
+        const html = await fs.readFile(dashboardHtmlFile, 'utf-8');
+        res.type('html').send(html.replaceAll('__AUTHORCLAW_AUTH_TOKEN__', this.authToken ?? ''));
+      } catch {
+        if (!res.headersSent) {
+          res.status(500).json({ status: 'error', message: 'AuthorClaw running but dashboard HTML not found.' });
+        }
+      }
+    };
+
+    this.app.get('/', serveDashboard);
+    this.app.use(express.static(dashboardPath, { index: false }));
 
     // JSON 404 handler for API routes — MUST run before SPA fallback
     // so unmatched /api/ requests get JSON errors instead of the dashboard HTML.
@@ -890,12 +1043,7 @@ class AuthorClawGateway {
     // SPA fallback — any non-API path serves the dashboard HTML
     this.app.get('*', (req, res) => {
       if (req.path.startsWith('/api/')) return; // already handled above
-      const htmlFile = join(dashboardPath, 'index.html');
-      res.sendFile(htmlFile, (err) => {
-        if (err && !res.headersSent) {
-          res.status(500).json({ status: 'error', message: 'AuthorClaw running but dashboard HTML not found.' });
-        }
-      });
+      serveDashboard(req, res);
     });
 
     // Global JSON error handler — ensures API errors never return HTML
@@ -925,7 +1073,54 @@ class AuthorClawGateway {
     console.log('');
   }
 
+  // True if the given source IP is permitted by the allowlist. Loopback is always
+  // allowed (recovery path). Unparseable addresses are denied while enforcing.
+  private isIpAllowed(rawIp: string): boolean {
+    let addr: ipaddr.IPv4 | ipaddr.IPv6;
+    try {
+      addr = ipaddr.process(rawIp); // normalizes IPv4-mapped IPv6 (::ffff:a.b.c.d) to IPv4
+    } catch {
+      return false;
+    }
+    if (addr.range() === 'loopback') return true;
+    for (const [maskAddr, bits] of this.allowedIps) {
+      if (addr.kind() === maskAddr.kind() && (addr as ipaddr.IPv4).match(maskAddr as ipaddr.IPv4, bits)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Resolve a Socket.IO client's source IP, honoring X-Forwarded-For when trust-proxy is on.
+  private socketClientIp(socket: { handshake: { address: string; headers: Record<string, unknown> } }): string {
+    if (this.trustProxy) {
+      const xff = String(socket.handshake.headers['x-forwarded-for'] || '');
+      const first = xff.split(',')[0].trim();
+      if (first) return first;
+    }
+    return socket.handshake.address || '';
+  }
+
   private setupWebSocket(): void {
+    // Source-IP gate on the handshake — same allowlist as the HTTP routes, in front of auth.
+    this.io.use((socket, next) => {
+      if (this.allowedIps.length === 0) return next(); // enforcement off
+      const ip = this.socketClientIp(socket);
+      if (this.isIpAllowed(ip)) return next();
+      this.audit?.log('security', 'ip_blocked', { ip, transport: 'websocket' });
+      next(new Error('Forbidden: source IP not allowed'));
+    });
+
+    // Bearer-token gate on the handshake — clients pass it via io(url, { auth: { token } }).
+    // Skipped when auth is disabled. The bundled dashboard is REST/polling-only and does
+    // not open a socket; this protects any other client that connects over the LAN.
+    this.io.use((socket, next) => {
+      if (this.authToken === null) return next();
+      const provided = String(socket.handshake.auth?.token || '').trim();
+      if (provided && bearerEquals(provided, this.authToken)) return next();
+      next(new Error('Unauthorized: missing or invalid bearer token'));
+    });
+
     this.io.on('connection', (socket) => {
       this.audit.log('connection', 'websocket_connected', { id: socket.id });
 

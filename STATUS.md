@@ -12,8 +12,8 @@ The actual feature backlog lives in [`docs/TODO.md`](docs/TODO.md) and [`docs/CO
 
 1. Read this file.
 2. Read [`docs/TODO.md`](docs/TODO.md) and [`docs/COMPLETED.md`](docs/COMPLETED.md) to confirm state.
-3. The current in-flight task is **Security review item #1: HTTP/WebSocket authentication.** Status is **paused awaiting four design decisions** — see the **Open questions** section below.
-4. Once those four answers are in, implement Option (A) — bearer token — as described in the **Decisions made** section.
+3. Security review **items #1 (auth), #2 (CORS), and the source-IP allowlist (`AUTHORCLAW_ALLOWED_IPS`) are DONE** (2026-05-30) — see [`docs/COMPLETED.md`](docs/COMPLETED.md). The current in-flight task is **Helmet CSP** (original item #3).
+4. Next item (Helmet CSP): replace `connectSrc: ["'self'", "*"]` with an allowlist matching the configured origins; reconsider `upgradeInsecureRequests: null` (keep off only while HTTP-on-LAN; flip on once a reverse-proxy/HTTPS path is recommended). Investigate which inline/script/connect sources the dashboard actually needs before tightening (the dashboard is one inline-JS HTML file). Same investigate → present options → implement pattern; add smoke-test assertions if feasible.
 
 ## Current phase
 
@@ -27,18 +27,23 @@ The actual feature backlog lives in [`docs/TODO.md`](docs/TODO.md) and [`docs/CO
 | README/LAUNCH-GUIDE/CLAUDE.md cleanups | ✅ done | Stale localhost claims, orphaned notes, OpenClaw note tightened, npm-build note tightened |
 | New TODO entries added | ✅ done | Multi-book mgmt, Mercury Docker deploy, Playwright e2e |
 | Initial commit | ✅ done | `e531952 — v5.0.0 fork bump, feature-tracking workflow, doc and dep cleanup` |
-| **Security review item #1 — auth** | 🟡 **in progress (paused on 4 questions)** | See **Open questions** below |
-| Security review items #2-#9 | ⬜ pending | See `docs/TODO.md` "Full security review" section |
+| **Security review item #1 — auth** | ✅ **done (2026-05-30)** | Bearer token; implemented + smoke-tested. See `docs/COMPLETED.md` |
+| **Security review item #2 — CORS** | ✅ **done (2026-05-30)** | Deny-by-default + `AUTHORCLAW_CORS_ORIGINS` allowlist + logged `*` escape hatch; smoke-tested (Phase 3) |
+| **Source-IP allowlist (`AUTHORCLAW_ALLOWED_IPS`)** | ✅ **done (2026-05-30)** | Unset=allow-all + notice; loopback always allowed; opt-in `AUTHORCLAW_TRUST_PROXY`; `ipaddr.js` CIDR matching; gate in front of auth; smoke-tested (Phase 4) |
+| **Helmet CSP** | 🟡 **next (in-flight task)** | Tighten `connectSrc: ["'self'","*"]`; reconsider `upgradeInsecureRequests` |
+| Security review remaining items (rate limiting, gate audit, source-IP audit-log, vault volume, egress, localhost re-audit) | ⬜ pending | See `docs/TODO.md` "Full security review" section |
 | Pending plans, Larger items | ⬜ pending | See `docs/TODO.md` |
 
-## Open questions (security item #1 — answer before implementing)
+## Open questions (security item #1) — ANSWERED 2026-05-30
 
-These were posed at the end of the prior session; the user paused to exit before answering.
+All four resolved by the user; all matched the prior leans.
 
-1. **Missing-token startup behavior:** auto-generate-and-persist to `.env` (matches the existing `AUTHORCLAW_VAULT_KEY` pattern, zero-config) **or** hard-fail with instructions? *My lean: auto-generate.*
-2. **No-auth escape hatch:** include `AUTHORCLAW_AUTH_DISABLED=1` with a loud startup warning, or no escape hatch at all? *My lean: include it.*
-3. **Token storage:** plain `AUTHORCLAW_AUTH_TOKEN` in `.env` alongside `AUTHORCLAW_VAULT_KEY`, **or** put it in the encrypted vault? *My lean: `.env` — dashboard injection needs plaintext at request time anyway.*
-4. **Telegram/Discord bridges:** leave them alone (they have their own platform auth), or also gate via this token? *My lean: leave alone.*
+1. **Missing-token startup behavior:** ✅ **auto-generate-and-persist to `.env`** (matches the existing `AUTHORCLAW_VAULT_KEY` pattern, zero-config).
+2. **No-auth escape hatch:** ✅ **include `AUTHORCLAW_AUTH_DISABLED=1`** with a loud startup warning.
+3. **Token storage:** ✅ **plain `AUTHORCLAW_AUTH_TOKEN` in `.env`** alongside `AUTHORCLAW_VAULT_KEY` (dashboard injection needs plaintext at request time).
+4. **Telegram/Discord bridges:** ✅ **leave them alone** (they have their own platform auth).
+
+Item #1 is now fully unblocked — implement per **What still ought to happen** below.
 
 ## Decisions made this session (don't re-litigate)
 
@@ -51,17 +56,39 @@ These were posed at the end of the prior session; the user paused to exit before
 - **Security item #1 approach:** Option (A) — bearer token in env var. Options (B) HMAC and (C) mTLS were rejected as disproportionate to the threat model (single-user home LAN, occasional family curiosity).
 - **Git workflow:** I write the commit message to a file named `commit_message` in the project root. User handles `git push`. Latest commit is `e531952`. The `commit_message` file from that commit remains in the working tree (untracked) — user can delete or `.gitignore` it.
 
-## What still ought to happen (next session)
+## Item #1 — DONE (2026-05-30)
 
-1. **Answer the four open questions** above.
-2. **Implement security item #1 (bearer token auth):**
-   - Add token-loading + auto-generation in the Phase 1 / Phase 2 init block of `gateway/src/index.ts` (alongside `AUTHORCLAW_VAULT_KEY` handling).
-   - Express middleware: enforce `Authorization: Bearer` on `/api/*`. Skip `/healthz`, `/`, and dashboard static assets.
-   - Socket.IO: `io.use((socket, next) => { ... })` checking `socket.handshake.auth.token`.
-   - Dashboard `index.html`: server-side substitution of a `__AUTHORCLAW_AUTH_TOKEN__` placeholder (intercept `/` serve before `express.static`). Update the `fetch` wrapper around `dashboard/dist/index.html:1197/1215` to prepend the header. Update Socket.IO client init to pass `{ auth: { token } }`.
-   - Per Karpathy "Goal-Driven Execution": verification is a smoke test — `npm start` → without token → 401 on `/api/status` from a fresh curl, but dashboard at `/` loads and its calls succeed (because the token was injected). With `AUTHORCLAW_AUTH_DISABLED=1` (if we include it), the startup warning fires and `/api/status` returns 200 without a header.
-3. **Move item #1 to `docs/COMPLETED.md`** with the implementation outcome notes.
-4. **Proceed to security item #2 (tighten CORS) — same investigate → present options → implement pattern.**
+Bearer-token auth implemented and smoke-tested. Full implementation + verification notes in [`docs/COMPLETED.md`](docs/COMPLETED.md). Key facts for follow-on items:
+
+- Token lives in `.env` as `AUTHORCLAW_AUTH_TOKEN` (auto-generated on first start). `.env` is gitignored; the smoke test's generated token was removed on cleanup — it regenerates on the next real `npm start`.
+- Gate is on `this.authToken` (`gateway/src/index.ts`): `null` = disabled (`AUTHORCLAW_AUTH_DISABLED=1`), string = enforced. Express middleware (constructor) and `io.use()` (`setupWebSocket`) both read it.
+- Native-element GETs (img/href/Audio in the dashboard) authenticate via `?token=` query fallback, not the header.
+- **Repeatable verification:** `npm run test:smoke` (`tests/smoke-test.sh`) boots the gateway and asserts auth, CORS, **and the source-IP allowlist** (16 checks across 4 phases). Re-run it after any change to auth, CORS, the IP gate, the dashboard fetch path, or startup. Per the `CLAUDE.md` `## Testing` directive, future security items should add their own assertions here rather than relying on manual curl runs.
+
+## Item #2 — DONE (2026-05-30)
+
+CORS tightened. Full notes in [`docs/COMPLETED.md`](docs/COMPLETED.md). Key facts:
+
+- Shared `corsOptions` (one origin-callback) applied to both Express (`cors(corsOptions)`) and the Socket.IO server. Computed in the constructor from `AUTHORCLAW_CORS_ORIGINS`; posture stored in `this.corsSummary`/`this.corsWildcard` and logged in Phase 2c.
+- Default (unset) = **deny cross-origin**; comma-separated list = override; literal `*` = permissive escape hatch (logged `⚠`). No-Origin requests (curl/MCP/same-origin) always allowed.
+- Smoke test Phase 1 asserts default-deny; Phase 3 asserts allowlist echo + unlisted-deny.
+
+## Source-IP allowlist — DONE (2026-05-30)
+
+Full notes in [`docs/COMPLETED.md`](docs/COMPLETED.md). Key facts for follow-on items:
+
+- Env: `AUTHORCLAW_ALLOWED_IPS` (comma-separated IPs/CIDRs; unset = allow all + `ℹ` notice; loopback always allowed when enforcing). `AUTHORCLAW_TRUST_PROXY=1` reads the client IP from `X-Forwarded-For` (off by default; spoofable unless behind a sole-ingress proxy).
+- `gateway/src/index.ts`: `this.allowedIps` (`ipaddr.js` `[addr, prefix]` tuples), `isIpAllowed()`, `socketClientIp()`. Express gate (403 + audit `ip_blocked`) and `io.use()` gate both sit **in front of** the auth gate. `ipaddr.js` is now a direct dep.
+- **Docker caveat (important):** default bridge + published port masks source IPs (container sees `172.x` for all external clients). For real per-IP enforcement use the host firewall / provider security group, or run host-net / behind a proxy with `AUTHORCLAW_TRUST_PROXY=1`. This is the most robust control for the VPS "only my home IP" case.
+- Smoke test Phase 4 (trust-proxy on) asserts exact-IP allow, CIDR allow, unlisted → 403 (proving the gate precedes auth), loopback recovery, and the enforcement log.
+
+## What still ought to happen (next session) — Helmet CSP (original item #3)
+
+1. **Investigate** what the dashboard actually loads: it's one inline-JS HTML file served same-origin, so it needs `script-src 'unsafe-inline'` (already present) and `connect-src` only for same-origin XHR/fetch (and the WebSocket, if ever used). Confirm no external script/style/font/image CDNs are referenced before tightening.
+2. **Present options** before coding: replace `connectSrc: ["'self'", "*"]` with `'self'` (+ any genuinely-needed origins, perhaps driven by the same `AUTHORCLAW_CORS_ORIGINS` set); decide `upgradeInsecureRequests` (keep `null`/off while HTTP-on-LAN, document flipping it on once an HTTPS/reverse-proxy path is recommended).
+3. **Implement** the tightened CSP in the constructor `helmet({ contentSecurityPolicy: … })` block (`gateway/src/index.ts`).
+4. **Add a smoke-test assertion** if feasible (e.g. assert the `Content-Security-Policy` response header no longer contains `*` in `connect-src`).
+5. **Move the item to `docs/COMPLETED.md`** and advance to the next item (API-level rate limiting).
 
 ## Side flags not in TODO yet (decide whether to add)
 

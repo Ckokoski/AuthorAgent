@@ -1161,6 +1161,19 @@ textarea { resize: vertical; min-height: 60px; }
 // GLOBALS & STATE
 // ================================================================
 var API = '';
+// Auth token injected by the server into the served HTML. Empty when auth is disabled.
+var AUTH_TOKEN = '__AUTHORCLAW_AUTH_TOKEN__';
+function authHeaders(base) {
+  base = base || {};
+  if (AUTH_TOKEN) base['Authorization'] = 'Bearer ' + AUTH_TOKEN;
+  return base;
+}
+// For native-element GETs (img/href/Audio) that can't send an Authorization header,
+// the server also accepts the token as a ?token= query param.
+function authUrl(path) {
+  if (!AUTH_TOKEN) return path;
+  return path + (path.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(AUTH_TOKEN);
+}
 var currentPanel = 'home';
 var projectFilter = 'all';
 var allProjects = [];
@@ -1192,7 +1205,7 @@ function showToast(message, type) {
 }
 
 function api(method, path, body) {
-  var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  var opts = { method: method, headers: authHeaders({ 'Content-Type': 'application/json' }) };
   if (body) opts.body = JSON.stringify(body);
   return fetch(API + path, opts).then(function(res) {
     var ct = res.headers.get('content-type') || '';
@@ -1210,7 +1223,7 @@ function api(method, path, body) {
 }
 
 function apiRaw(method, path, body) {
-  var opts = { method: method };
+  var opts = { method: method, headers: authHeaders() };
   if (body) { opts.body = body; }
   return fetch(API + path, opts).then(function(res) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2223,7 +2236,7 @@ function loadProjectFiles(id) {
         ? '<button class="small secondary btn-export-docx" data-project="' + esc(id) + '" data-file="' + esc(f.name) + '" style="font-size:11px;padding:3px 8px;margin-right:6px;" title="Export as Word document">DOCX</button>'
         : '';
       var thumbHtml = isImage
-        ? '<div style="margin:6px 0;"><img src="/api/projects/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(f.name) + '" style="max-width:200px;max-height:280px;border-radius:6px;border:1px solid var(--border);"></div>'
+        ? '<div style="margin:6px 0;"><img src="' + authUrl('/api/projects/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(f.name)) + '" style="max-width:200px;max-height:280px;border-radius:6px;border:1px solid var(--border);"></div>'
         : '';
       row.innerHTML =
         '<span class="file-icon" style="display:flex;align-items:center;color:var(--accent);">' + iconSvg + '</span>' +
@@ -2234,7 +2247,7 @@ function loadProjectFiles(id) {
         '</div>' +
         '<div style="display:flex;align-items:center;">' +
           docxBtn +
-          '<a class="file-dl" href="/api/projects/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(f.name) + '" download="' + esc(f.name) + '">Download</a>' +
+          '<a class="file-dl" href="' + authUrl('/api/projects/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(f.name)) + '" download="' + esc(f.name) + '">Download</a>' +
         '</div>';
       el.appendChild(row);
     });
@@ -2962,7 +2975,7 @@ document.getElementById('btnTestVoice').addEventListener('click', function() {
   btn.disabled = true;
   api('POST', '/api/audio/generate', { text: 'Hello! I am AuthorClaw, your AI writing partner. Let me help you create your next bestseller.', voice: voice }).then(function(data) {
     if (data.success && data.filename) {
-      var audio = new Audio('/api/audio/file/' + encodeURIComponent(data.filename));
+      var audio = new Audio(authUrl('/api/audio/file/' + encodeURIComponent(data.filename)));
       audio.play().then(function() {
         showToast('Playing voice: ' + voice, 'success');
       }).catch(function() {

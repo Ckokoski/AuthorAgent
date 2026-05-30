@@ -1,14 +1,59 @@
-v5.0.0 fork bump, feature-tracking workflow, doc and dep cleanup
+Security review item #1: bearer-token auth on HTTP + WebSocket
 
-- Bump version to 5.0.0 in package.json/package-lock/banner/QUICKSTART
-- Add Karpathy AI Coding Guidelines + TODO/COMPLETED workflow to CLAUDE.md
-- Add docs/COMPLETED.md to track finished items
-- New TODOs: multi-book mgmt with author/genre styles; Mercury Docker deploy; Playwright e2e
-- README + LAUNCH-GUIDE: replace stale localhost-only claims with configurable-bind language
-- LAUNCH-GUIDE: replace Windows-direct section with Docker Desktop/WSL2 routing
-- loader.ts: drop stale historical comment about the ops category
-- npm audit fix: resolve 9 transitive CVEs (3 high, 6 moderate); no semver changes
-- CLAUDE.md cleanups: tighten OpenClaw and npm-run-build notes; drop orphaned entries
-- SKILLS.txt: auto-regeneration during smoke test (now reflects 29 skills)
+- gateway/src/index.ts: load/auto-generate AUTHORCLAW_AUTH_TOKEN in Phase 2c
+  (persists to .env, mirrors AUTHORCLAW_VAULT_KEY); AUTHORCLAW_AUTH_DISABLED=1
+  escape hatch with a loud startup warning
+- Express middleware gates /api/* with a constant-time bearer compare; accepts
+  Authorization: Bearer or a ?token= query fallback for native-element GETs
+- io.use() gates the Socket.IO handshake (socket.handshake.auth.token)
+- "/" now serves the dashboard HTML with the token substituted into a
+  __AUTHORCLAW_AUTH_TOKEN__ placeholder; express.static set index:false
+- dashboard/dist/index.html: AUTH_TOKEN global + authHeaders()/authUrl();
+  api()/apiRaw() send the bearer header; project-file img, download link, and
+  TTS Audio URLs carry ?token=
+- docs/TODO.md -> docs/COMPLETED.md, STATUS.md, memory entry updated
+- Smoke-tested: no token 401, bearer 200, ?token= 200, wrong token 401,
+  dashboard loads with placeholder substituted; disabled-mode warning + 200.
+  tsc --noEmit clean.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Also: scripted the verification as a repeatable test
+
+- tests/smoke-test.sh + `npm run test:smoke`: boots the gateway and asserts
+  the auth gate end-to-end (the checks above). Hermetic/non-destructive —
+  token via env (no .env write), loopback-only bind, launches node --import
+  tsx directly so the PID is killable, EXIT-trap cleanup, -v streams the
+  server log. All 8 checks pass.
+- CLAUDE.md: new ## Testing section (tests must be scripted/repeatable; debug
+  logging available for testing) and corrected the stale "no test suite / no
+  tests/ directory / don't invent test commands" notes.
+
+Security review item #2: tighten CORS
+
+- gateway/src/index.ts: shared corsOptions (one origin callback) applied to
+  both Express and the Socket.IO server, driven by AUTHORCLAW_CORS_ORIGINS
+  (comma-separated). Unset = deny cross-origin (dashboard is same-origin so
+  unaffected); a literal "*" entry = permissive escape hatch, logged loudly.
+  Requests with no Origin header (curl/MCP/same-origin) always allowed.
+  Startup logs the effective posture.
+- tests/smoke-test.sh: default-deny gives no Access-Control-Allow-Origin;
+  new Phase 3 starts with an allowlist and asserts listed origin echoed,
+  unlisted origin denied. 11 checks total, all pass. tsc --noEmit clean.
+- Identified a distinct, stronger control (source-IP allowlist,
+  AUTHORCLAW_ALLOWED_IPS) and added it to docs/TODO.md as the next item.
+
+Security review: source-IP allowlist (AUTHORCLAW_ALLOWED_IPS)
+
+- gateway/src/index.ts: network-level allowlist gating ALL clients, in front
+  of auth. Express middleware (403 + audit ip_blocked on deny) and a matching
+  io.use() handshake gate. ipaddr.js (now a direct dep) handles IPv4/IPv6 +
+  IPv4-mapped + CIDR matching; isIpAllowed() treats loopback as always-allowed.
+- Unset = allow all + startup notice (enforcement opt-in; auto-deriving a /24
+  rejected as a Docker/VPS trap). AUTHORCLAW_TRUST_PROXY=1 reads the client IP
+  from X-Forwarded-For for reverse-proxy deploys (off by default, spoofable
+  unless behind a sole-ingress proxy). Startup logs the posture.
+- package.json: add ipaddr.js ^1.9.1 (was transitive via proxy-addr).
+- tests/smoke-test.sh Phase 4 (trust-proxy on): exact IP + CIDR allowed,
+  unlisted IP -> 403 even with a valid token (gate precedes auth), loopback
+  recovery, enforcement log present. 16 checks total, all pass. tsc clean.
+- CLAUDE.md: documented the security-perimeter env vars + the Docker
+  source-IP-masking caveat. Corrected the stale "CORS permissive" note.
