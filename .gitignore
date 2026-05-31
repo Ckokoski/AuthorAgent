@@ -4,6 +4,9 @@ gateway/dist/
 config/.vault/
 config/user.json
 
+# Local API keys for testing (never commit secrets)
+.keys
+
 # Test-build trigger + logs (local to Mercury, see scripts/systemd/)
 build_now
 .build-logs/

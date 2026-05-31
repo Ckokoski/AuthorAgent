@@ -1,11 +1,12 @@
-Complete project rename: finalize Stage D + close out tracking
+Add OpenRouter pipeline test, TODO items, and .keys ignore
 
-- Mark RENAME-PLAN.md as COMPLETE: Stage D (local dir mv) done, all
-  post-mv validation boxes checked (remote, grep, .env, tsc, smoke 18/18)
-- Move the RENAME-PLAN item out of docs/TODO.md into docs/COMPLETED.md
-  under 2026-05-31, preserving the original bullet text plus outcome
-- Drop the now-empty "Pending plans" section from docs/TODO.md
-- Rename the build-watcher systemd unit files authorclaw-build.{service,
-  timer} -> bookclaw-build.{service,timer} (the rename sed updated their
-  contents but not the filenames); now matches the README install commands
-  and the bookclaw-build.timer -> bookclaw-build.service pairing
+- tests/openrouter-pipeline.sh: non-hermetic, manually-run verification that
+  drives a bounded novel pipeline through OpenRouter only (Ollama disabled via
+  an EXIT-trap that restores it) to confirm every pipeline task type — incl.
+  reasoning-high (consistency, final_edit) and 16K-output steps — completes.
+  Parameterized (BASE_URL / BOOKCLAW_AUTH_TOKEN / CONTAINER / CHAPTERS / WORDS)
+- docs/TODO.md: add OpenRouter key auto-register bug (routes.ts:257), per-step
+  model selection (Larger items), API-first frontend principle (enables MCP),
+  and a new "User experience & product features" group (start-a-project
+  tutorial, in-app help system, markdown file viewer)
+- .gitignore: ignore .keys (local API-key stash for testing)
