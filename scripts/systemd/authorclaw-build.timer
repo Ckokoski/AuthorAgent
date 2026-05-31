@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll for the AuthorClaw build_now sentinel once a minute
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

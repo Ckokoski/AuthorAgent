@@ -4,6 +4,10 @@ gateway/dist/
 config/.vault/
 config/user.json
 
+# Test-build trigger + logs (local to Mercury, see scripts/systemd/)
+build_now
+.build-logs/
+
 # Workspace runtime data (user-generated, not code)
 workspace/projects/
 workspace/research/

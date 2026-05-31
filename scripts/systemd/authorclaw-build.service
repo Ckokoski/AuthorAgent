@@ -1,0 +1,17 @@
+[Unit]
+Description=AuthorClaw test-build watcher (rebuilds the image when build_now is present)
+Documentation=file:///home/paul/data/dev/authorclaw/scripts/systemd/README.md
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=paul
+Group=paul
+# Needed to talk to the Docker daemon socket.
+SupplementaryGroups=docker
+WorkingDirectory=/home/paul/data/dev/authorclaw
+Environment=HOME=/home/paul
+ExecStart=/home/paul/data/dev/authorclaw/scripts/build-watch.sh
+# A build (npm ci + tsc + image assembly) can take a few minutes.
+TimeoutStartSec=1800

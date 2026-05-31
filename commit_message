@@ -1,7 +1,8 @@
-Establish multi-author/multi-book North Star as a guiding goal
+Add sentinel-triggered test-build watcher for Mercury
 
-- Add "North Star" section to docs/TODO.md framing the ultimate goal (multi-author, multi-book studio with customizable per-author/genre pipelines) as the lens for weighing other decisions, not a near-term task
-- Define the four first-class entities it implies (book, author profile, genre profile, customizable pipeline) and contrast each with today's single-author / free-text-genre / hardcoded-pipeline state
-- Expand the Larger-items entry with the customizable-pipeline build-out and link it to the North Star
-- Steer GOD-CLASS-REFACTOR.md by the goal: project-engine seam at Level 1, pipelines as a plugin-shaped subsystem at Level 3, anti-goal of hardening single-author assumptions
-- Note in RENAME-PLAN.md why "BookClaw" aligns with the book-centric model
+- scripts/build-watch.sh: rebuild + docker compose up from the live working tree when a build_now sentinel exists; consumes the sentinel up front, flock-guarded, reuses the stable vault key from .env, logs to .build-logs/, reports FAIL to systemd
+- scripts/systemd/authorclaw-build.{service,timer}: 1-min poll running as paul in the docker group
+- scripts/systemd/README.md: install/check/uninstall steps
+- scripts/deploy.sh: healthcheck polls /healthz instead of the now-auth-gated /api/health
+- .gitignore: ignore build_now and .build-logs/
+- docs/TODO.md: record the as-built sentinel approach on the Mercury-deploy item

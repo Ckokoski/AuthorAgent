@@ -62,7 +62,7 @@ echo "  [4/4] Waiting for health check..."
 RETRIES=0
 MAX_RETRIES=30
 while [ $RETRIES -lt $MAX_RETRIES ]; do
-    if curl -sf http://localhost:3847/api/health > /dev/null 2>&1; then
+    if curl -sf http://localhost:3847/healthz > /dev/null 2>&1; then
         echo "  ✓ AuthorClaw is healthy!"
         break
     fi
