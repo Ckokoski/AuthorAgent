@@ -20,7 +20,7 @@ Direct `npm start` from a Windows command prompt or PowerShell is not a supporte
 ### First-time setup
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Ckokoski/bookclaw.git
+git clone https://github.com/pshort05/bookclaw.git
 cd bookclaw
 
 # 2. Install Node 22+ (if running without Docker)

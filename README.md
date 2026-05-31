@@ -6,6 +6,8 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org)
 [![Security](https://img.shields.io/badge/security-hardened-green.svg)](#security)
 
+> **BookClaw is a fork of [AuthorClaw](https://github.com/Ckokoski/authorclaw) by Christopher Kokoski (Writing Secrets)** — with deep thanks for the foundation it builds on. AuthorClaw is itself a fork of OpenClaw. See [Acknowledgements](#acknowledgements).
+
 BookClaw is a security-hardened AI agent purpose-built for fiction and nonfiction authors. It doesn't just write — it runs the entire book production pipeline autonomously, from first idea to KDP-ready manuscript.
 
 **Give it an idea and a pen name. It plans, writes, revises, formats, and launches.** Pipeline mode chains 6 production phases automatically. Author personas manage multiple pen names with distinct voices. Deep revision runs 21 editing passes. Export produces professional DOCX and EPUB ready for self-publishing.
@@ -56,11 +58,21 @@ BookClaw: "Pipeline created — 6 phases, 48 steps total"
 
 ---
 
+## Where BookClaw is heading
+
+The rename from AuthorClaw is more than cosmetic. The name now centers the **book** — and that is the direction the project is steering toward: a **multi-author, multi-book studio**.
+
+Today BookClaw runs one pipeline at a time around author personas. The North Star is many books in flight at once, each a first-class entity with its own author profile, genre, and customizable production pipeline — so a single instance can manage a whole catalog, not just one author's voice.
+
+> **This is aspirational.** Not all of it is built yet. It is the lens used to weigh design decisions (storage shapes, API design, new features) — prefer the option that moves toward a multi-book model rather than re-cementing "the author" as a singleton. Track progress in [docs/TODO.md](docs/TODO.md).
+
+---
+
 ## Quick Start
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/Ckokoski/bookclaw.git
+git clone https://github.com/pshort05/bookclaw.git
 cd bookclaw
 npm install
 
@@ -86,7 +98,7 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full setup guide, or [docs/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    BOOKCLAW v4 ARCHITECTURE                │
+│                    BOOKCLAW v5 ARCHITECTURE                │
 │                                                             │
 │  ┌───────────┐   ┌─────────────────┐   ┌────────────────┐  │
 │  │ Channels  │   │    Gateway       │   │  AI Router     │  │
@@ -268,7 +280,7 @@ If AI planning fails, the system falls back to template-based planning (6 projec
 
 ## Skills
 
-Skills are markdown files that teach the AI how to handle specific writing tasks. V4 ships with 19 focused, author-centric skills:
+Skills are markdown files that teach the AI how to handle specific writing tasks. BookClaw ships with 19 focused, author-centric skills:
 
 **Core Skills (4):** self-improve, after-action-review, prompt-optimizer, error-recovery
 
@@ -327,14 +339,19 @@ bookclaw/
 
 ## Security
 
-BookClaw security features:
+BookClaw ships a security perimeter tuned for a single-user home-LAN threat model:
 
-- **Vault**: AES-256-GCM encrypted credential storage (scrypt KDF)
-- **Sandbox**: Workspace-only file access enforcement
-- **Audit**: Daily JSONL logs with categories (message, security, error, connection)
-- **Injection Detection**: Pattern matching for prompt injection attempts
-- **Rate Limiting**: Per-channel rate limits
-- **Research Gate**: Real web search + HTML extraction, 50+ allowlisted domains, 60 req/hr rate limit
+- **Authentication**: bearer token gating every `/api/*` route and the Socket.IO handshake. Auto-generated into `.env` on first run; `BOOKCLAW_AUTH_DISABLED=1` turns it off (with a loud warning).
+- **CORS**: cross-origin requests **denied by default**; allow specific browser origins via `BOOKCLAW_CORS_ORIGINS`.
+- **Source-IP allowlist**: optional network gate (`BOOKCLAW_ALLOWED_IPS`, CIDRs supported) sitting in front of auth; loopback always allowed. `BOOKCLAW_TRUST_PROXY=1` reads the client IP from `X-Forwarded-For` behind a trusted proxy.
+- **Content Security Policy**: Helmet CSP with `connect-src 'self'` (the dashboard is same-origin only).
+- **Confirmation Gate**: every irreversible external action (publish, send, submit, upload, purchase) requires explicit user approval before it runs.
+- **Vault**: AES-256-GCM encrypted credential storage (scrypt KDF).
+- **Sandbox**: Workspace-only file access enforcement.
+- **Audit**: Daily JSONL logs with categories (message, security, error, connection).
+- **Injection Detection**: Pattern matching for prompt injection attempts.
+- **Rate Limiting**: Per-channel rate limits.
+- **Research Gate**: Real web search + HTML extraction, 50+ allowlisted domains, 60 req/hr rate limit.
 - **Configurable Bind**: Server bind address controlled by `BOOKCLAW_BIND` (default `0.0.0.0` for LAN reach; set to `127.0.0.1` for loopback-only). See the **Deployment — Defense in Depth** section below for the full fork posture.
 
 ---
@@ -343,15 +360,17 @@ BookClaw security features:
 
 > **We strongly recommend running BookClaw inside a VM or VPS with Docker.** Your API keys, manuscripts, and creative work deserve real protection. Defense in depth means multiple security layers — not just application-level security.
 
-> **Fork posture — LAN-accessible by default.** This fork ships the Docker
+> **Fork posture — LAN-accessible by default, authenticated.** This fork ships the Docker
 > image bound to `0.0.0.0` so the published port is reachable from other hosts
 > on the same LAN. The bind address is controlled by the `BOOKCLAW_BIND`
 > env var (default `0.0.0.0`; set to `127.0.0.1` for loopback-only). This is
-> intentional and overrides the upstream localhost-only behavior. **The
-> service has no HTTP/WebSocket authentication.** Acceptable on a trusted
-> single-user home LAN; not acceptable for wider exposure. For untrusted
-> networks, front it with a reverse proxy (Caddy / Nginx / Traefik) that
-> enforces auth and TLS. See [SECURITY.md](SECURITY.md#3-security-posture-of-the-local-installation) for the full posture.
+> intentional and overrides the upstream localhost-only behavior. **A bearer
+> token gates every `/api/*` route and the WebSocket handshake** (auto-generated
+> on first run), CORS is deny-by-default, and an optional source-IP allowlist
+> can gate connections in front of auth. This perimeter targets a trusted
+> single-user home LAN — not a hostile internet. For untrusted networks, still
+> front it with a reverse proxy (Caddy / Nginx / Traefik) that enforces TLS.
+> See [SECURITY.md](SECURITY.md#3-security-posture-of-the-local-installation) for the full posture.
 
 ### Recommended: VPS + Docker + VPN (Best Security)
 
@@ -369,7 +388,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up
 
 # Clone and deploy:
-git clone https://github.com/Ckokoski/bookclaw.git
+git clone https://github.com/pshort05/bookclaw.git
 cd bookclaw/docker
 docker compose up -d
 ```
@@ -405,7 +424,7 @@ bash /media/sf_bookclaw-transfer/run.sh
 Running directly on your machine works fine for development and testing:
 
 ```bash
-git clone https://github.com/Ckokoski/bookclaw.git
+git clone https://github.com/pshort05/bookclaw.git
 cd bookclaw && npm install
 npx tsx gateway/src/index.ts
 ```
@@ -419,14 +438,17 @@ By default this fork binds BookClaw to `0.0.0.0:3847` so the Docker image is rea
 | App-level vault (AES-256) | ✅ | ✅ | ✅ | ✅ |
 | Sandbox file access | ✅ | ✅ | ✅ | ✅ |
 | Audit logging | ✅ | ✅ | ✅ | ✅ |
+| Bearer-token HTTP/WS auth | ✅ | ✅ | ✅ | ✅ |
+| CORS deny-by-default | ✅ | ✅ | ✅ | ✅ |
+| Source-IP allowlist (optional) | ✅ | ✅ | ✅ | ✅ |
 | OS isolation | ❌ | ✅ | ✅ | ✅ |
 | Container isolation | ❌ | Optional | ✅ | ✅ |
 | Loopback-only network | Default | Default | ❌ (LAN-exposed) | ✅ (VPN-only) |
-| HTTP/WS authentication | ❌ | ❌ | ❌ — add reverse proxy | ❌ — add reverse proxy |
+| TLS termination | ❌ — add reverse proxy | ❌ — add reverse proxy | ❌ — add reverse proxy | ❌ — add reverse proxy |
 | Always-on (Telegram 24/7) | ❌ | ❌ | ✅ | ✅ |
 | Disposable environment | ❌ | ✅ | ✅ | ✅ |
 
-The "LAN Docker" column is this fork's default. The service has no built-in HTTP/WebSocket auth — if you're exposing beyond a trusted LAN, front it with an authenticating reverse proxy.
+The "LAN Docker" column is this fork's default. The bearer token gates HTTP and WebSocket in every column; what's missing on the LAN is **TLS** — if you're exposing beyond a trusted LAN, front BookClaw with a reverse proxy that terminates HTTPS.
 
 ---
 
@@ -460,7 +482,7 @@ All supporting guides live in [`docs/`](docs/). Start with whichever matches wha
 - **[docs/STORYHACKERAI-PORTING.md](docs/STORYHACKERAI-PORTING.md)** ✨ *new* — Audit of StoryHackerAI (n8n-based author pipeline) for patterns to port. Top item: **make OpenRouter the canonical AI gateway** instead of one provider among five. Also covers the Selector → Brief → Draft → Check multi-pass chapter pattern, genre templates as reusable artifacts, and explicit Chronology / Style / Wordcount checks.
 - **[docs/GOD-CLASS-REFACTOR.md](docs/GOD-CLASS-REFACTOR.md)** ✨ *new* — Analysis of the `index.ts` (2,649 lines, 61 services, 35 init phases) and `routes.ts` (5,516 lines, 234 endpoints in one function) god classes. Compares against OpenClaw's plugin architecture and lays out a three-level incremental refactor plan (phase extraction → service registry → plugin contracts).
 - **[docs/TODO.md](docs/TODO.md)** — Tracked work items: security review, quick cleanups, larger refactors, and standing constraints not to "fix."
-- **[docs/RENAME-PLAN.md](docs/RENAME-PLAN.md)** — Runbook for the BookClaw → BookClaw rename. Decisions captured; not yet executed.
+- **[docs/RENAME-PLAN.md](docs/RENAME-PLAN.md)** — Historical record of the AuthorClaw → BookClaw rename (completed 2026-05-31): decisions, runbook, and verification.
 
 ---
 
@@ -486,6 +508,16 @@ BookClaw is open source and contributions are welcome! Whether you're an author 
 5. Submit a Pull Request with a clear description
 
 For new skills, create a folder in `skills/author/`, `skills/marketing/`, or `skills/core/` with a `SKILL.md` file following the existing format (YAML frontmatter + markdown body).
+
+---
+
+## Acknowledgements
+
+BookClaw is a fork of **[AuthorClaw](https://github.com/Ckokoski/authorclaw)** by **Christopher Kokoski (Writing Secrets)**. Enormous thanks to Christopher for building the foundation — the autonomous pipeline, author personas, skills system, and book-production workflow that BookClaw extends all originate in AuthorClaw.
+
+AuthorClaw is itself a fork of **OpenClaw**, whose architecture and feature set (TTS engine, thinking-budget controls, browser-doctor probe, and more) this project continues to build on. Fork-attribution and "Inspired by OpenClaw …" credits remain throughout the code by design.
+
+This project stands on both. Where BookClaw goes next — toward a multi-author, multi-book studio — is its own direction, but the starting point was their work.
 
 ---
 

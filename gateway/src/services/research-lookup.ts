@@ -144,7 +144,7 @@ export class ResearchLookupService {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/Ckokoski/bookclaw',
+        'HTTP-Referer': 'https://github.com/pshort05/bookclaw',
         'X-Title': 'BookClaw',
       },
       body: JSON.stringify({

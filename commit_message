@@ -1,11 +1,11 @@
-Rename project: AuthorClaw -> BookClaw (code + env vars + class)
+Complete project rename: finalize Stage D + close out tracking
 
-- Bulk-rename all occurrences across 147 tracked files: AuthorClaw->BookClaw,
-  AUTHORCLAW->BOOKCLAW (incl. standalone all-caps banners the runbook's
-  AUTHORCLAW_ rule would have missed), authorclaw->bookclaw
-- Decision 2a (hard env rename): AUTHORCLAW_* env vars -> BOOKCLAW_*; no
-  dual-read fallback. Local .env updated in place (var value preserved); no
-  vault.enc existed, so no credential migration needed
-- Decision 4a: AuthorClawGateway class -> BookClawGateway
-- Verified: tsc --noEmit clean, smoke test 16/16 pass, 0 residual references
-- Remote rename (1a) and local directory rename (3a) handled separately
+- Mark RENAME-PLAN.md as COMPLETE: Stage D (local dir mv) done, all
+  post-mv validation boxes checked (remote, grep, .env, tsc, smoke 18/18)
+- Move the RENAME-PLAN item out of docs/TODO.md into docs/COMPLETED.md
+  under 2026-05-31, preserving the original bullet text plus outcome
+- Drop the now-empty "Pending plans" section from docs/TODO.md
+- Rename the build-watcher systemd unit files authorclaw-build.{service,
+  timer} -> bookclaw-build.{service,timer} (the rename sed updated their
+  contents but not the filenames); now matches the README install commands
+  and the bookclaw-build.timer -> bookclaw-build.service pairing

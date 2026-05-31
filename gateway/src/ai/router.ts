@@ -694,7 +694,7 @@ export class AIRouter {
     // headers for ranking on their leaderboard. Since BookClaw is local-only,
     // we send a stable referrer string. Harmless for other providers.
     if (provider.id === 'openrouter') {
-      headers['HTTP-Referer'] = 'https://github.com/Ckokoski/bookclaw';
+      headers['HTTP-Referer'] = 'https://github.com/pshort05/bookclaw';
       headers['X-Title'] = 'BookClaw';
     }
 

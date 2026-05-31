@@ -24,10 +24,6 @@ Anything currently being worked on must appear in this list. When an item is fin
 
 The full implementation breakdown lives below under **[Larger items → Multi-author, multi-book platform](#larger-items-worth-scoping-before-starting)**; this section is the framing, that item is the work.
 
-## Pending plans (separate files)
-
-- [ ] **[RENAME-PLAN.md](RENAME-PLAN.md)** — rename project from BookClaw → BookClaw. Decisions captured, runbook ready, not yet executed.
-
 ## Full security review (post-LAN-exposure)
 
 Opening the bind from loopback to LAN turned several previously-defense-in-depth
@@ -55,7 +51,7 @@ cover at minimum:
 
 ## Quick cleanups (minutes)
 
-_(empty — completed items moved to [COMPLETED.md](COMPLETED.md))_
+- [ ] **Remove the small icons at the bottom-left of the dashboard** (site, yt, sub, tools).
 
 ## Investigations (under an hour each)
 

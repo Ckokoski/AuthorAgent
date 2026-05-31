@@ -2,11 +2,23 @@
 
 Tracked for later execution. Captures decisions, runbook, and verification steps so this can be picked up cold.
 
-## Status
+## Status — COMPLETE (2026-05-31)
 
-- **Decision date:** _pending — none of the four decisions below have been confirmed yet._
-- **Execution:** _not started._
-- **Reversible?** Yes. Git history preserves the old name; `gh repo rename` works both directions; the directory can be moved back. Cost of changing again later is the same as this first rename.
+All four decisions executed: **1a** (rename remote in place), **2a** (hard env-var rename, no dual-read), **3a** (rename local dir), **4a** (rename `AuthorClawGateway` class). Done in stages, validating at each. This file is now historical; the outcome is recorded in `docs/COMPLETED.md`.
+
+- **Stage A — code rename: DONE & pushed.** Bulk-replaced all occurrences across 147 tracked files with three sed rules (`AuthorClaw→BookClaw`, `AUTHORCLAW→BOOKCLAW` — broadened from the runbook's `AUTHORCLAW_` rule to also catch standalone all-caps banners, `authorclaw→bookclaw`). `.env` var renamed `AUTHORCLAW_VAULT_KEY→BOOKCLAW_VAULT_KEY` (value preserved). **No `vault.enc` existed, so 2a's credential-loss risk was moot** — no migration needed. Verified: `tsc --noEmit` clean, smoke test **16/16 pass**, 0 residual references, class is `BookClawGateway`. Committed as `9cf372c` and pushed.
+- **Stage C — remote rename (1a): DONE.** `gh repo rename` → `pshort05/bookclaw`; local `origin` set to `https://github.com/pshort05/bookclaw.git`; old URL auto-redirects; `main` synced.
+- **Stage D — local directory rename (3a): DONE.** `cd /home/paul/data/dev && mv authorclaw bookclaw`; session relaunched from `/home/paul/data/dev/bookclaw`. Pre-checks had passed (no systemd user units, no processes rooted in the old path).
+
+### Post-`mv` validation (all passed in the relaunched session)
+
+- [x] `pwd` ends in `/bookclaw`; `git remote -v` shows `pshort05/bookclaw`.
+- [x] `git grep -li authorclaw` lists **only** `docs/RENAME-PLAN.md` (this file deliberately quotes the old name in the runbook/resume steps); every other file is 0.
+- [x] `.env` present with `BOOKCLAW_VAULT_KEY` (value intact).
+- [x] `npm run test:smoke` → 18/18 pass; `npx tsc --noEmit` clean.
+- [x] RENAME-PLAN item moved from `docs/TODO.md` to `docs/COMPLETED.md` with completion date.
+
+**Reversible?** Yes. Git history preserves the old name; `gh repo rename` works both directions; the directory can be moved back.
 
 ## Why "BookClaw" — alignment with the North Star
 

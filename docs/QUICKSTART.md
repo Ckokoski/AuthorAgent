@@ -11,7 +11,7 @@ Get BookClaw running and writing in under 5 minutes.
 ## Install
 
 ```bash
-git clone https://github.com/Ckokoski/bookclaw.git
+git clone https://github.com/pshort05/bookclaw.git
 cd bookclaw
 npm install
 ```
