@@ -81,12 +81,11 @@ import { WebsiteBuilderService } from './services/website-builder.js';
 import { TelegramBridge } from './bridges/telegram.js';
 import { DiscordBridge } from './bridges/discord.js';
 import { createAPIRoutes } from './api/routes.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const ROOT_DIR = __dirname.includes('dist')
-  ? join(__dirname, '..', '..', '..')
-  : join(__dirname, '..', '..');
+import { ROOT_DIR } from './paths.js';
+import { initConfig } from './init/phase-01-config.js';
+import { initSecurity } from './init/phase-02-security.js';
+import { initSoulMemory } from './init/phase-03-soul-memory.js';
+import { initAI } from './init/phase-04-ai.js';
 
 // Constant-time comparison of a request's bearer token against the expected token.
 // Length check first because timingSafeEqual throws on unequal-length buffers.
@@ -101,93 +100,93 @@ function bearerEquals(provided: string, expected: string): boolean {
 // ═══════════════════════════════════════════════════════════
 
 class BookClawGateway {
-  private app: express.Application;
-  private server: ReturnType<typeof createServer>;
-  private io: SocketIO;
+  public app: express.Application;
+  public server: ReturnType<typeof createServer>;
+  public io: SocketIO;
 
   // Core services
-  private config!: ConfigService;
-  private memory!: MemoryService;
-  private soul!: SoulService;
-  private heartbeat!: HeartbeatService;
-  private costs!: CostTracker;
-  private research!: ResearchGate;
-  private activityLog!: ActivityLog;
-  private aiRouter!: AIRouter;
+  public config!: ConfigService;
+  public memory!: MemoryService;
+  public soul!: SoulService;
+  public heartbeat!: HeartbeatService;
+  public costs!: CostTracker;
+  public research!: ResearchGate;
+  public activityLog!: ActivityLog;
+  public aiRouter!: AIRouter;
 
   // Security services
-  private vault!: Vault;
-  private permissions!: PermissionManager;
-  private audit!: AuditLog;
-  private sandbox!: SandboxGuard;
-  private injectionDetector!: InjectionDetector;
+  public vault!: Vault;
+  public permissions!: PermissionManager;
+  public audit!: AuditLog;
+  public sandbox!: SandboxGuard;
+  public injectionDetector!: InjectionDetector;
   // Bearer token gating /api/* and the Socket.IO handshake.
   // null = auth disabled (BOOKCLAW_AUTH_DISABLED=1); a string = enforced.
-  private authToken: string | null = null;
+  public authToken: string | null = null;
   // CORS posture, computed in the constructor and logged at startup.
-  private corsSummary = '';
-  private corsWildcard = false;
+  public corsSummary = '';
+  public corsWildcard = false;
   // Source-IP allowlist (BOOKCLAW_ALLOWED_IPS). Empty = enforcement off (allow all).
   // Each entry is an ipaddr.js [address, prefixLength] CIDR (single IPs become /32 or /128).
-  private allowedIps: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]> = [];
-  private ipAllowlistSummary = '';
-  private trustProxy = false;
+  public allowedIps: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]> = [];
+  public ipAllowlistSummary = '';
+  public trustProxy = false;
 
   // Skills, goals & bridges
-  private skills!: SkillLoader;
-  private authorOS!: AuthorOSService;
-  private tts!: TTSService;
-  private imageGen!: ImageGenService;
-  private personas!: PersonaService;
-  private projectEngine!: ProjectEngine;
-  private contextEngine!: ContextEngine;
-  private memorySearch!: MemorySearchService;
-  private userModel!: UserModelService;
-  private cronScheduler!: CronSchedulerService;
-  private autoSkill!: AutoSkillService;
-  private writingJudge!: WritingJudgeService;
-  private researchLookup!: ResearchLookupService;
-  private videoResearch!: VideoResearchService;
-  private storyStructures!: StoryStructureService;
-  private plotPromises!: PlotPromisesService;
-  private characterVoices!: CharacterVoicesService;
-  private websiteSites!: WebsiteSiteService;
-  private blogPostDrafter!: BlogPostDrafterService;
-  private websiteDeploy!: WebsiteDeployService;
-  private lessons!: LessonStore;
-  private preferences!: PreferenceStore;
-  private orchestrator!: OrchestratorService;
-  private kdpExporter!: KDPExporter;
-  private betaReader!: BetaReaderService;
-  private dialogueAuditor!: DialogueAuditor;
-  private manuscriptHub!: ManuscriptHubService;
-  private coverTypography!: CoverTypographyService;
-  private externalTools!: ExternalToolsService;
-  private trackChanges!: TrackChangesService;
-  private goalsService!: GoalsService;
-  private seriesBible!: SeriesBibleService;
-  private craftCritic!: CraftCriticService;
-  private audiobookPrep!: AudiobookPrepService;
-  private styleClone!: StyleCloneService;
+  public skills!: SkillLoader;
+  public authorOS!: AuthorOSService;
+  public tts!: TTSService;
+  public imageGen!: ImageGenService;
+  public personas!: PersonaService;
+  public projectEngine!: ProjectEngine;
+  public contextEngine!: ContextEngine;
+  public memorySearch!: MemorySearchService;
+  public userModel!: UserModelService;
+  public cronScheduler!: CronSchedulerService;
+  public autoSkill!: AutoSkillService;
+  public writingJudge!: WritingJudgeService;
+  public researchLookup!: ResearchLookupService;
+  public videoResearch!: VideoResearchService;
+  public storyStructures!: StoryStructureService;
+  public plotPromises!: PlotPromisesService;
+  public characterVoices!: CharacterVoicesService;
+  public websiteSites!: WebsiteSiteService;
+  public blogPostDrafter!: BlogPostDrafterService;
+  public websiteDeploy!: WebsiteDeployService;
+  public lessons!: LessonStore;
+  public preferences!: PreferenceStore;
+  public orchestrator!: OrchestratorService;
+  public kdpExporter!: KDPExporter;
+  public betaReader!: BetaReaderService;
+  public dialogueAuditor!: DialogueAuditor;
+  public manuscriptHub!: ManuscriptHubService;
+  public coverTypography!: CoverTypographyService;
+  public externalTools!: ExternalToolsService;
+  public trackChanges!: TrackChangesService;
+  public goalsService!: GoalsService;
+  public seriesBible!: SeriesBibleService;
+  public craftCritic!: CraftCriticService;
+  public audiobookPrep!: AudiobookPrepService;
+  public styleClone!: StyleCloneService;
   // Wave 3 — autonomous career agent with safety rails
-  private confirmationGate!: ConfirmationGateService;
-  private disclosures!: DisclosuresService;
-  private launchOrchestrator!: LaunchOrchestratorService;
-  private amsAds!: AMSAdsService;
-  private bookbub!: BookBubSubmitterService;
-  private releaseCalendar!: ReleaseCalendarService;
-  private readerIntel!: ReaderIntelService;
-  private translationPipeline!: TranslationPipelineService;
-  private websiteBuilder!: WebsiteBuilderService;
-  private telegram?: TelegramBridge;
-  private discord?: DiscordBridge;
+  public confirmationGate!: ConfirmationGateService;
+  public disclosures!: DisclosuresService;
+  public launchOrchestrator!: LaunchOrchestratorService;
+  public amsAds!: AMSAdsService;
+  public bookbub!: BookBubSubmitterService;
+  public releaseCalendar!: ReleaseCalendarService;
+  public readerIntel!: ReaderIntelService;
+  public translationPipeline!: TranslationPipelineService;
+  public websiteBuilder!: WebsiteBuilderService;
+  public telegram?: TelegramBridge;
+  public discord?: DiscordBridge;
 
   // State
   // Conversation history keyed by channel/session to prevent cross-contamination
   // between Telegram users, web chat, and API callers.
-  private conversationHistories: Map<string, Array<{ role: string; content: string; timestamp: Date }>> = new Map();
+  public conversationHistories: Map<string, Array<{ role: string; content: string; timestamp: Date }>> = new Map();
 
-  private getHistory(channel: string): Array<{ role: string; content: string; timestamp: Date }> {
+  public getHistory(channel: string): Array<{ role: string; content: string; timestamp: Date }> {
     let history = this.conversationHistories.get(channel);
     if (!history) {
       history = [];
@@ -311,122 +310,10 @@ class BookClawGateway {
     console.log('  An OpenClaw fork for authors');
     console.log('');
 
-    // ── Phase 1: Configuration ──
-    this.config = new ConfigService(join(ROOT_DIR, 'config'));
-    await this.config.load();
-    console.log('  ✓ Configuration loaded');
-
-    // ── Phase 2: Security Layer ──
-    this.vault = new Vault(join(ROOT_DIR, 'config', '.vault'));
-    await this.vault.initialize();
-    console.log('  ✓ Encrypted vault initialized (AES-256-GCM)');
-
-    this.permissions = new PermissionManager(this.config.get('security.permissionPreset', 'standard'));
-    console.log(`  ✓ Permissions: ${this.permissions.preset} mode`);
-
-    this.audit = new AuditLog(join(ROOT_DIR, 'workspace', '.audit'));
-    await this.audit.initialize();
-    console.log('  ✓ Audit logging active');
-
-    this.sandbox = new SandboxGuard(join(ROOT_DIR, 'workspace'));
-    console.log('  ✓ Sandbox: workspace-only file access');
-
-    this.injectionDetector = new InjectionDetector();
-    console.log('  ✓ Prompt injection detection active');
-
-    // ── Phase 2c: API auth token ──
-    // Gates /api/* and the Socket.IO handshake. Mirrors the BOOKCLAW_VAULT_KEY
-    // pattern: read from env (.env already loaded by dotenv), else generate and
-    // persist to .env. BOOKCLAW_AUTH_DISABLED=1 turns the gate off entirely.
-    if (process.env.BOOKCLAW_AUTH_DISABLED === '1') {
-      this.authToken = null;
-      console.warn('  ⚠️  AUTH DISABLED — BOOKCLAW_AUTH_DISABLED=1 is set.');
-      console.warn('     Every host that can reach this server can drive the agent unauthenticated.');
-    } else {
-      let token = (process.env.BOOKCLAW_AUTH_TOKEN || '').trim();
-      if (!token) {
-        token = randomBytes(32).toString('hex');
-        const envPath = join(ROOT_DIR, '.env');
-        try {
-          await fs.appendFile(
-            envPath,
-            `\n# Auto-generated by BookClaw — HTTP/WebSocket auth token\nBOOKCLAW_AUTH_TOKEN=${token}\n`,
-          );
-          console.log('  🔑 Generated API auth token and saved to .env.');
-        } catch {
-          console.warn('  ⚠️  WARNING: Could not write auth token to .env — using a random session token.');
-          console.warn('     Set BOOKCLAW_AUTH_TOKEN in the environment for production use.');
-        }
-        process.env.BOOKCLAW_AUTH_TOKEN = token;
-      }
-      this.authToken = token;
-      console.log('  ✓ API authentication active (bearer token on /api/* and WebSocket)');
-    }
-
-    // CORS posture (computed in the constructor; applied to Express + Socket.IO).
-    if (this.corsWildcard) {
-      console.warn(`  ${this.corsSummary}`);
-    } else {
-      console.log(`  ${this.corsSummary}`);
-    }
-
-    // Source-IP allowlist posture (computed in the constructor).
-    console.log(`  ${this.ipAllowlistSummary}`);
-
-    // ── Phase 2b: Activity Log ──
-    this.activityLog = new ActivityLog(join(ROOT_DIR, 'workspace'));
-    await this.activityLog.initialize();
-    console.log('  ✓ Activity log initialized');
-
-    // ── Phase 3: Soul & Memory ──
-    this.soul = new SoulService(join(ROOT_DIR, 'workspace', 'soul'));
-    await this.soul.load();
-    console.log(`  ✓ Soul loaded: "${this.soul.getName()}"`);
-
-    this.memory = new MemoryService(join(ROOT_DIR, 'workspace', 'memory'), this.config.get('memory'));
-    await this.memory.initialize();
-    console.log('  ✓ Memory system initialized');
-
-    // ── Phase 3b: Memory Search (FTS5 over conversations + project outputs) ──
-    // Hermes-inspired persistent cross-session search. Falls back gracefully
-    // if better-sqlite3 isn't available on this platform.
-    this.memorySearch = new MemorySearchService(join(ROOT_DIR, 'workspace'));
-    await this.memorySearch.initialize();
-    if (this.memorySearch.isAvailable()) {
-      // Wire memory.process() → live FTS indexing
-      this.memory.setLiveIndexHook((entry) => this.memorySearch.indexConversationTurn(entry));
-      // Index any pre-existing data on first boot — incremental on subsequent.
-      try {
-        const result = await this.memorySearch.reindexAll();
-        const stats = this.memorySearch.getStats();
-        console.log(`  ✓ Memory search ready: ${stats.totalEntries} entries indexed (added ${result.indexed}, skipped ${result.skipped})`);
-      } catch (err) {
-        console.warn(`  ⚠ Memory search reindex failed: ${(err as Error)?.message || err}`);
-      }
-    } else {
-      console.log('  ⚠ Memory search unavailable (search will be disabled, rest of BookClaw works)');
-    }
-
-    // ── Phase 4: AI Providers ──
-    const costsConfig = this.config.get('costs') || {};
-    costsConfig.persistPath = join(ROOT_DIR, 'workspace', 'costs.json');
-    this.costs = new CostTracker(costsConfig);
-    await this.costs.initialize();
-    console.log(`  ✓ Budget: $${this.costs.dailyLimit}/day, $${this.costs.monthlyLimit}/month (persisted)`);
-
-    this.aiRouter = new AIRouter(this.config.get('ai'), this.vault, this.costs);
-    await this.aiRouter.initialize();
-    // Load global preferred provider from config
-    const globalPref = this.config.get('ai.preferredProvider');
-    if (globalPref) {
-      this.aiRouter.setGlobalPreferredProvider(globalPref);
-      console.log(`  ✓ Global preferred provider: ${globalPref}`);
-    }
-    const providers = this.aiRouter.getActiveProviders();
-    for (const p of providers) {
-      const tier = p.tier === 'free' ? '🆓 FREE' : p.tier === 'cheap' ? '💰 CHEAP' : '💎 PAID';
-      console.log(`  ✓ AI: ${p.name} (${p.model}) — ${tier}`);
-    }
+    await initConfig(this);
+    await initSecurity(this);
+    await initSoulMemory(this);
+    await initAI(this);
 
     // ── Phase 5: Research Gate ──
     this.research = new ResearchGate(
@@ -1064,6 +951,7 @@ class BookClawGateway {
     });
 
     // Log startup to activity log
+    const providers = this.aiRouter.getActiveProviders();
     await this.activityLog.log({
       type: 'system',
       source: 'internal',
@@ -1084,7 +972,7 @@ class BookClawGateway {
 
   // True if the given source IP is permitted by the allowlist. Loopback is always
   // allowed (recovery path). Unparseable addresses are denied while enforcing.
-  private isIpAllowed(rawIp: string): boolean {
+  public isIpAllowed(rawIp: string): boolean {
     let addr: ipaddr.IPv4 | ipaddr.IPv6;
     try {
       addr = ipaddr.process(rawIp); // normalizes IPv4-mapped IPv6 (::ffff:a.b.c.d) to IPv4
@@ -1101,7 +989,7 @@ class BookClawGateway {
   }
 
   // Resolve a Socket.IO client's source IP, honoring X-Forwarded-For when trust-proxy is on.
-  private socketClientIp(socket: { handshake: { address: string; headers: Record<string, unknown> } }): string {
+  public socketClientIp(socket: { handshake: { address: string; headers: Record<string, unknown> } }): string {
     if (this.trustProxy) {
       const xff = String(socket.handshake.headers['x-forwarded-for'] || '');
       const first = xff.split(',')[0].trim();
@@ -1110,7 +998,7 @@ class BookClawGateway {
     return socket.handshake.address || '';
   }
 
-  private setupWebSocket(): void {
+  public setupWebSocket(): void {
     // Source-IP gate on the handshake — same allowlist as the HTTP routes, in front of auth.
     this.io.use((socket, next) => {
       if (this.allowedIps.length === 0) return next(); // enforcement off
@@ -1390,7 +1278,7 @@ class BookClawGateway {
   /**
    * Classify what type of writing task this is for tiered routing.
    */
-  private classifyTask(content: string): string {
+  public classifyTask(content: string): string {
     const lower = content.toLowerCase();
 
     if (lower.match(/consistency|continuity|timeline check|cross.?chapter|plot.?hole|contradiction/)) {
@@ -1428,7 +1316,7 @@ class BookClawGateway {
    * Build the complete system prompt with soul, memory, skills, and project context
    */
   /** Write the human-readable SKILLS.txt reference file in workspace/. */
-  private async writeSkillsReference(rootDir: string): Promise<void> {
+  public async writeSkillsReference(rootDir: string): Promise<void> {
     try {
       const skillsRefPath = join(rootDir, 'workspace', 'SKILLS.txt');
       const catalog = this.skills.getSkillCatalog();
@@ -1464,12 +1352,12 @@ class BookClawGateway {
 
   /** Escape HTML chars in a string. Used by the website-sites hook so we
    *  don't pass user-supplied project descriptions raw into a book blurb. */
-  private escapeBasicHTML(s: string): string {
+  public escapeBasicHTML(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  private buildSystemPrompt(context: {
+  public buildSystemPrompt(context: {
     soul: string;
     memories: string;
     activeProject: string | null;
@@ -1706,7 +1594,7 @@ class BookClawGateway {
    * Mirrors Telegram command logic but returns strings.
    */
   // Dashboard file list cache for /read and /export number-picking
-  private dashboardLastFileList: string[] = [];
+  public dashboardLastFileList: string[] = [];
 
   async handleDashboardCommand(input: string): Promise<string> {
     const parts = input.split(/\s+/);
@@ -2271,7 +2159,7 @@ class BookClawGateway {
    * These let Telegram commands directly interact with GoalEngine,
    * file system, and AI — without dumping long responses into chat.
    */
-  private buildTelegramCommandHandlers() {
+  public buildTelegramCommandHandlers() {
     const gateway = this;
     const workspaceDir = join(ROOT_DIR, 'workspace');
 

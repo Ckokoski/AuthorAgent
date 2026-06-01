@@ -1,12 +1,21 @@
-Add OpenRouter pipeline test, TODO items, and .keys ignore
+Refactor (Level 1, part 1): extract init Phases 1-4 into init/ modules
 
-- tests/openrouter-pipeline.sh: non-hermetic, manually-run verification that
-  drives a bounded novel pipeline through OpenRouter only (Ollama disabled via
-  an EXIT-trap that restores it) to confirm every pipeline task type — incl.
-  reasoning-high (consistency, final_edit) and 16K-output steps — completes.
-  Parameterized (BASE_URL / BOOKCLAW_AUTH_TOKEN / CONTAINER / CHAPTERS / WORDS)
-- docs/TODO.md: add OpenRouter key auto-register bug (routes.ts:257), per-step
-  model selection (Larger items), API-first frontend principle (enables MCP),
-  and a new "User experience & product features" group (start-a-project
-  tutorial, in-app help system, markdown file viewer)
-- .gitignore: ignore .keys (local API-key stash for testing)
+Scaffolding for the god-class split. Behavior-preserving (pure relocation,
+no interface/behavior changes); verified with tsc + smoke (18/18).
+
+- Add gateway/src/paths.ts exporting ROOT_DIR (shared by index.ts and the new
+  init modules; avoids a circular value-import)
+- Make BookClawGateway service fields + helper methods public so init modules
+  can operate on the gateway instance (pass-gateway/mutate pattern; encapsulation
+  to be tightened in Level 2 service registry)
+- Extract initialize() Phases 1-4 into gateway/src/init/:
+  phase-01-config, phase-02-security (vault/permissions/audit/sandbox/injection
+  + auth token + CORS/IP posture + activity log), phase-03-soul-memory,
+  phase-04-ai. initialize() now calls initConfig/initSecurity/initSoulMemory/initAI.
+- Recompute `providers` locally at the startup activity-log (the const moved into
+  initAI) — same value, no behavior change.
+- docs/TODO.md: log a latent init-ordering bug found during extraction
+  (characterVoices wired with undefined styleClone — preserved, not fixed here).
+
+Remaining for Level 1: extract Phases 5-11 (init), then split api/routes.ts
+into per-feature mounters (Stage B).

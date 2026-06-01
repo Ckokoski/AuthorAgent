@@ -52,6 +52,7 @@ cover at minimum:
 ## Quick cleanups (minutes)
 
 - [ ] **Remove the small icons at the bottom-left of the dashboard** (site, yt, sub, tools).
+- [ ] **Latent init-ordering bug: `characterVoices` wired with `undefined` styleClone.** In `index.ts` `initialize()`, Phase 6g9 calls `this.characterVoices.setStyleClone(this.styleClone)` but `this.styleClone` isn't constructed until Phase 6j — so it's `undefined` at wire time. Found during the Level 1 refactor (behavior preserved, not fixed there). Fix by constructing `styleClone` before 6g9, or re-wiring after. (Add others here if more are found during the refactor.)
 - [ ] **OpenRouter key doesn't auto-register providers on save** — `POST /api/vault` only reinitializes the AI router for the keys in the `apiKeyNames` list (`routes.ts:257`: gemini/deepseek/anthropic/openai). `openrouter_api_key` is missing, so storing it leaves OpenRouter unregistered until a manual `/api/providers/refresh` or restart. Fix: add `'openrouter_api_key'` to that array. Verify by storing the key and confirming `openrouter` appears in `/api/status` without a manual refresh.
 
 ## Investigations (under an hour each)
