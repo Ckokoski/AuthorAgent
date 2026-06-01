@@ -1,22 +1,23 @@
-Refactor (Level 1, Stage B part 2): extract settings + projects mounters
+Refactor (Level 1, Stage B part 3): lift shared helpers + 5 more mounters
 
-Behavior-preserving; verified tsc + route-registration diff (234/234 identical).
-routes.ts: ~5,518 -> 4,128 lines.
+Behavior-preserving; verified tsc + route-registration diff (234/234) + a
+called-vs-defined mounter check + smoke (18/18) after each step.
+routes.ts: ~4,128 -> 1,973 lines.
 
-- routes/settings.routes.ts (mountSettings): memory reset, vault key CRUD +
-  provider refresh, sanitized config read + whitelisted update, Telegram bridge.
-- routes/projects.routes.ts (mountProjects): the Project Engine section (templates,
-  project + pipeline creation, start/auto-execute incl. the local helpers
-  buildStepUserMessage/getSmartExcerpt/stepNeedsFullManuscript, retry/restart/
-  resume/pause, file listing/download, DOCX export, compile, provider override).
-- routes.ts calls mountSettings + mountProjects.
+- routes/_shared.ts: lift the 3 cross-cutting helpers out of routes.ts —
+  `upload` (multer), `addWaveDisclaimer` (pure), and a `makeGatherChapters(baseDir)`
+  factory so call sites stay `gatherChapters(project)`, alongside `safePath`.
+- New mounters: documents (library/uploads/context engine), heartbeat (autonomous
+  mode, idle tasks, agent journal, native export, tool ingestion), personas,
+  media (research/image/tts incl. resolveVoiceForRequest), ops (lessons/prefs/
+  orchestrator).
+- Fixed relative dynamic-import paths for the deeper routes/ folder
+  (../ -> ../../: idle-tasks-defaults, image-gen, tts) and added `path` imports
+  where handlers used bare `path.`.
 
-Large sections are lifted verbatim via sed (handlers close over services/gateway/
-baseDir, not `this`, so no renaming is needed) and wrapped — fidelity-guaranteed.
-Each step verified by diffing every app.METHOD('path') vs the pre-split baseline.
-
-Remaining mounters: documents (+ the cross-cutting `upload` multer), heartbeat,
-personas, media (research/image/tts), ops (lessons/prefs/orchestrator), export
-(+ cross-cutting `gatherChapters`, `upload`), wave2/3 (+ `gatherChapters`,
-`addWaveDisclaimer`), knowledge, website. The 3 cross-cutting helpers get lifted
-into routes/_shared.ts next. Final gate: Mercury rebuild + tests/openrouter-pipeline.sh.
+Sections still inline in routes.ts (extracted next): export (KDP/track-changes/
+external/cover/hub/beta — uses shared gatherChapters + upload), wave2/3 (uses
+gatherChapters + addWaveDisclaimer), knowledge, website. routes.ts temporarily
+imports `upload` (for the still-inline track-changes route) and still holds the
+inline gatherChapters/addWaveDisclaimer defs — both removed when export/wave land.
+Final gate: Mercury rebuild + tests/openrouter-pipeline.sh.
