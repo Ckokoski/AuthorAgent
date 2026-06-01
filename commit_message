@@ -1,24 +1,22 @@
-Refactor (Level 1, Stage B part 1): split routes.ts — _shared + core mounter
+Refactor (Level 1, Stage B part 2): extract settings + projects mounters
 
-Behavior-preserving; verified tsc + smoke (18/18) + a route-registration diff
-(234/234 endpoints register identically, before vs after the split).
+Behavior-preserving; verified tsc + route-registration diff (234/234 identical).
+routes.ts: ~5,518 -> 4,128 lines.
 
-- gateway/src/api/routes/_shared.ts: hoist safePath out of routes.ts so the
-  per-feature mounters can import it (one-way dep: routes.ts -> mounters).
-- gateway/src/api/routes/core.routes.ts (mountCore): health/liveness/readiness
-  probes, status dashboard, chat API, project listing, cost, audit, activity
-  feed + SSE. Handler bodies moved verbatim.
-- routes.ts: import safePath from _shared; replace the inline core section with
-  mountCore(app, gateway, baseDir).
+- routes/settings.routes.ts (mountSettings): memory reset, vault key CRUD +
+  provider refresh, sanitized config read + whitelisted update, Telegram bridge.
+- routes/projects.routes.ts (mountProjects): the Project Engine section (templates,
+  project + pipeline creation, start/auto-execute incl. the local helpers
+  buildStepUserMessage/getSmartExcerpt/stepNeedsFullManuscript, retry/restart/
+  resume/pause, file listing/download, DOCX export, compile, provider override).
+- routes.ts calls mountSettings + mountProjects.
 
-Verification harness for the rest of Stage B: enumerate every app.METHOD('path')
-across routes.ts + routes/*.ts and diff vs the pre-split baseline. This guards
-against the main risk — a dropped/renamed route from a transcription slip — since
-gateway is `any`-typed and tsc can't catch service/method typos in handler bodies.
+Large sections are lifted verbatim via sed (handlers close over services/gateway/
+baseDir, not `this`, so no renaming is needed) and wrapped — fidelity-guaranteed.
+Each step verified by diffing every app.METHOD('path') vs the pre-split baseline.
 
-Remaining mounters: memory; settings (vault/config/telegram); projects (+ its
-local helpers buildStepUserMessage/getSmartExcerpt/stepNeedsFullManuscript);
-documents; personas; media (research/image/tts); ops (lessons/prefs/orchestrator);
-export; wave2/3; knowledge; website. The 3 cross-cutting helpers (upload,
-gatherChapters, addWaveDisclaimer) get lifted into _shared.ts as param-taking
-functions. Final gate before PR: rebuild on Mercury + full tests/openrouter-pipeline.sh.
+Remaining mounters: documents (+ the cross-cutting `upload` multer), heartbeat,
+personas, media (research/image/tts), ops (lessons/prefs/orchestrator), export
+(+ cross-cutting `gatherChapters`, `upload`), wave2/3 (+ `gatherChapters`,
+`addWaveDisclaimer`), knowledge, website. The 3 cross-cutting helpers get lifted
+into routes/_shared.ts next. Final gate: Mercury rebuild + tests/openrouter-pipeline.sh.
