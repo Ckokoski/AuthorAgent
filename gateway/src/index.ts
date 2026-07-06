@@ -613,6 +613,10 @@ class AuthorClawGateway {
 
     this.translationPipeline = new TranslationPipelineService();
     this.translationPipeline.setGate(this.confirmationGate);
+    this.translationPipeline.setAI(
+      (req) => this.aiRouter.complete(req),
+      (taskType: string) => this.aiRouter.selectProvider(taskType),
+    );
 
     this.websiteBuilder = new WebsiteBuilderService(join(ROOT_DIR, 'workspace'));
     console.log('  ✓ AMS, BookBub, Reader Intel, Translation, Website Builder ready');

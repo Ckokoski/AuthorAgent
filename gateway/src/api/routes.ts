@@ -24,6 +24,82 @@ function safePath(base: string, userInput: string): string | null {
   return safeResolveWithin(base, userInput);
 }
 
+/**
+ * Non-blocking sanity check for vault key/value slot mismatches.
+ *
+ * Bug this guards against: a Gemini key (`AIzaSy...`) was pasted into the
+ * OpenAI vault slot, so gpt-image calls 401'd silently — nothing at save
+ * time hinted the value was in the wrong slot. This never blocks the save
+ * (the user may know better, e.g. a proxy that re-maps keys); it only
+ * returns a warning string for the caller to surface.
+ */
+function validateKeyFormat(keyName: string, value: string): { ok: boolean; warning?: string } {
+  const looksGoogle = /^AIzaSy/.test(value);
+  const looksAnthropic = /^sk-ant-/.test(value);
+  const looksOpenAI = /^sk-(?!ant-)/.test(value); // sk-... but not sk-ant-...
+
+  switch (keyName) {
+    case 'openai_api_key': {
+      if (looksGoogle) {
+        return { ok: false, warning: 'This looks like a Google/Gemini API key (starts with "AIzaSy"), not an OpenAI key (usually starts with "sk-" or "sk-proj-").' };
+      }
+      if (looksAnthropic) {
+        return { ok: false, warning: 'This looks like an Anthropic/Claude API key (starts with "sk-ant-"), not an OpenAI key.' };
+      }
+      if (!looksOpenAI) {
+        return { ok: false, warning: 'OpenAI API keys usually start with "sk-" or "sk-proj-". Double-check this is the right key.' };
+      }
+      return { ok: true };
+    }
+
+    case 'anthropic_api_key': {
+      if (looksGoogle) {
+        return { ok: false, warning: 'This looks like a Google/Gemini API key (starts with "AIzaSy"), not an Anthropic/Claude key (starts with "sk-ant-").' };
+      }
+      if (value.startsWith('sk-') && !looksAnthropic) {
+        return { ok: false, warning: 'This looks like a plain "sk-" key (e.g. OpenAI), not an Anthropic/Claude key (usually starts with "sk-ant-").' };
+      }
+      if (!looksAnthropic) {
+        return { ok: false, warning: 'Anthropic/Claude API keys usually start with "sk-ant-". Double-check this is the right key.' };
+      }
+      return { ok: true };
+    }
+
+    case 'gemini_api_key': {
+      if (looksOpenAI || looksAnthropic) {
+        return { ok: false, warning: 'This looks like an OpenAI/Anthropic API key ("sk-..."), not a Google/Gemini key (usually starts with "AIzaSy").' };
+      }
+      if (!looksGoogle) {
+        return { ok: false, warning: 'Google/Gemini API keys usually start with "AIzaSy". Double-check this is the right key.' };
+      }
+      return { ok: true };
+    }
+
+    case 'together_api_key':
+    case 'openrouter_api_key': {
+      if (looksGoogle) {
+        return { ok: false, warning: `This looks like a Google/Gemini API key (starts with "AIzaSy"), not a ${keyName.replace(/_/g, ' ')}.` };
+      }
+      if (looksAnthropic) {
+        return { ok: false, warning: `This looks like an Anthropic/Claude API key (starts with "sk-ant-"), not a ${keyName.replace(/_/g, ' ')}.` };
+      }
+      // together/openrouter keys can legitimately look like "sk-..." (openrouter is "sk-or-v1-...")
+      // so a bare OpenAI-style key isn't flagged here, only clear cross-provider mismatches.
+      return { ok: true };
+    }
+
+    case 'telegram_bot_token': {
+      if (!/^\d+:[A-Za-z0-9_-]+$/.test(value)) {
+        return { ok: false, warning: 'Telegram bot tokens usually look like "123456789:ABC-DEF...". Double-check this is the right value.' };
+      }
+      return { ok: true };
+    }
+
+    default:
+      return { ok: true };
+  }
+}
+
 export function createAPIRoutes(app: Application, gateway: any, rootDir?: string): void {
   const services = gateway.getServices();
   const baseDir = rootDir || process.cwd();
@@ -250,6 +326,14 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
       return res.status(400).json({ error: 'Invalid key name. Use only letters, numbers, underscores, and hyphens.' });
     }
+
+    // Non-blocking format check — catches slot/format mismatches (e.g. a
+    // Gemini key pasted into the OpenAI slot) without preventing the save.
+    const formatCheck = validateKeyFormat(key, value);
+    if (!formatCheck.ok && formatCheck.warning) {
+      console.warn(`[vault] Key format warning for "${key}": ${formatCheck.warning}`);
+    }
+
     try {
       await services.vault.set(key, value);
       await services.audit.log('vault', 'key_stored', { key });
@@ -261,7 +345,7 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
         refreshedProviders = await services.aiRouter.reinitialize();
       }
 
-      res.json({ success: true, key, refreshedProviders });
+      res.json({ success: true, key, refreshedProviders, warning: formatCheck.warning });
     } catch (error) {
       res.status(500).json({ error: 'Failed to store key' });
     }
@@ -4770,6 +4854,42 @@ ${sourceCode.substring(0, 15000)}
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Proposal failed' });
+    }
+  });
+
+  // Execute an APPROVED translation. The user must first approve the
+  // ConfirmationRequest from /propose; this runs the gated translation and
+  // records the outcome back on the confirmation gate.
+  app.post('/api/translation/execute', async (req: Request, res: Response) => {
+    const tp = services.translationPipeline;
+    if (!tp) return res.status(503).json({ error: 'Translation pipeline not initialized' });
+
+    const {
+      confirmationId, manuscript, text, projectId,
+      targetLanguage, sourceLanguage, glossary, tier, preferredProvider,
+    } = req.body || {};
+
+    if (!confirmationId || typeof confirmationId !== 'string') {
+      return res.status(400).json({ error: "confirmationId (string) required — user must approve the translation request first" });
+    }
+    if (!targetLanguage) {
+      return res.status(400).json({ error: 'targetLanguage required' });
+    }
+    if (!manuscript && !text) {
+      return res.status(400).json({ error: 'manuscript (or text) with the full source text required' });
+    }
+
+    try {
+      const result = await tp.executeApprovedTranslation(confirmationId, {
+        manuscript, text, projectId,
+        targetLanguage, sourceLanguage, glossary, tier, preferredProvider,
+      });
+      addWaveDisclaimer(res);
+      res.json(result);
+    } catch (err: any) {
+      const msg = err?.message || 'Translation failed';
+      const status = /not 'approved'|not found|expired|rejected/i.test(msg) ? 409 : 500;
+      res.status(status).json({ error: msg });
     }
   });
 

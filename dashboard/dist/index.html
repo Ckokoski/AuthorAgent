@@ -2712,8 +2712,10 @@ function renderKeyProviders() {
   if (!el) { console.warn('apiKeyProviders div missing — Settings panel may have failed to load'); return; }
   el.innerHTML = '';
   keyProviders.forEach(function(p) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:10px;';
     var row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;';
+    row.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
     var helpLink = p.helpUrl
       ? '<a href="' + esc(p.helpUrl) + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);text-decoration:none;" title="Open ' + esc(p.label) + ' API key page">Get key →</a>'
       : '';
@@ -2723,18 +2725,36 @@ function renderKeyProviders() {
       '<input type="password" class="key-input" data-key="' + esc(p.key) + '" placeholder="' + placeholder + '" style="flex:1;min-width:200px;" autocomplete="off">' +
       '<button class="small btn-save-key" data-key="' + esc(p.key) + '">Save</button>' +
       (helpLink ? '<span style="margin-left:6px;">' + helpLink + '</span>' : '');
-    el.appendChild(row);
+    wrap.appendChild(row);
+    var warnEl = document.createElement('div');
+    warnEl.className = 'key-format-warning';
+    warnEl.setAttribute('data-key-warning', p.key);
+    warnEl.style.cssText = 'display:none;font-size:11px;color:var(--warning, #d97706);margin-top:4px;';
+    wrap.appendChild(warnEl);
+    el.appendChild(wrap);
   });
 
   el.querySelectorAll('.btn-save-key').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var keyName = btn.getAttribute('data-key');
       var input = el.querySelector('input[data-key="' + keyName + '"]');
+      var warnEl = el.querySelector('[data-key-warning="' + keyName + '"]');
       var value = input.value.trim();
       if (!value) { showToast('Please enter a key value', 'error'); return; }
-      api('POST', '/api/vault', { key: keyName, value: value }).then(function() {
+      if (warnEl) { warnEl.style.display = 'none'; warnEl.textContent = ''; }
+      api('POST', '/api/vault', { key: keyName, value: value }).then(function(data) {
         input.value = '';
-        showToast('Key saved and encrypted!', 'success');
+        if (data && data.warning) {
+          // Non-blocking: the key was still saved. Surface a subtle caution
+          // note near the field rather than failing or alarming the user.
+          showToast('Key saved, but format looks off — see note below', 'info');
+          if (warnEl) {
+            warnEl.textContent = '⚠ ' + data.warning;
+            warnEl.style.display = 'block';
+          }
+        } else {
+          showToast('Key saved and encrypted!', 'success');
+        }
         loadKeys();
         loadStatus();
       }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
