@@ -246,6 +246,128 @@ describe('AIRouter provider selection and tiering (mocked vault/network)', () =>
     });
   });
 
+  describe('model resolution precedence (override > config > default)', () => {
+    let workspaceDir: string;
+
+    beforeEach(async () => {
+      workspaceDir = await mkdtemp(join(tmpdir(), 'authorclaw-modelcfg-test-'));
+    });
+
+    afterEach(async () => {
+      await rm(workspaceDir, { recursive: true, force: true });
+    });
+
+    it('uses the hardcoded default when no config and no override are set', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const router = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await router.initialize();
+      expect(router.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-2.5-flash');
+    });
+
+    it('uses config.<provider>.model over the hardcoded default', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const router = new AIRouter(
+        { ollama: { enabled: false }, gemini: { model: 'gemini-2.5-pro' } },
+        vault, costs, workspaceDir,
+      );
+      await router.initialize();
+      expect(router.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-2.5-pro');
+    });
+
+    it('override from model-config.json wins over both config and default, without restart', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const router = new AIRouter(
+        { ollama: { enabled: false }, gemini: { model: 'gemini-2.5-pro' } },
+        vault, costs, workspaceDir,
+      );
+      await router.initialize();
+      // Override to a custom model; setProviderModel persists + reinitializes.
+      await router.setProviderModel('gemini', 'gemini-experimental-x');
+      expect(router.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-experimental-x');
+    });
+
+    it('persists the override to disk (survives a fresh router load)', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const r1 = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await r1.initialize();
+      await r1.setProviderModel('gemini', 'gemini-2.5-pro');
+
+      // New router pointed at the same workspace loads the persisted override.
+      const r2 = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await r2.initialize();
+      expect(r2.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-2.5-pro');
+    });
+
+    it('clearing the override (empty string) reverts to config/default', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const router = new AIRouter(
+        { ollama: { enabled: false }, gemini: { model: 'gemini-2.5-pro' } },
+        vault, costs, workspaceDir,
+      );
+      await router.initialize();
+      await router.setProviderModel('gemini', 'gemini-experimental-x');
+      expect(router.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-experimental-x');
+      await router.setProviderModel('gemini', '');
+      expect(router.getActiveProviders().find(p => p.id === 'gemini')!.model).toBe('gemini-2.5-pro');
+    });
+
+    it('setProviderModel throws for an unknown provider', async () => {
+      const router = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await router.initialize();
+      await expect(router.setProviderModel('not-a-provider', 'x')).rejects.toThrow('Unknown provider');
+    });
+
+    it('cost math is UNCHANGED for the default models (model-aware pricing preserves today\'s numbers)', async () => {
+      await vault.set('anthropic_api_key', 'k-claude');
+      await vault.set('openai_api_key', 'k-openai');
+      await vault.set('deepseek_api_key', 'k-deepseek');
+      const router = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await router.initialize();
+      const active = router.getActiveProviders();
+      const claude = active.find(p => p.id === 'claude')!;
+      const openai = active.find(p => p.id === 'openai')!;
+      const deepseek = active.find(p => p.id === 'deepseek')!;
+      expect(claude.costPer1kInput).toBe(0.003);
+      expect(claude.costPer1kOutput).toBe(0.015);
+      expect(openai.costPer1kInput).toBe(0.0025);
+      expect(openai.costPer1kOutput).toBe(0.01);
+      expect(deepseek.costPer1kInput).toBe(0.00014);
+      expect(deepseek.costPer1kOutput).toBe(0.00028);
+    });
+
+    it('switching a provider model updates its cost math (model-aware pricing)', async () => {
+      await vault.set('anthropic_api_key', 'k-claude');
+      const router = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await router.initialize();
+      // Default claude = sonnet 4.5 = 0.003/0.015
+      expect(router.getActiveProviders().find(p => p.id === 'claude')!.costPer1kInput).toBe(0.003);
+      // Switch to Fable 5 = 0.010/0.050 (rough), cost math follows the model.
+      await router.setProviderModel('claude', 'claude-fable-5');
+      const claude = router.getActiveProviders().find(p => p.id === 'claude')!;
+      expect(claude.model).toBe('claude-fable-5');
+      expect(claude.costPer1kInput).toBe(0.010);
+      expect(claude.costPer1kOutput).toBe(0.050);
+    });
+
+    it('getProviderModelInfo reports currentModel, defaultModel, knownModels, and price', async () => {
+      await vault.set('gemini_api_key', 'k1');
+      const router = new AIRouter({ ollama: { enabled: false } }, vault, costs, workspaceDir);
+      await router.initialize();
+      const info = router.getProviderModelInfo();
+      const gemini = info.find(p => p.id === 'gemini')!;
+      expect(gemini.available).toBe(true);
+      expect(gemini.currentModel).toBe('gemini-2.5-flash');
+      expect(gemini.defaultModel).toBe('gemini-2.5-flash');
+      expect(gemini.knownModels).toContain('gemini-2.5-pro');
+      expect(gemini.price.costPer1kInput).toBe(0);
+      // Providers without a key still appear, with available=false and the resolved default model.
+      const claude = info.find(p => p.id === 'claude')!;
+      expect(claude.available).toBe(false);
+      expect(claude.currentModel).toBe('claude-sonnet-4-5-20250929');
+      expect(claude.knownModels).toContain('claude-fable-5');
+    });
+  });
+
   describe('complete() dispatch (smoke test)', () => {
     // TODO: deeper coverage — complete() has one HTTP-calling method per
     // provider (completeOllama/completeGemini/completeClaude/

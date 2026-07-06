@@ -345,7 +345,7 @@ class AuthorClawGateway {
     await this.costs.initialize();
     logger.info(`  ✓ Budget: $${this.costs.dailyLimit}/day, $${this.costs.monthlyLimit}/month (persisted)`);
 
-    this.aiRouter = new AIRouter(this.config.get('ai'), this.vault, this.costs);
+    this.aiRouter = new AIRouter(this.config.get('ai'), this.vault, this.costs, join(ROOT_DIR, 'workspace'));
     await this.aiRouter.initialize();
     // Load global preferred provider from config
     const globalPref = this.config.get('ai.preferredProvider');

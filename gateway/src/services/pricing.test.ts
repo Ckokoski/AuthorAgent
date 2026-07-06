@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PRICING, PRICING_LAST_VERIFIED, getOpenAIImagePrice } from './pricing.js';
+import { PRICING, PRICING_LAST_VERIFIED, getOpenAIImagePrice, getLLMPrice, LLM_PRICING } from './pricing.js';
 
 describe('PRICING table shape', () => {
   it('exposes lastVerified matching the exported constant', () => {
@@ -132,6 +132,89 @@ describe('getOpenAIImagePrice — gpt-image-2 (explicit model)', () => {
   it('uses gpt-image-1 pricing for any model string other than "gpt-image-2"', () => {
     expect(getOpenAIImagePrice(1024, 1024, 'high', 'some-other-model')).toBe(0.17);
     expect(getOpenAIImagePrice(1024, 1024, 'high', undefined)).toBe(0.17);
+  });
+});
+
+describe('getLLMPrice — LLM per-model pricing', () => {
+  it('returns listed pricing for known Claude models', () => {
+    const sonnet = getLLMPrice('claude-sonnet-4-5');
+    expect(sonnet.costPer1kInput).toBe(0.003);
+    expect(sonnet.costPer1kOutput).toBe(0.015);
+    expect(sonnet.confidence).toBe('listed');
+
+    const opus = getLLMPrice('claude-opus-4-8');
+    expect(opus.costPer1kInput).toBe(0.005);
+    expect(opus.costPer1kOutput).toBe(0.025);
+    expect(opus.confidence).toBe('listed');
+  });
+
+  it('marks Claude Fable 5 pricing as "rough" (unverified, above Opus tier)', () => {
+    const fable = getLLMPrice('claude-fable-5');
+    expect(fable.costPer1kInput).toBe(0.010);
+    expect(fable.costPer1kOutput).toBe(0.050);
+    expect(fable.confidence).toBe('rough');
+  });
+
+  it('returns listed pricing for known OpenAI + DeepSeek models', () => {
+    const gpt4o = getLLMPrice('gpt-4o');
+    expect(gpt4o.costPer1kInput).toBe(0.0025);
+    expect(gpt4o.costPer1kOutput).toBe(0.01);
+    expect(gpt4o.confidence).toBe('listed');
+
+    const deepseek = getLLMPrice('deepseek-chat');
+    expect(deepseek.costPer1kInput).toBe(0.00014);
+    expect(deepseek.costPer1kOutput).toBe(0.00028);
+  });
+
+  it('marks gpt-5 / o-series as "rough" (unverified)', () => {
+    expect(getLLMPrice('gpt-5').confidence).toBe('rough');
+    expect(getLLMPrice('o3').confidence).toBe('rough');
+  });
+
+  it('prices Gemini free-tier models at zero', () => {
+    const flash = getLLMPrice('gemini-2.5-flash');
+    expect(flash.costPer1kInput).toBe(0);
+    expect(flash.costPer1kOutput).toBe(0);
+    const pro = getLLMPrice('gemini-2.5-pro');
+    expect(pro.costPer1kInput).toBe(0);
+    expect(pro.costPer1kOutput).toBe(0);
+  });
+
+  it('falls back to provided numbers with "rough" confidence for an unknown model (never throws)', () => {
+    const price = getLLMPrice('some-future-model-9000', { costPer1kInput: 0.003, costPer1kOutput: 0.015 });
+    expect(price.costPer1kInput).toBe(0.003);
+    expect(price.costPer1kOutput).toBe(0.015);
+    expect(price.confidence).toBe('rough');
+    expect(price.note).toContain('some-future-model-9000');
+  });
+
+  it('falls back to 0/0 for an unknown model when no fallback is supplied', () => {
+    const price = getLLMPrice('totally-unknown');
+    expect(price.costPer1kInput).toBe(0);
+    expect(price.costPer1kOutput).toBe(0);
+    expect(price.confidence).toBe('rough');
+  });
+
+  it('every LLM_PRICING row has a lastVerified date and a note', () => {
+    for (const [model, entry] of Object.entries(LLM_PRICING)) {
+      expect(entry.lastVerified).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(typeof entry.note).toBe('string');
+      expect(entry.note.length).toBeGreaterThan(0);
+      expect(typeof entry.costPer1kInput).toBe('number');
+      expect(typeof entry.costPer1kOutput).toBe('number');
+    }
+  });
+
+  it('matches the historical hardcoded default-model prices (cost math unchanged for defaults)', () => {
+    // These per-1K numbers are the router's historical hardcoded values —
+    // keeping them exact means model-aware pricing does not change cost math
+    // for anyone still on the default models.
+    expect(getLLMPrice('claude-sonnet-4-5').costPer1kInput).toBe(0.003);
+    expect(getLLMPrice('claude-sonnet-4-5').costPer1kOutput).toBe(0.015);
+    expect(getLLMPrice('gpt-4o').costPer1kInput).toBe(0.0025);
+    expect(getLLMPrice('gpt-4o').costPer1kOutput).toBe(0.01);
+    expect(getLLMPrice('deepseek-chat').costPer1kInput).toBe(0.00014);
+    expect(getLLMPrice('deepseek-chat').costPer1kOutput).toBe(0.00028);
   });
 });
 

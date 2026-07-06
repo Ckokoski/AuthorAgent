@@ -272,6 +272,51 @@ export function registerSystemRoutes(ctx: ApiContext): void {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // Per-provider Model Selection (settings-editable)
+  // ═══════════════════════════════════════════════════════════
+
+  // List each provider's current/default model, tier, known models, and price.
+  app.get('/api/models', (_req: Request, res: Response) => {
+    const router = services.aiRouter;
+    if (!router || typeof router.getProviderModelInfo !== 'function') {
+      return res.status(503).json({ error: 'AI router not available' });
+    }
+    res.json({ providers: router.getProviderModelInfo() });
+  });
+
+  // Set a provider's model (settings-editable), persist, and reinitialize.
+  // Accepts a free-text custom model string — unknown models are allowed
+  // (price confidence is reported as 'rough').
+  app.post('/api/models', async (req: Request, res: Response) => {
+    const router = services.aiRouter;
+    if (!router || typeof router.setProviderModel !== 'function') {
+      return res.status(503).json({ error: 'AI router not available' });
+    }
+    const { provider, model } = req.body || {};
+    if (!provider || typeof provider !== 'string') {
+      return res.status(400).json({ error: 'provider (string) required' });
+    }
+    if (typeof model !== 'string') {
+      return res.status(400).json({ error: 'model (string) required (empty string clears the override)' });
+    }
+    const knownProviders: string[] = typeof router.getKnownProviders === 'function'
+      ? router.getKnownProviders()
+      : [];
+    if (knownProviders.length > 0 && !knownProviders.includes(provider)) {
+      return res.status(400).json({ error: `Unknown provider "${provider}". Known: ${knownProviders.join(', ')}` });
+    }
+    try {
+      await router.setProviderModel(provider, model);
+      await services.audit?.log?.('models', 'model_set', { provider, model });
+      // Return the updated info for just this provider.
+      const info = router.getProviderModelInfo().find((p: any) => p.id === provider);
+      res.json({ success: true, provider: info });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to set provider model' });
+    }
+  });
+
   // Load API keys from text files in the VM shared folder
   app.post('/api/vault/load-from-files', async (req: Request, res: Response) => {
     const { readFile: rf } = await import('fs/promises');

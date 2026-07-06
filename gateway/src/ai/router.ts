@@ -8,6 +8,8 @@ import { createHash } from 'crypto';
 import { Vault } from '../security/vault.js';
 import { CostTracker } from '../services/costs.js';
 import { logger } from '../services/logger.js';
+import { getLLMPrice } from '../services/pricing.js';
+import { ModelConfig } from './model-config.js';
 
 const log = logger.child('[router]');
 
@@ -136,6 +138,49 @@ export function getOutputBudget(taskType: string): number {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Per-provider defaults
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Hardcoded default model + fallback pricing per provider.
+ *
+ * `defaultModel` is the last resort in the model-resolution precedence
+ * (model-config.json override → config.<provider>.model → this).
+ *
+ * `costPer1kInput/Output` are the provider's historical hardcoded numbers,
+ * used ONLY as the fallback pricing when the active model isn't in the
+ * LLM_PRICING table (see getLLMPrice). Keeping them here means an unknown /
+ * custom model still bills like that provider's default instead of $0.
+ */
+interface ProviderDefault {
+  defaultModel: string;
+  tier: 'free' | 'cheap' | 'paid';
+  costPer1kInput: number;
+  costPer1kOutput: number;
+}
+
+const PROVIDER_DEFAULTS: Record<string, ProviderDefault> = {
+  ollama:     { defaultModel: 'llama3.2',                       tier: 'free',  costPer1kInput: 0,       costPer1kOutput: 0 },
+  gemini:     { defaultModel: 'gemini-2.5-flash',              tier: 'free',  costPer1kInput: 0,       costPer1kOutput: 0 },
+  deepseek:   { defaultModel: 'deepseek-chat',                 tier: 'cheap', costPer1kInput: 0.00014, costPer1kOutput: 0.00028 },
+  claude:     { defaultModel: 'claude-sonnet-4-5-20250929',    tier: 'paid',  costPer1kInput: 0.003,   costPer1kOutput: 0.015 },
+  openai:     { defaultModel: 'gpt-4o',                        tier: 'paid',  costPer1kInput: 0.0025,  costPer1kOutput: 0.01 },
+  openrouter: { defaultModel: 'anthropic/claude-sonnet-4-5',   tier: 'cheap', costPer1kInput: 0.003,   costPer1kOutput: 0.015 },
+};
+
+/** Known model slugs per provider, for a settings dropdown. Free-text custom
+ *  models are ALSO allowed (see POST /api/models) — this is a convenience list,
+ *  not a whitelist. Includes future models (fable-5, opus-4-8, gpt-5, etc.). */
+export const KNOWN_MODELS: Record<string, string[]> = {
+  ollama:   ['llama3.2', 'llama3.1:8b-instruct-q4_K_M', 'mistral', 'qwen2.5'],
+  gemini:   ['gemini-2.5-flash', 'gemini-2.5-pro'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  claude:   ['claude-sonnet-4-5-20250929', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-fable-5', 'claude-haiku-4-5'],
+  openai:   ['gpt-4o', 'gpt-4o-mini', 'gpt-5', 'gpt-5-mini', 'o3', 'o4-mini'],
+  openrouter: ['anthropic/claude-sonnet-4-5', 'anthropic/claude-opus-4-8', 'openai/gpt-4o', 'google/gemini-2.5-pro', 'meta-llama/llama-3.1-70b-instruct'],
+};
+
+// ═══════════════════════════════════════════════════════════
 // AI Router
 // ═══════════════════════════════════════════════════════════
 
@@ -145,6 +190,7 @@ export class AIRouter {
   private vault: Vault;
   private costs: CostTracker;
   private globalPreferredProvider: string | null = null;
+  private modelConfig: ModelConfig | null = null;
 
   // ── Prompt Cache ──
   // Caches system prompt hashes so repeated calls with the same soul/style
@@ -154,15 +200,51 @@ export class AIRouter {
   private cacheMisses = 0;
   private savedTokens = 0;
 
-  constructor(config: any, vault: Vault, costs: CostTracker) {
+  constructor(config: any, vault: Vault, costs: CostTracker, workspaceDir?: string) {
     this.config = config;
     this.vault = vault;
     this.costs = costs;
+    // When a workspace is provided (production), model overrides are persisted
+    // to workspace/data/model-config.json. Tests that omit it get default-only
+    // behavior (no override store), matching pre-feature behavior.
+    if (workspaceDir) {
+      this.modelConfig = new ModelConfig(workspaceDir);
+    }
+  }
+
+  /**
+   * Resolve the active model for a provider using the precedence:
+   *   model-config.json override → this.config.<provider>.model → hardcoded default.
+   */
+  private resolveModel(provider: string, hardcodedDefault: string): string {
+    const override = this.modelConfig?.get(provider);
+    if (override && override.trim().length > 0) return override.trim();
+    const configured = this.config?.[provider]?.model;
+    if (configured && String(configured).trim().length > 0) return String(configured).trim();
+    return hardcodedDefault;
+  }
+
+  /**
+   * Build model-aware pricing for a provider's active model. Uses the
+   * per-model LLM_PRICING table, falling back to the provider's historical
+   * hardcoded numbers for unknown/custom model slugs (never throws).
+   */
+  private priceFor(provider: string, model: string): { costPer1kInput: number; costPer1kOutput: number } {
+    const def = PROVIDER_DEFAULTS[provider];
+    const price = getLLMPrice(model, def
+      ? { costPer1kInput: def.costPer1kInput, costPer1kOutput: def.costPer1kOutput }
+      : undefined);
+    return { costPer1kInput: price.costPer1kInput, costPer1kOutput: price.costPer1kOutput };
   }
 
   async initialize(): Promise<void> {
     // Clear any stale providers (important for reinitialize)
     this.providers.clear();
+
+    // Load persisted model overrides (safe no-op if no store / no file).
+    if (this.modelConfig) {
+      await this.modelConfig.load();
+    }
 
     // ── Ollama (FREE - Local) ──
     if (this.config.ollama?.enabled !== false) {
@@ -170,10 +252,12 @@ export class AIRouter {
         this.config.ollama?.endpoint || 'http://localhost:11434'
       );
       if (ollamaAvailable) {
+        const model = this.resolveModel('ollama', PROVIDER_DEFAULTS.ollama.defaultModel);
+        const price = this.priceFor('ollama', model);
         this.providers.set('ollama', {
           id: 'ollama',
           name: 'Ollama',
-          model: this.config.ollama?.model || 'llama3.2',
+          model,
           tier: 'free',
           available: true,
           endpoint: this.config.ollama?.endpoint || 'http://localhost:11434',
@@ -181,8 +265,8 @@ export class AIRouter {
           // for most modern instruct models without forcing the user to
           // tune num_ctx in their Modelfile.
           maxTokens: 8192,
-          costPer1kInput: 0,
-          costPer1kOutput: 0,
+          costPer1kInput: price.costPer1kInput,
+          costPer1kOutput: price.costPer1kOutput,
         });
       }
     }
@@ -190,66 +274,74 @@ export class AIRouter {
     // ── Google Gemini (FREE tier) ──
     const geminiKey = await this.vault.get('gemini_api_key');
     if (geminiKey) {
+      const model = this.resolveModel('gemini', PROVIDER_DEFAULTS.gemini.defaultModel);
+      const price = this.priceFor('gemini', model);
       this.providers.set('gemini', {
         id: 'gemini',
         name: 'Google Gemini',
-        model: this.config.gemini?.model || 'gemini-2.5-flash',
+        model,
         tier: 'free',
         available: true,
         endpoint: 'https://generativelanguage.googleapis.com/v1beta',
         maxTokens: 65536,
-        costPer1kInput: 0, // Free tier
-        costPer1kOutput: 0,
+        costPer1kInput: price.costPer1kInput, // Free tier for 2.5 flash/pro
+        costPer1kOutput: price.costPer1kOutput,
       });
     }
 
     // ── DeepSeek (CHEAP) ──
     const deepseekKey = await this.vault.get('deepseek_api_key');
     if (deepseekKey) {
+      const model = this.resolveModel('deepseek', PROVIDER_DEFAULTS.deepseek.defaultModel);
+      const price = this.priceFor('deepseek', model);
       this.providers.set('deepseek', {
         id: 'deepseek',
         name: 'DeepSeek',
-        model: this.config.deepseek?.model || 'deepseek-chat',
+        model,
         tier: 'cheap',
         available: true,
         endpoint: 'https://api.deepseek.com/v1',
         maxTokens: 8192, // DeepSeek-chat supports 8K output tokens
-        costPer1kInput: 0.00014,
-        costPer1kOutput: 0.00028,
+        costPer1kInput: price.costPer1kInput,
+        costPer1kOutput: price.costPer1kOutput,
       });
     }
 
     // ── Anthropic Claude (PAID) ──
     const claudeKey = await this.vault.get('anthropic_api_key');
     if (claudeKey) {
+      const model = this.resolveModel('claude', PROVIDER_DEFAULTS.claude.defaultModel);
+      const price = this.priceFor('claude', model);
       this.providers.set('claude', {
         id: 'claude',
         name: 'Anthropic Claude',
-        model: this.config.claude?.model || 'claude-sonnet-4-5-20250929',
+        model,
         tier: 'paid',
         available: true,
         endpoint: 'https://api.anthropic.com/v1',
         // Claude Sonnet 4.5 supports up to 64K output tokens. 16K is enough
         // for chapter prose + reasoning budget without becoming wasteful.
         maxTokens: 16384,
-        costPer1kInput: 0.003,
-        costPer1kOutput: 0.015,
+        costPer1kInput: price.costPer1kInput,
+        costPer1kOutput: price.costPer1kOutput,
       });
     }
 
     // ── OpenAI GPT (PAID) ──
     const openaiKey = await this.vault.get('openai_api_key');
     if (openaiKey) {
+      const model = this.resolveModel('openai', PROVIDER_DEFAULTS.openai.defaultModel);
+      const price = this.priceFor('openai', model);
       this.providers.set('openai', {
         id: 'openai',
         name: 'OpenAI GPT',
-        model: this.config.openai?.model || 'gpt-4o',
+        model,
         tier: 'paid',
         available: true,
         endpoint: 'https://api.openai.com/v1',
         maxTokens: 16384, // GPT-4o + GPT-4o-mini support 16K output tokens
-        costPer1kInput: 0.0025,
-        costPer1kOutput: 0.01,
+        costPer1kInput: price.costPer1kInput,
+        costPer1kOutput: price.costPer1kOutput,
       });
     }
 
@@ -259,10 +351,12 @@ export class AIRouter {
     // separate API keys. Requested by users who want one billing surface.
     const openrouterKey = await this.vault.get('openrouter_api_key');
     if (openrouterKey) {
+      const model = this.resolveModel('openrouter', PROVIDER_DEFAULTS.openrouter.defaultModel);
+      const price = this.priceFor('openrouter', model);
       this.providers.set('openrouter', {
         id: 'openrouter',
         name: 'OpenRouter',
-        model: this.config.openrouter?.model || 'anthropic/claude-sonnet-4-5',
+        model,
         // Tier depends on the chosen model — default to 'cheap' since users
         // typically pick OpenRouter for cost flexibility. Power users can
         // override per-project.
@@ -270,11 +364,12 @@ export class AIRouter {
         available: true,
         endpoint: 'https://openrouter.ai/api/v1',
         maxTokens: 16384,
-        // Cost varies wildly by model. These are placeholder estimates that
-        // assume Claude Sonnet pricing — actual cost is reported by the
-        // OpenRouter usage endpoint. Don't budget against this number.
-        costPer1kInput: 0.003,
-        costPer1kOutput: 0.015,
+        // Cost varies wildly by model. OpenRouter slugs (e.g.
+        // "anthropic/claude-sonnet-4-5") aren't in LLM_PRICING, so this falls
+        // back to the historical Claude-Sonnet-pricing estimate. Actual cost
+        // is reported by the OpenRouter usage endpoint — don't budget on this.
+        costPer1kInput: price.costPer1kInput,
+        costPer1kOutput: price.costPer1kOutput,
       });
     }
   }
@@ -287,6 +382,72 @@ export class AIRouter {
   async reinitialize(): Promise<string[]> {
     await this.initialize();
     return this.getActiveProviders().map(p => p.id);
+  }
+
+  /**
+   * Set (or clear) a provider's model override, persist it, and reinitialize
+   * so the change takes effect without a restart. Passing an empty model
+   * clears the override (reverts to config/default).
+   *
+   * Throws if the provider id is not a known provider.
+   */
+  async setProviderModel(provider: string, model: string): Promise<void> {
+    if (!PROVIDER_DEFAULTS[provider]) {
+      throw new Error(`Unknown provider: ${provider}`);
+    }
+    if (!this.modelConfig) {
+      throw new Error('Model config store not initialized (no workspace dir configured).');
+    }
+    await this.modelConfig.set(provider, model);
+    await this.reinitialize();
+  }
+
+  /** Known providers, whether or not they're currently available (have a key). */
+  getKnownProviders(): string[] {
+    return Object.keys(PROVIDER_DEFAULTS);
+  }
+
+  /**
+   * Describe every known provider's model config for the settings UI:
+   * current active model, hardcoded default, tier, known-model list, and the
+   * model-aware price for the current model. `available` reflects whether the
+   * provider currently has a key / is reachable.
+   */
+  getProviderModelInfo(): Array<{
+    id: string;
+    available: boolean;
+    currentModel: string;
+    defaultModel: string;
+    override: string | null;
+    tier: 'free' | 'cheap' | 'paid';
+    knownModels: string[];
+    price: { costPer1kInput: number; costPer1kOutput: number; confidence: string; lastVerified: string };
+  }> {
+    return Object.entries(PROVIDER_DEFAULTS).map(([id, def]) => {
+      const active = this.providers.get(id);
+      // Resolve the current model even when the provider isn't active (no key),
+      // so the UI can still show what it WOULD use.
+      const currentModel = active?.model ?? this.resolveModel(id, def.defaultModel);
+      const priceRow = getLLMPrice(currentModel, {
+        costPer1kInput: def.costPer1kInput,
+        costPer1kOutput: def.costPer1kOutput,
+      });
+      return {
+        id,
+        available: !!active?.available,
+        currentModel,
+        defaultModel: def.defaultModel,
+        override: this.modelConfig?.get(id) ?? null,
+        tier: def.tier,
+        knownModels: KNOWN_MODELS[id] ?? [],
+        price: {
+          costPer1kInput: priceRow.costPer1kInput,
+          costPer1kOutput: priceRow.costPer1kOutput,
+          confidence: priceRow.confidence,
+          lastVerified: priceRow.lastVerified,
+        },
+      };
+    });
   }
 
   private async checkOllama(endpoint: string): Promise<boolean> {
