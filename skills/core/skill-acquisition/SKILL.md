@@ -1,6 +1,8 @@
 ---
 name: skill-acquisition
 description: Research topics and create new skills for AuthorClaw to learn
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - learn how to
   - add a skill for

@@ -1,6 +1,8 @@
 ---
 name: task-planner
 description: Break complex tasks into actionable steps with dependencies and priorities
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - plan
   - break down

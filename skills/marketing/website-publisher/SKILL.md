@@ -1,6 +1,8 @@
 ---
 name: website-publisher
 description: Manage your author website — auto-publish books on completion, draft blog posts from your projects, render and deploy with one command
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - publish my site
   - publish my website

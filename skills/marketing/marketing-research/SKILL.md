@@ -1,6 +1,8 @@
 ---
 name: marketing-research
 description: Research literary agents, podcasts, book bloggers, reviewers, and newsletters in your genre with verified citations
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - find literary agents
   - find a literary agent

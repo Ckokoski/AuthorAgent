@@ -1,7 +1,7 @@
 ---
 name: prompt-optimizer
 description: Automatically improves prompts based on output quality, user feedback, and A/B testing results
-author: Writing Secrets
+author: AuthorClaw
 version: 1.0.0
 triggers:
   - "optimize prompt"

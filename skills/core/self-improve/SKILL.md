@@ -1,7 +1,7 @@
 ---
 name: self-improve
 description: Continuous self-improvement loop — AuthorClaw learns from mistakes, successes, and user feedback to get better over time
-author: Writing Secrets
+author: AuthorClaw
 version: 1.0.0
 triggers:
   - "self improve"

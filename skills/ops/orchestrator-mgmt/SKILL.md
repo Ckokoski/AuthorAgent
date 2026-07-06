@@ -1,6 +1,8 @@
 ---
 name: orchestrator-mgmt
 description: Manage user scripts and automated processes — start, stop, restart, monitor, view logs
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - script
   - scripts

@@ -1,6 +1,8 @@
 ---
 name: browser-automation
 description: Drive a browser through Wave 3 author actions (KDP, AMS, BookBub, ESP) safely via a confirmation-gated executor
+author: AuthorClaw
+version: 1.0.0
 triggers:
   - open kdp
   - open amazon kdp

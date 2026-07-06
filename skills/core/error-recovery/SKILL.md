@@ -1,7 +1,7 @@
 ---
 name: error-recovery
 description: Intelligent error diagnosis, automatic recovery strategies, and prevention of recurring failures
-author: Writing Secrets
+author: AuthorClaw
 version: 1.0.0
 triggers:
   - "error"
