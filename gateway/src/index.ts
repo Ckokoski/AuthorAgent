@@ -48,6 +48,7 @@ import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
 import { SkillCuratorService } from './services/skill-curator.js';
 import { WritingJudgeService } from './services/writing-judge.js';
+import { ProseEvolverService } from './services/prose-evolver.js';
 import { ReaderPanelService } from './services/reader-panel.js';
 import { ResearchLookupService } from './services/research-lookup.js';
 import { VideoResearchService } from './services/video-research.js';
@@ -181,6 +182,8 @@ class AuthorClawGateway {
   private set skillCurator(v: SkillCuratorService) { this.services.skillCurator = v; }
   private get writingJudge(): WritingJudgeService { return this.services.writingJudge; }
   private set writingJudge(v: WritingJudgeService) { this.services.writingJudge = v; }
+  private get proseEvolver(): ProseEvolverService { return this.services.proseEvolver; }
+  private set proseEvolver(v: ProseEvolverService) { this.services.proseEvolver = v; }
   private get readerPanel(): ReaderPanelService { return this.services.readerPanel; }
   private set readerPanel(v: ReaderPanelService) { this.services.readerPanel = v; }
   private get researchLookup(): ResearchLookupService { return this.services.researchLookup; }
@@ -631,6 +634,16 @@ class AuthorClawGateway {
     // keep AI cost predictable.
     this.writingJudge = new WritingJudgeService();
     logger.info('  ✓ Writing judge: mechanical screen + LLM judge ready');
+
+    // ── GEPA-style Reflective Prose Evolution ──
+    // Uses the WritingJudge as a fitness signal to iteratively improve a prose
+    // passage (score → reflect → revise → re-score), keeping only candidates
+    // that strictly beat the running best (Pareto / no-regression) and stopping
+    // after 2 non-improving rounds. Voice is preserved via the soul/style-guide;
+    // manuscript consistency via CORE memory. Stateless — deps (judge + router
+    // closures + soul + memoryTier) are passed per request from the route.
+    this.proseEvolver = new ProseEvolverService();
+    logger.info('  ✓ Prose evolver: GEPA reflective evolution (judge-as-fitness, no-regression) ready');
 
     // ── Synthetic Reader Panels — tournament-based marketing-asset testing ──
     // Pairwise persona tournament for blurbs/titles/cover-concepts with

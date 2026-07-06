@@ -44,6 +44,7 @@ import { CronSchedulerService } from './cron-scheduler.js';
 import { AutoSkillService } from './auto-skill.js';
 import { SkillCuratorService } from './skill-curator.js';
 import { WritingJudgeService } from './writing-judge.js';
+import { ProseEvolverService } from './prose-evolver.js';
 import { ReaderPanelService } from './reader-panel.js';
 import { ResearchLookupService } from './research-lookup.js';
 import { VideoResearchService } from './video-research.js';
@@ -111,6 +112,7 @@ export interface GatewayServices {
   autoSkill: AutoSkillService;
   skillCurator: SkillCuratorService;
   writingJudge: WritingJudgeService;
+  proseEvolver: ProseEvolverService;
   readerPanel: ReaderPanelService;
   researchLookup: ResearchLookupService;
   videoResearch: VideoResearchService;
@@ -191,6 +193,7 @@ export class ServiceContainer {
   autoSkill!: AutoSkillService;
   skillCurator!: SkillCuratorService;
   writingJudge!: WritingJudgeService;
+  proseEvolver!: ProseEvolverService;
   readerPanel!: ReaderPanelService;
   researchLookup!: ResearchLookupService;
   videoResearch!: VideoResearchService;
@@ -260,6 +263,7 @@ export class ServiceContainer {
       autoSkill: this.autoSkill,
       skillCurator: this.skillCurator,
       writingJudge: this.writingJudge,
+      proseEvolver: this.proseEvolver,
       readerPanel: this.readerPanel,
       researchLookup: this.researchLookup,
       videoResearch: this.videoResearch,

@@ -484,6 +484,69 @@ export function registerManuscriptQualityRoutes(ctx: ApiContext): void {
   });
 
   // ═══════════════════════════════════════════════════════════
+  // GEPA-style Reflective Prose Evolution
+  // ═══════════════════════════════════════════════════════════
+  // Iteratively improves a prose passage using the WritingJudge as a fitness
+  // signal: score → reflect (diagnose 2-3 highest-leverage fixes) → revise
+  // (voice-preserving) → re-score. Keeps only candidates that strictly beat the
+  // running best (Pareto / no-regression); varies the reflection angle after a
+  // non-improving round; stops after 2 non-improving rounds. Returns an
+  // auditable EvolutionResult (original vs best score, per-round trace, cost).
+  //
+  // Cost: ~3 AI calls per round (score + reflect + revise) plus 1 initial score.
+  // Rounds default 3, hard-capped at 5. Never throws — on any AI failure it
+  // returns the best-so-far (falling back to the original) with a warning.
+
+  /**
+   * POST /api/prose/evolve { passage, projectId?, goal?, rounds?, preserveVoice? }
+   *   503 if the evolver or the judge (its fitness function) is unavailable.
+   *   400 if the passage is missing or too short (< 40 chars).
+   */
+  app.post('/api/prose/evolve', async (req: Request, res: Response) => {
+    const evolver = services.proseEvolver;
+    const judge = services.writingJudge;
+    if (!evolver || !judge) {
+      return res.status(503).json({ error: 'Prose evolver or writing judge not initialized' });
+    }
+
+    const passage = typeof req.body?.passage === 'string' ? req.body.passage : '';
+    if (!passage || passage.trim().length < 40) {
+      return res.status(400).json({ error: 'passage (string, at least 40 characters) required' });
+    }
+
+    const projectId = typeof req.body?.projectId === 'string' ? req.body.projectId : undefined;
+    const goal = typeof req.body?.goal === 'string' ? req.body.goal : undefined;
+    const rounds = typeof req.body?.rounds === 'number' ? req.body.rounds : undefined;
+    const preserveVoice = req.body?.preserveVoice !== false; // default true
+
+    // Hydrate the project's CORE memory cache so voice-consistent revisions can
+    // read it (best-effort — evolve() degrades gracefully if it's empty).
+    if (projectId && services.contextEngine) {
+      try { await services.contextEngine.loadContext(projectId); } catch { /* anchorless is fine */ }
+    }
+
+    const aiCompleteFn = (r: any) => services.aiRouter.complete(r);
+    const aiSelectFn = (t: string) => services.aiRouter.selectProvider(t);
+
+    try {
+      const result = await evolver.evolve(
+        { passage, projectId, goal, rounds, preserveVoice },
+        {
+          writingJudge: judge,
+          aiComplete: aiCompleteFn,
+          aiSelectProvider: aiSelectFn,
+          soul: services.soul ?? null,
+          memoryTier: services.memoryTier ?? null,
+        },
+      );
+      res.json(result);
+    } catch (err: any) {
+      // evolve() is designed never to throw, but guard the closure construction.
+      res.status(500).json({ error: err?.message || 'Prose evolution failed' });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
   // Specialist Revision Passes — one prioritized findings report
   // ═══════════════════════════════════════════════════════════
   // Runs the coordinated set of narrow expert passes (continuity, voice,
