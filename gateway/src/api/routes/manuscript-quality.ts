@@ -553,4 +553,58 @@ export function registerManuscriptQualityRoutes(ctx: ApiContext): void {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // Active Contradiction Detection — evidence-chained consistency checker
+  // ═══════════════════════════════════════════════════════════
+  // Diffs a chapter against the project's persisted entity DB (attributes +
+  // change-log) and prior chapter summaries, returning categorized,
+  // evidence-backed contradictions (ConStory taxonomy). ONE mid-tier
+  // ('consistency') AI call. A report may be empty if no entities are cached
+  // for the project yet — extract entities on the chapters first.
+
+  /**
+   * POST /api/projects/:id/contradictions { chapterText, chapterId? }
+   *   Runs the ContradictionDetector against the project's entity DB + prior
+   *   summaries. chapterText required. 503 if the detector/context engine is
+   *   unavailable. 404 if the project is unknown.
+   */
+  app.post('/api/projects/:id/contradictions', async (req: Request, res: Response) => {
+    const detector = services.contradictionDetector;
+    const ctxEngine = services.contextEngine;
+    if (!detector || !ctxEngine) {
+      return res.status(503).json({ error: 'Contradiction detector not initialized' });
+    }
+
+    const engine = gateway.getProjectEngine?.();
+    const project = engine?.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const chapterText: string | undefined =
+      typeof req.body?.chapterText === 'string' ? req.body.chapterText : undefined;
+    if (!chapterText || chapterText.trim().length === 0) {
+      return res.status(400).json({ error: 'chapterText (string) required' });
+    }
+    const chapterId = typeof req.body?.chapterId === 'string' ? req.body.chapterId : undefined;
+
+    try {
+      // Load the canonical entity DB + summaries the detector diffs against.
+      // loadContext hydrates the in-memory cache; the pure getters read from it.
+      await ctxEngine.loadContext(req.params.id);
+      const entities = ctxEngine.getEntities(req.params.id);
+      const priorSummaries = ctxEngine.getSummaries(req.params.id);
+
+      const aiCompleteFn = (r: any) => services.aiRouter.complete(r);
+      const aiSelectFn = (t: string) => services.aiRouter.selectProvider(t);
+
+      const report = await detector.detect(
+        { projectId: req.params.id, chapterText, chapterId, priorSummaries, entities },
+        aiCompleteFn,
+        aiSelectFn,
+      );
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Contradiction detection failed' });
+    }
+  });
+
 }

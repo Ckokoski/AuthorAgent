@@ -13,6 +13,16 @@ function makeContextEngine(opts: {
   characters?: Array<{ name: string; aliases?: string[] }>;
   throws?: boolean;
 } = {}) {
+  const characters = (opts.characters ?? []).map(c => ({
+    name: c.name,
+    type: 'character',
+    aliases: c.aliases ?? [],
+    description: '',
+    firstAppearance: '',
+    lastSeen: '',
+    attributes: {},
+    changes: [],
+  }));
   return {
     runContinuityCheck: vi.fn(async () => {
       if (opts.throws) throw new Error('continuity boom');
@@ -24,18 +34,28 @@ function makeContextEngine(opts: {
         issues: opts.issues ?? [],
       };
     }),
-    getEntitiesByType: vi.fn((_pid: string, _type: string) =>
-      (opts.characters ?? []).map(c => ({
-        name: c.name,
-        type: 'character',
-        aliases: c.aliases ?? [],
-        description: '',
-        firstAppearance: '',
-        lastSeen: '',
-        attributes: {},
-        changes: [],
-      })),
-    ),
+    getEntitiesByType: vi.fn((_pid: string, _type: string) => characters),
+    // The upgraded continuity pass reads these when a detector is present.
+    getEntities: vi.fn((_pid: string) => characters),
+    getSummaries: vi.fn((_pid: string) => []),
+  } as any;
+}
+
+/** A stub ContradictionDetector — returns crafted contradictions. */
+function makeContradictionDetector(opts: { contradictions?: any[]; throws?: boolean } = {}) {
+  return {
+    detect: vi.fn(async () => {
+      if (opts.throws) throw new Error('detector boom');
+      const contradictions = opts.contradictions ?? [];
+      return {
+        projectId: 'p1',
+        generatedAt: new Date().toISOString(),
+        total: contradictions.length,
+        byCategory: {},
+        bySeverity: { error: 0, warning: 0, info: 0 },
+        contradictions,
+      };
+    }),
   } as any;
 }
 
@@ -297,6 +317,84 @@ describe('RevisionOrchestrator — per-pass tier routing (aiSelectProvider spy)'
     });
     await orch.analyze({ chapterText: CHAPTER, passes: ['craft'] });
     expect(calls).toContain('revision');
+  });
+});
+
+describe('RevisionOrchestrator — continuity pass uses ContradictionDetector (guarded)', () => {
+  it('prefers the detector: maps Contradictions → Findings (category = CATEGORY/subtype, evidence in description)', async () => {
+    const contextEngine = makeContextEngine({ characters: [{ name: 'Kai' }] });
+    const detector = makeContradictionDetector({
+      contradictions: [
+        {
+          category: 'CHARACTER',
+          subtype: 'trait',
+          severity: 'error',
+          description: "Kai's eyes changed color.",
+          chapterEvidence: 'brown eyes',
+          priorEvidence: 'eyeColor=green',
+          entity: 'Kai',
+          suggestion: 'pick one',
+        },
+      ],
+    });
+    const orch = new RevisionOrchestrator({
+      contextEngine,
+      contradictionDetector: detector,
+      aiComplete: vi.fn(async () => ({ text: '{}', tokensUsed: 0, estimatedCost: 0, provider: 'stub' })),
+      aiSelectProvider: vi.fn((_t: string) => ({ id: 'stub' })),
+    });
+
+    const report = await orch.analyze({ projectId: 'p1', chapterText: CHAPTER, chapterId: 'c2', passes: ['continuity'] });
+
+    expect(detector.detect).toHaveBeenCalledOnce();
+    // Fallback whole-index check must NOT run when the detector is present.
+    expect(contextEngine.runContinuityCheck).not.toHaveBeenCalled();
+    expect(report.totalFindings).toBe(1);
+    const f = report.findings[0];
+    expect(f.pass).toBe('continuity');
+    expect(f.category).toBe('CHARACTER/trait');
+    expect(f.severity).toBe('error');
+    expect(f.location).toBe('Kai');
+    // Evidence chain is folded into the description.
+    expect(f.description).toContain('brown eyes');
+    expect(f.description).toContain('eyeColor=green');
+  });
+
+  it('falls back to runContinuityCheck when NO detector is wired', async () => {
+    const contextEngine = makeContextEngine({
+      characters: [{ name: 'Kai' }],
+      issues: [
+        { category: 'character', severity: 'warning', description: 'old-style issue', chapters: ['c1'], evidence: [], suggestion: 'fix' },
+      ],
+    });
+    const orch = new RevisionOrchestrator({
+      contextEngine, // no contradictionDetector
+      aiComplete: vi.fn(async () => ({ text: '{}', tokensUsed: 0, estimatedCost: 0, provider: 'stub' })),
+      aiSelectProvider: vi.fn((_t: string) => ({ id: 'stub' })),
+    });
+
+    const report = await orch.analyze({ projectId: 'p1', chapterText: CHAPTER, passes: ['continuity'] });
+
+    expect(contextEngine.runContinuityCheck).toHaveBeenCalledOnce();
+    expect(report.totalFindings).toBe(1);
+    expect(report.findings[0].category).toBe('character');
+  });
+
+  it('a throwing detector is isolated — continuity is skipped, not fatal', async () => {
+    const contextEngine = makeContextEngine({ characters: [{ name: 'Kai' }] });
+    const detector = makeContradictionDetector({ throws: true });
+    const orch = new RevisionOrchestrator({
+      contextEngine,
+      contradictionDetector: detector,
+      writingJudge: makeWritingJudge({ issues: [] }),
+      aiComplete: vi.fn(async () => ({ text: '{}', tokensUsed: 0, estimatedCost: 0, provider: 'stub' })),
+      aiSelectProvider: vi.fn((_t: string) => ({ id: 'stub' })),
+    });
+
+    const report = await orch.analyze({ projectId: 'p1', chapterText: CHAPTER, passes: ['continuity', 'anti-slop'] });
+
+    expect(report.passesSkipped).toContain('continuity');
+    expect(report.passesRun).toContain('anti-slop');
   });
 });
 

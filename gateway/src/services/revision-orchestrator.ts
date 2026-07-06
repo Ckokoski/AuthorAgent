@@ -17,7 +17,11 @@
  *     try/catch and, on failure, is reported in `passesSkipped`.
  *
  * The passes:
- *   1. continuity  — ContextEngine.runContinuityCheck (entity-DB diff).
+ *   1. continuity  — ACTIVE CONTRADICTION DETECTION. When a ContradictionDetector
+ *                    is wired, the pass diffs the CHAPTER TEXT against the
+ *                    project's entity DB + prior summaries (evidence-chained,
+ *                    categorized findings). If no detector is available it falls
+ *                    back to ContextEngine.runContinuityCheck (whole-index diff).
  *                    tier 'consistency'. Needs a projectId.
  *   2. voice       — CharacterVoices drift detection for the chapter dialogue.
  *                    tier 'style_analysis'. Needs a projectId + entity DB.
@@ -36,6 +40,7 @@ import type { StyleCloneService } from './style-clone.js';
 import type { CraftCriticService } from './craft-critic.js';
 import type { DialogueAuditor } from './dialogue-auditor.js';
 import type { WritingJudgeService } from './writing-judge.js';
+import type { ContradictionDetector, Contradiction } from './contradiction-detector.js';
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -91,6 +96,11 @@ export interface RevisionOrchestratorDeps {
   craftCritic?: CraftCriticService | null;
   dialogueAuditor?: DialogueAuditor | null;
   writingJudge?: WritingJudgeService | null;
+  /** Active contradiction detector. When present, the continuity pass diffs the
+   *  chapter text against the entity DB + prior summaries (evidence-chained).
+   *  When absent, the continuity pass falls back to
+   *  ContextEngine.runContinuityCheck. Optional → graceful fallback. */
+  contradictionDetector?: ContradictionDetector | null;
   /** Closure that performs an AI completion (from AIRouter.complete). */
   aiComplete?: AICompleteFn | null;
   /** Closure that selects a provider for a task type (from
@@ -184,7 +194,14 @@ export class RevisionOrchestrator {
     };
   }
 
-  // ── Pass 1: continuity (tier 'consistency', premium reasoning) ──
+  // ── Pass 1: continuity (tier 'consistency', mid reasoning) ──
+  //
+  // UPGRADED to ACTIVE CONTRADICTION DETECTION. When a ContradictionDetector is
+  // wired, the pass diffs THE CHAPTER TEXT against the project's entity DB +
+  // prior summaries and returns evidence-chained, categorized contradictions.
+  // When no detector is available, it falls back to the original whole-index
+  // ContextEngine.runContinuityCheck. The guard means the upgrade is additive:
+  // a deployment without the detector behaves exactly as before.
 
   private async runContinuityPass(input: RevisionAnalyzeInput): Promise<Finding[]> {
     const engine = this.deps.contextEngine;
@@ -194,9 +211,46 @@ export class RevisionOrchestrator {
     }
 
     // Honor the cost tier: continuity is a cross-chapter reasoning problem →
-    // route it to the consistency tier (premium-leaning).
+    // route it to the consistency tier (mid). (The detector routes internally
+    // too; selecting here keeps the tier intent observable for the fallback
+    // path and for tier-routing assertions.)
     this.deps.aiSelectProvider('consistency');
 
+    // ── Preferred path: active contradiction detection on the chapter text ──
+    const detector = this.deps.contradictionDetector;
+    if (detector) {
+      // Pull the canonical entity DB + prior summaries from the engine's cached
+      // context (pure in-memory reads — never AI-call, never throw).
+      const entities = engine.getEntities(input.projectId);
+      const priorSummaries = engine.getSummaries(input.projectId);
+
+      const report = await detector.detect(
+        {
+          projectId: input.projectId,
+          chapterText: input.chapterText || '',
+          chapterId: input.chapterId,
+          priorSummaries,
+          entities,
+        },
+        this.deps.aiComplete,
+        this.deps.aiSelectProvider,
+      );
+
+      return (report?.contradictions ?? []).map((c: Contradiction) => ({
+        pass: 'continuity',
+        // Category carries the taxonomy category + subtype so the UI can group
+        // by both (e.g. "CHARACTER/trait").
+        category: `${c.category}/${c.subtype}`,
+        severity: c.severity,
+        location: c.entity || input.chapterId,
+        // Fold the evidence chain into the description so a Finding stays a
+        // flat shape while still carrying the defensible both-sides evidence.
+        description: this.formatContradiction(c),
+        suggestion: c.suggestion || undefined,
+      }));
+    }
+
+    // ── Fallback path: original whole-index continuity check ──
     const report = await engine.runContinuityCheck(
       input.projectId,
       this.deps.aiComplete,
@@ -211,6 +265,17 @@ export class RevisionOrchestrator {
       description: issue.description,
       suggestion: issue.suggestion || undefined,
     }));
+  }
+
+  /** Render a Contradiction into a self-contained, evidence-chained description. */
+  private formatContradiction(c: Contradiction): string {
+    const parts: string[] = [];
+    if (c.description) parts.push(c.description);
+    const evidence: string[] = [];
+    if (c.chapterEvidence) evidence.push(`this chapter: "${c.chapterEvidence}"`);
+    if (c.priorEvidence) evidence.push(`established: "${c.priorEvidence}"`);
+    if (evidence.length) parts.push(`[${evidence.join(' vs. ')}]`);
+    return parts.join(' ') || 'Contradiction detected';
   }
 
   // ── Pass 2: voice (tier 'style_analysis', mid) ──
