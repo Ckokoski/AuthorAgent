@@ -146,12 +146,7 @@ export class WebsiteDeployService {
         case 'cloudflare-pages':
           return await this.deployCloudflarePages(input);
         case 'github-pages':
-          return {
-            success: false, target,
-            durationMs: Date.now() - start,
-            output: '',
-            error: 'github-pages adapter is not implemented in v1 — use Netlify drag-and-drop or `manual-zip` for now. Add it later if author requests.',
-          };
+          return await this.deployGithubPages(input);
         case 'rsync':
           return await this.deployRsync(input);
         case 'manual-zip':
@@ -199,6 +194,128 @@ export class WebsiteDeployService {
     }
     const cmd = `wrangler pages deploy ${this.shellQuote(input.siteDir)} --project-name ${this.shellQuote(projectName)}`;
     return this.runCommand(cmd, 'cloudflare-pages', start, /(https:\/\/\S+\.pages\.dev)/i);
+  }
+
+  /**
+   * github-pages: init a scratch git repo *inside the rendered output dir*,
+   * commit everything, and force-push it to the configured remote branch
+   * (default `gh-pages`). We deliberately do NOT touch the author's actual
+   * project repo — this stages a throwaway repo in the build output so a
+   * force-push can't clobber unrelated history.
+   *
+   * Auth: relies entirely on the user's ambient git credentials (SSH agent,
+   * a stored credential helper, or a token embedded in an HTTPS remote URL
+   * they configured themselves). We never prompt for or store credentials
+   * here — if git fails with an auth error, we say so and point at the
+   * config, we don't attempt to intercept credentials.
+   */
+  private async deployGithubPages(input: {
+    siteId: string;
+    siteDir: string;
+    deployConfig: DeployConfig;
+  }): Promise<DeployResult> {
+    const start = Date.now();
+    const target: DeployTarget = 'github-pages';
+    const repo = input.deployConfig.options?.repo;
+    const branch = input.deployConfig.options?.branch || 'gh-pages';
+
+    if (!repo) {
+      return {
+        success: false, target,
+        durationMs: Date.now() - start,
+        output: '',
+        error: 'github-pages requires deploy.options.repo = your GitHub repo remote URL ' +
+          '(e.g. https://github.com/you/your-site.git or git@github.com:you/your-site.git). ' +
+          'Set deploy.options.branch to override the default `gh-pages` branch.',
+      };
+    }
+
+    const gitOk = await this.checkBinary('git');
+    if (!gitOk) {
+      return {
+        success: false, target,
+        durationMs: Date.now() - start,
+        output: '',
+        error: 'git is not installed or not on PATH. Install git (https://git-scm.com/downloads) and try again.',
+      };
+    }
+
+    // Run all git commands with cwd = the rendered site dir, staging a
+    // throwaway repo there. `git init` is idempotent if one already exists
+    // from a previous deploy (keeps a small amount of local history but we
+    // always force-push, so remote state is authoritative).
+    const gitCmd = (args: string) =>
+      execAsync(`git ${args}`, {
+        cwd: input.siteDir,
+        timeout: 5 * 60 * 1000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+    let output = '';
+    try {
+      if (!existsSync(join(input.siteDir, '.git'))) {
+        const initRes = await gitCmd('init -q');
+        output += initRes.stdout + initRes.stderr;
+      }
+
+      // Ensure identity is set for this repo so commit doesn't fail on a
+      // machine with no global user.name/user.email configured. Harmless
+      // if already set — local config always overrides.
+      await gitCmd(`config user.email "authorclaw@localhost"`);
+      await gitCmd(`config user.name "AuthorClaw"`);
+
+      const addRes = await gitCmd('add -A');
+      output += addRes.stdout + addRes.stderr;
+
+      // Commit — `--allow-empty` so a no-op render (unchanged site) doesn't
+      // hard-fail the deploy with "nothing to commit".
+      const stamp = new Date().toISOString();
+      const commitRes = await gitCmd(`commit -q --allow-empty -m ${this.shellQuote(`Deploy ${input.siteId} — ${stamp}`)}`);
+      output += commitRes.stdout + commitRes.stderr;
+
+      // Point (or repoint) origin at the configured remote every deploy —
+      // cheap and avoids drift if the author changes the repo config.
+      try {
+        await gitCmd(`remote remove origin`);
+      } catch { /* no existing remote — fine */ }
+      await gitCmd(`remote add origin ${this.shellQuote(repo)}`);
+
+      // Force-push HEAD to the target branch. Force is required because
+      // this scratch repo's history is unrelated to whatever's already on
+      // the remote branch (Pages branches are typically just build output).
+      const pushRes = await gitCmd(`push --force origin HEAD:${this.shellQuote(branch)}`);
+      output += pushRes.stdout + pushRes.stderr;
+
+      return {
+        success: true, target,
+        durationMs: Date.now() - start,
+        output: output.slice(-4000),
+        url: this.guessGithubPagesUrl(repo),
+      };
+    } catch (err: any) {
+      const combined = `${err?.stdout || ''}\n${err?.stderr || ''}`;
+      const authHint = /authentication|permission denied|could not read username|403/i.test(combined)
+        ? '\n\nThis looks like a git authentication failure. github-pages deploy relies on YOUR ambient git ' +
+          'credentials (SSH key in your agent, a stored credential helper, or a token baked into an HTTPS remote ' +
+          'URL) — AuthorClaw does not manage GitHub auth itself. Make sure `git push` to this repo already works ' +
+          'from a normal terminal on this machine before retrying here.'
+        : '';
+      return {
+        success: false, target,
+        durationMs: Date.now() - start,
+        output: (output + '\n' + combined).slice(-4000),
+        error: (err?.message?.slice(0, 500) || 'git command failed') + authHint,
+      };
+    }
+  }
+
+  /** Best-effort github.io URL guess from a repo remote — not authoritative
+   *  (custom domains / org Pages have different URLs), just a helpful hint. */
+  private guessGithubPagesUrl(repo: string): string | undefined {
+    const m = repo.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/i);
+    if (!m) return undefined;
+    const [, owner, name] = m;
+    return `https://${owner}.github.io/${name}/`;
   }
 
   private async deployRsync(input: { siteDir: string; deployConfig: DeployConfig }): Promise<DeployResult> {

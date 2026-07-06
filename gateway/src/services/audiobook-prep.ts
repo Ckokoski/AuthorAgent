@@ -23,6 +23,14 @@
  * Google Play, and Spotify all require disclosure of AI-narrated audio.
  */
 
+import {
+  splitParagraphs,
+  startsWithQuote,
+  matchSpeakerTag,
+  buildNameLookup,
+  escapeRegex as sharedEscapeRegex,
+} from './dialogue-parser.js';
+
 export interface PronunciationEntry {
   name: string;
   type: 'character' | 'location' | 'item' | 'event' | 'rule';
@@ -187,7 +195,7 @@ export class AudiobookPrepService {
       if (!this.looksUncommon(entity.name)) continue;
 
       // Count appearances in the full manuscript (case-insensitive).
-      const pattern = new RegExp(`\\b${this.escapeRegex(entity.name)}\\b`, 'gi');
+      const pattern = new RegExp(`\\b${sharedEscapeRegex(entity.name)}\\b`, 'gi');
       const count = (fullText.match(pattern) || []).length;
 
       entries.push({
@@ -248,7 +256,7 @@ export class AudiobookPrepService {
 
       // Replace named entities with SSML phoneme tags (only if IPA supplied).
       for (const [name, ipa] of ipaMap) {
-        const pattern = new RegExp(`\\b${this.escapeRegex(name)}\\b`, 'gi');
+        const pattern = new RegExp(`\\b${sharedEscapeRegex(name)}\\b`, 'gi');
         body = body.replace(pattern, (match) =>
           `<phoneme alphabet="ipa" ph="${ipa}">${match}</phoneme>`
         );
@@ -336,11 +344,7 @@ export class AudiobookPrepService {
     let segIdx = 0;
 
     // Build a fast-lookup set of canonical character names (lowercased).
-    const charNameLower = new Map<string, string>();
-    for (const n of input.characterNames || []) {
-      const k = n.toLowerCase().trim();
-      if (k) charNameLower.set(k, n);
-    }
+    const charNameLower = buildNameLookup(input.characterNames || []);
 
     // Helper: resolve a speaker name to a voice + flag unmapped.
     const resolveVoice = (name: string): string => {
@@ -359,18 +363,12 @@ export class AudiobookPrepService {
 
     // Split into paragraphs first — dialogue convention is one
     // speaker-per-paragraph in modern fiction.
-    const paragraphs = input.text.split(/\n\s*\n+/).filter(p => p.trim());
-
-    // Patterns we look for in attribution tags.
-    // Matches: "..." NAME said|asked|whispered|... | said|asked|... NAME ...
-    const explicitTagRe = /(?:["\u201D\u201C]\s*[,.?!]?\s*)([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+)?)\s+(?:said|asked|whispered|shouted|murmured|replied|added|continued|growled|hissed|breathed|spat|snapped|laughed|cried|exclaimed|gasped|muttered|sighed|stammered|interjected|noted|protested|objected)\b/i;
-    const reverseTagRe = /\b(?:said|asked|whispered|shouted|murmured|replied|added|continued|growled|hissed|breathed|spat|snapped|laughed|cried|exclaimed|gasped|muttered|sighed)\s+([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+)?)/i;
+    const paragraphs = splitParagraphs(input.text);
 
     for (const para of paragraphs) {
       const trimmed = para.trim();
       // Detect dialogue paragraphs by leading quote character.
-      const startsWithQuote = /^[""\u201C"]/.test(trimmed);
-      if (!startsWithQuote) {
+      if (!startsWithQuote(trimmed)) {
         // Pure narration / action beat — narrator voice.
         segments.push({
           index: segIdx++,
@@ -382,17 +380,12 @@ export class AudiobookPrepService {
         continue;
       }
 
-      // Try to extract a speaker name from the tag.
+      // Try to extract a speaker name from the tag (explicit, then reverse).
       let speakerName: string | null = null;
       let inferred = false;
 
-      const explicit = trimmed.match(explicitTagRe);
-      if (explicit?.[1]) {
-        speakerName = explicit[1].trim();
-      } else {
-        const reverse = trimmed.match(reverseTagRe);
-        if (reverse?.[1]) speakerName = reverse[1].trim();
-      }
+      const tagMatch = matchSpeakerTag(trimmed);
+      if (tagMatch) speakerName = tagMatch.name;
 
       // Validate the candidate against the known character list.
       if (speakerName) {
@@ -483,10 +476,6 @@ export class AudiobookPrepService {
       characterVoices,
       defaultCharacterVoice: input.presetVoiceIds[0] || input.narratorVoice,
     };
-  }
-
-  private escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private escapeXml(s: string): string {

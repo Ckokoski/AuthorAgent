@@ -46,6 +46,13 @@ export interface DeployConfig {
      *  read from .env / process.env at deploy time. We never store the
      *  token itself in this config. */
     tokenEnvVar?: string;
+    /** github-pages: the git remote URL to push to, e.g.
+     *  `https://github.com/author/author-site.git` or an SSH remote
+     *  (`git@github.com:author/author-site.git`). Required for github-pages. */
+    repo?: string;
+    /** github-pages: branch to force-push the rendered site to.
+     *  Defaults to `gh-pages`. */
+    branch?: string;
   };
 }
 

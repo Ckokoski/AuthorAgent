@@ -26,6 +26,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import type { ConfirmationGateService } from './confirmation-gate.js';
 import type { DisclosuresService, DisclosureScope } from './disclosures.js';
+import { PRICING, type CostConfidence } from './pricing.js';
 
 export type LaunchPhase =
   | 'draft_ready'
@@ -279,6 +280,9 @@ export class LaunchOrchestratorService {
 
     // Build the dry-run diff + rollback steps depending on the action.
     const { dryRunResult, rollbackSteps } = this.buildStepPreview(step, state);
+    const costEstimate = this.estimatedCostFor(step, state);
+    const dryRunWithCost = `${dryRunResult}\n\nEstimated cost: $${costEstimate.usd.toFixed(2)} ` +
+      `(${costEstimate.confidence === 'listed' ? 'listed' : 'rough estimate'}) — ${costEstimate.note}`;
 
     const req = await this.gate.createRequest({
       service: 'launch-orchestrator',
@@ -295,9 +299,9 @@ export class LaunchOrchestratorService {
       riskLevel: step.riskLevel,
       isReversible: phase !== 'launch_day' && !step.action.includes('Publish'),
       disclosures: this.disclosures.formatForConfirmation(check.requirements),
-      dryRunResult,
+      dryRunResult: dryRunWithCost,
       rollbackSteps,
-      estimatedCost: this.estimatedCostFor(step, state),
+      estimatedCost: costEstimate.usd,
     });
 
     // Track which confirmation this phase belongs to.
@@ -359,11 +363,29 @@ export class LaunchOrchestratorService {
     return { dryRunResult: dry, rollbackSteps: rollback };
   }
 
-  private estimatedCostFor(step: LaunchPlan['timeline'][0], _state: LaunchState): number | undefined {
-    if (step.action.toLowerCase().includes('ams') || step.action.toLowerCase().includes('ad')) {
-      return 0;  // First campaign has no cost until bids clear; user sets the cap in AMS.
-    }
-    return undefined;
+  /**
+   * Estimate the cost of a launch step, sourced from the central pricing
+   * table (pricing.ts). Every step returns SOME estimate — even if it's an
+   * explicit 0 — plus a confidence tag so callers/UI can distinguish a
+   * provider-listed price from a rough guess.
+   */
+  private estimatedCostFor(step: LaunchPlan['timeline'][0], _state: LaunchState): { usd: number; confidence: CostConfidence; note: string } {
+    const haystack = `${step.action} ${step.platform}`.toLowerCase();
+
+    const matchers: Array<{ test: RegExp; key: keyof typeof PRICING.launchSteps }> = [
+      { test: /\bams\b|advertising|ad campaign|\bads?\b/, key: 'ams' },
+      { test: /bookfunnel/, key: 'bookfunnel' },
+      { test: /email|esp/, key: 'esp' },
+      { test: /bookbub/, key: 'bookbub' },
+      { test: /kdp|amazon kdp/, key: 'kdp' },
+      { test: /social/, key: 'social' },
+      { test: /internal/, key: 'internal' },
+    ];
+
+    const match = matchers.find(m => m.test.test(haystack));
+    const entry = match ? PRICING.launchSteps[match.key] : PRICING.launchSteps.default;
+
+    return { usd: entry.usd, confidence: entry.confidence, note: entry.note };
   }
 
   private async persist(): Promise<void> {

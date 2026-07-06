@@ -4,11 +4,12 @@
  * Uses native fetch — no external dependencies.
  */
 
-import { mkdir, writeFile, readdir, stat, unlink } from 'fs/promises';
+import { mkdir, writeFile, readFile, readdir, stat, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { Vault } from '../security/vault.js';
+import { getOpenAIImagePrice } from './pricing.js';
 
 export interface ImageResult {
   success: boolean;
@@ -28,7 +29,38 @@ export interface ImageGenOptions {
   style?: 'realistic' | 'illustrated' | 'minimalist';
   /** OpenAI gpt-image-1 quality knob: 'low' | 'medium' | 'high' | 'auto' (default 'high' for covers) */
   quality?: 'low' | 'medium' | 'high' | 'auto';
+  /**
+   * Routing hint, separate from the `quality` param above (which is the
+   * OpenAI render-quality knob). 'final' (default) runs the full provider
+   * chain starting from the top (best output). 'draft' starts the chain at
+   * the configured `draftTier` provider (default 'gemini' / Nano Banana) to
+   * save money on concepts, social variants, and iteration passes — falling
+   * through the remaining chain on error exactly like 'final' does.
+   */
+  routingTier?: 'final' | 'draft';
 }
+
+/** Providers eligible to appear in the configurable fallback chain. */
+export type ImageProviderName = 'openai' | 'gemini' | 'together';
+
+/** Persisted, user-editable image-gen settings — model slugs and routing
+ *  order are settings, not code, per the owner's cheapest-best-output
+ *  philosophy. Lives at workspace/data/image-gen-config.json. */
+export interface ImageGenConfig {
+  /** OpenAI model slug to use. Default 'gpt-image-2'; falls back once to
+   *  'gpt-image-1' at request time if the configured model 404s. */
+  openaiModel: string;
+  /** Provider fallback order for 'auto' / 'final' routing. */
+  chain: ImageProviderName[];
+  /** Provider the chain starts at for 'draft'-tier calls (cheap iteration). */
+  draftTier: ImageProviderName;
+}
+
+const DEFAULT_IMAGE_GEN_CONFIG: ImageGenConfig = {
+  openaiModel: 'gpt-image-2',
+  chain: ['openai', 'gemini', 'together'],
+  draftTier: 'gemini',
+};
 
 /**
  * Standard cover sizes an author needs for the major retail platforms.
@@ -82,15 +114,27 @@ const COVER_VARIANTS: Record<CoverVariant, {
   },
 };
 
+/** 7 days — how long a discovered Gemini image model slug stays cached before re-probing. */
+const GEMINI_MODEL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface GeminiModelCacheFile {
+  model: string;
+  discoveredAt: string; // ISO
+}
+
 export class ImageGenService {
   private imageDir: string;
   private vault: Vault;
+  private dataDir: string;
+  private geminiModelCachePath: string;
+  private configPath: string;
+  private config: ImageGenConfig = { ...DEFAULT_IMAGE_GEN_CONFIG };
 
   // Together AI models
   private static readonly TOGETHER_FREE = 'black-forest-labs/FLUX.1-schnell-Free';
   private static readonly TOGETHER_PRO = 'black-forest-labs/FLUX.1.1-pro';
-  // OpenAI model
-  private static readonly OPENAI_MODEL = 'gpt-image-1';
+  // OpenAI model fallback when the configured model 404s ("model not found").
+  private static readonly OPENAI_FALLBACK_MODEL = 'gpt-image-1';
   // Gemini "Nano Banana" — Gemini's image-generation models. Decent text
   // rendering, free tier, uses the same gemini_api_key the AI router needs.
   // Model availability shifts month-to-month (Google rotates preview slugs),
@@ -107,10 +151,109 @@ export class ImageGenService {
   constructor(workspaceDir: string, vault: Vault) {
     this.imageDir = join(workspaceDir, 'images');
     this.vault = vault;
+    this.dataDir = join(workspaceDir, 'data');
+    this.geminiModelCachePath = join(this.dataDir, 'gemini-image-model.json');
+    this.configPath = join(this.dataDir, 'image-gen-config.json');
   }
 
   async initialize(): Promise<void> {
     await mkdir(this.imageDir, { recursive: true });
+    await mkdir(this.dataDir, { recursive: true });
+    await this.loadCachedGeminiImageModel();
+    await this.loadConfig();
+  }
+
+  // ── Configurable settings (model slugs, routing chain — settings, not code) ──
+
+  /** Load persisted settings from disk, creating the file with defaults if missing. */
+  private async loadConfig(): Promise<void> {
+    try {
+      if (!existsSync(this.configPath)) {
+        await this.saveConfig(DEFAULT_IMAGE_GEN_CONFIG);
+        this.config = { ...DEFAULT_IMAGE_GEN_CONFIG };
+        return;
+      }
+      const raw = await readFile(this.configPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      this.config = {
+        openaiModel: typeof parsed?.openaiModel === 'string' ? parsed.openaiModel : DEFAULT_IMAGE_GEN_CONFIG.openaiModel,
+        chain: Array.isArray(parsed?.chain) && parsed.chain.length > 0 ? parsed.chain : DEFAULT_IMAGE_GEN_CONFIG.chain,
+        draftTier: typeof parsed?.draftTier === 'string' ? parsed.draftTier : DEFAULT_IMAGE_GEN_CONFIG.draftTier,
+      };
+    } catch {
+      // Corrupted config — fall back to defaults in memory, don't clobber the file.
+      this.config = { ...DEFAULT_IMAGE_GEN_CONFIG };
+    }
+  }
+
+  /** Persist settings to disk (atomic write via temp file + rename). */
+  private async saveConfig(config: ImageGenConfig): Promise<void> {
+    await mkdir(this.dataDir, { recursive: true });
+    const tmp = this.configPath + '.tmp';
+    await writeFile(tmp, JSON.stringify(config, null, 2));
+    const { rename } = await import('fs/promises');
+    await rename(tmp, this.configPath);
+  }
+
+  /** Get the current image-gen settings (model slugs, chain, draft tier). */
+  getConfig(): ImageGenConfig {
+    return { ...this.config, chain: [...this.config.chain] };
+  }
+
+  /** Merge + persist a partial settings update. Returns the resulting config. */
+  async updateConfig(update: Partial<ImageGenConfig>): Promise<ImageGenConfig> {
+    const next: ImageGenConfig = {
+      openaiModel: update.openaiModel ?? this.config.openaiModel,
+      chain: update.chain ?? this.config.chain,
+      draftTier: update.draftTier ?? this.config.draftTier,
+    };
+    await this.saveConfig(next);
+    this.config = next;
+    return this.getConfig();
+  }
+
+  // ── Gemini model slug cache ──
+
+  /** Load the persisted slug from disk if present and not past its TTL. */
+  private async loadCachedGeminiImageModel(): Promise<void> {
+    try {
+      if (!existsSync(this.geminiModelCachePath)) return;
+      const raw = await readFile(this.geminiModelCachePath, 'utf-8');
+      const cache: GeminiModelCacheFile = JSON.parse(raw);
+      if (!cache?.model || !cache?.discoveredAt) return;
+      const age = Date.now() - new Date(cache.discoveredAt).getTime();
+      if (age > GEMINI_MODEL_CACHE_TTL_MS) return; // stale — will re-probe
+      this.cachedGeminiImageModel = cache.model;
+    } catch {
+      // Corrupted cache — ignore, will re-probe.
+    }
+  }
+
+  /** Persist the discovered slug + timestamp so future process starts skip the probe call. */
+  private async saveCachedGeminiImageModel(model: string): Promise<void> {
+    try {
+      await mkdir(this.dataDir, { recursive: true });
+      const payload: GeminiModelCacheFile = { model, discoveredAt: new Date().toISOString() };
+      const tmp = this.geminiModelCachePath + '.tmp';
+      await writeFile(tmp, JSON.stringify(payload, null, 2));
+      const { rename } = await import('fs/promises');
+      await rename(tmp, this.geminiModelCachePath);
+    } catch {
+      // Non-fatal — worst case we re-probe next cold start.
+    }
+  }
+
+  /** Invalidate the cache in-memory and on disk (called on 404 / model-not-found). */
+  private async invalidateCachedGeminiImageModel(): Promise<void> {
+    this.cachedGeminiImageModel = null;
+    try {
+      if (existsSync(this.geminiModelCachePath)) {
+        const { unlink: unlinkFile } = await import('fs/promises');
+        await unlinkFile(this.geminiModelCachePath);
+      }
+    } catch {
+      // Non-fatal.
+    }
   }
 
   /**
@@ -149,19 +292,34 @@ export class ImageGenService {
     }
 
     // ── Provider preference order (auto) ──
-    //   1. OpenAI gpt-image-1     — best text rendering, paid
+    // Order comes from the persisted config (workspace/data/image-gen-config.json),
+    // default openai → gemini → together:
+    //   1. OpenAI (gpt-image-2, falling back to gpt-image-1) — best text rendering, paid
     //   2. Gemini Nano Banana     — solid text rendering, free tier, uses
     //                                the same gemini_api_key the AI router
     //                                already needs (so authors usually
     //                                already have it)
     //   3. Together AI Flux       — free fallback, weaker text rendering
     //
-    // Explicit `provider:` values still override this preference.
-    const preferenceChain: Array<'openai' | 'gemini' | 'together'> =
+    // Explicit `provider:` values still override this preference. For
+    // routingTier: 'draft' calls (concepts/social/iteration), the chain
+    // starts at the configured draftTier provider instead of the top, to
+    // save money — falling through the rest of the chain on error exactly
+    // like 'final' does.
+    const configuredChain = this.config.chain.length > 0 ? this.config.chain : DEFAULT_IMAGE_GEN_CONFIG.chain;
+    let preferenceChain: ImageProviderName[] =
       preferredProvider === 'openai'   ? ['openai']
       : preferredProvider === 'gemini'   ? ['gemini']
       : preferredProvider === 'together' ? ['together']
-      : ['openai', 'gemini', 'together']; // 'auto'
+      : [...configuredChain]; // 'auto'
+
+    if (preferredProvider === 'auto' && options.routingTier === 'draft') {
+      const draftTier = this.config.draftTier || DEFAULT_IMAGE_GEN_CONFIG.draftTier;
+      const startIdx = preferenceChain.indexOf(draftTier);
+      if (startIdx > 0) {
+        preferenceChain = [...preferenceChain.slice(startIdx), ...preferenceChain.slice(0, startIdx)];
+      }
+    }
 
     let lastError = '';
     for (const provider of preferenceChain) {
@@ -230,11 +388,8 @@ export class ImageGenService {
    * given aspect ratio in each call, so the layout adapts (vertical
    * spine-friendly composition for ebook vs. landscape for social).
    *
-   * Cost (gpt-image-1, high quality, late 2025-2026 pricing):
-   *   1024x1024  ≈ $0.17/image
-   *   1024x1536  ≈ $0.25/image
-   *   1536x1024  ≈ $0.25/image
-   *   Full set   ≈ $0.92 (one of each + ebook = 2× 1024x1536)
+   * Cost estimates are sourced from `pricing.ts` (gpt-image-1, high quality,
+   * last verified pricing.PRICING_LAST_VERIFIED). See getOpenAIImagePrice().
    */
   async generateCoverSet(params: {
     title: string;
@@ -256,23 +411,16 @@ export class ImageGenService {
     variants?: CoverVariant[];
     quality?: 'low' | 'medium' | 'high' | 'auto';
     provider?: 'together' | 'openai' | 'auto';
+    /** Override the per-variant routing tier (final vs draft). By default:
+     *  ebook/print/audiobook = 'final' (best output), social = 'draft'
+     *  (cheaper — concepts/social variants don't need the top of the chain). */
+    routingTier?: 'final' | 'draft';
   }): Promise<CoverSetResult> {
     const promptBase = this.buildCoverPrompt(params);
     const targets = params.variants || ['ebook', 'print', 'audiobook', 'social'];
     const variants: Partial<Record<CoverVariant, ImageResult>> = {};
     const successful: CoverVariant[] = [];
     let estimatedCost = 0;
-
-    // Cost approximations per gpt-image-1 high-quality output. Low quality
-    // is ~1/4 the price; medium ~1/2.
-    const costMap: Record<string, number> = {
-      '1024x1024': 0.17,
-      '1024x1536': 0.25,
-      '1536x1024': 0.25,
-    };
-    const qualityMult = params.quality === 'low' ? 0.25
-                      : params.quality === 'medium' ? 0.5
-                      : 1.0;
 
     const includeText = params.includeText !== false;
 
@@ -299,19 +447,27 @@ export class ImageGenService {
 
       const prompt = promptBase + variantHint;
 
+      // Routing philosophy: best output as cheaply as possible. ebook/print/
+      // audiobook covers are the deliverable — run the full chain from the
+      // top ('final'). Social variants are promo/iteration material — start
+      // at the cheaper draftTier provider unless the caller overrides.
+      const defaultTier: 'final' | 'draft' = variant === 'social' ? 'draft' : 'final';
+      const routingTier = params.routingTier || defaultTier;
+
       const result = await this.generate(prompt, {
         provider: params.provider || 'auto',
         style: params.style || 'illustrated',
         width: spec.width,
         height: spec.height,
         quality: params.quality || 'high',
+        routingTier,
       });
 
       variants[variant] = result;
       if (result.success) {
         successful.push(variant);
-        const sizeKey = `${spec.width}x${spec.height}`;
-        estimatedCost += (costMap[sizeKey] || 0.2) * qualityMult;
+        const modelForPricing = result.provider === 'openai' ? result.model : undefined;
+        estimatedCost += getOpenAIImagePrice(spec.width, spec.height, params.quality || 'high', modelForPricing);
       }
     }
 
@@ -426,6 +582,37 @@ export class ImageGenService {
       return { success: false, error: 'OpenAI API key not configured' };
     }
 
+    const configuredModel = this.config.openaiModel || DEFAULT_IMAGE_GEN_CONFIG.openaiModel;
+    const result = await this.callOpenAIImages(apiKey, configuredModel, prompt, width, height, quality);
+    if (result.success) return result;
+
+    // Fall back once to gpt-image-1 if the configured model wasn't found.
+    if (
+      configuredModel !== ImageGenService.OPENAI_FALLBACK_MODEL &&
+      this.isModelNotFoundError(result.error)
+    ) {
+      console.log(`[image-gen] OpenAI model "${configuredModel}" not found, falling back to "${ImageGenService.OPENAI_FALLBACK_MODEL}"`);
+      return this.callOpenAIImages(apiKey, ImageGenService.OPENAI_FALLBACK_MODEL, prompt, width, height, quality);
+    }
+
+    return result;
+  }
+
+  /** Heuristic: does this OpenAI error text look like "model not found" (bad slug)? */
+  private isModelNotFoundError(error?: string): boolean {
+    if (!error) return false;
+    const lower = error.toLowerCase();
+    return lower.includes('404') || lower.includes('model_not_found') || (lower.includes('model') && lower.includes('not found')) || lower.includes('does not exist');
+  }
+
+  private async callOpenAIImages(
+    apiKey: string,
+    model: string,
+    prompt: string,
+    width: number,
+    height: number,
+    quality: 'low' | 'medium' | 'high' | 'auto',
+  ): Promise<ImageResult> {
     try {
       // Map dimensions to OpenAI supported sizes
       const size = this.getOpenAISize(width, height);
@@ -437,26 +624,26 @@ export class ImageGenService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: ImageGenService.OPENAI_MODEL,
+          model,
           prompt,
           size,
           quality,
           n: 1,
-          // gpt-image-1 always returns base64 — no response_format param.
+          // gpt-image-1 / gpt-image-2 always return base64 — no response_format param.
         }),
         signal: AbortSignal.timeout(180000), // 3-min cap; high quality covers can take 60-90s
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        return { success: false, error: `OpenAI error: ${response.status} ${errText.slice(0, 200)}` };
+        return { success: false, error: `OpenAI error (model ${model}): ${response.status} ${errText.slice(0, 200)}` };
       }
 
       const data = await response.json() as any;
       const b64 = data?.data?.[0]?.b64_json;
       if (!b64) return { success: false, error: 'OpenAI returned empty image data' };
 
-      return this.saveImage(Buffer.from(b64, 'base64'), 'openai', ImageGenService.OPENAI_MODEL, width, height);
+      return this.saveImage(Buffer.from(b64, 'base64'), 'openai', model, width, height);
     } catch (err) {
       return { success: false, error: `OpenAI image request failed: ${String(err)}` };
     }
@@ -517,8 +704,16 @@ export class ImageGenService {
 
       if (!response.ok) {
         const errText = await response.text();
-        // Bust the cache if the model that previously worked has been retired.
-        if (response.status === 404) this.cachedGeminiImageModel = null;
+        // Bust the cache if the model that previously worked has been
+        // retired (404 / model-not-found), then re-probe once so this call
+        // doesn't fail just because the cached slug rotated out.
+        if (response.status === 404) {
+          await this.invalidateCachedGeminiImageModel();
+          const rediscovered = await this.discoverGeminiImageModel(apiKey);
+          if (rediscovered && rediscovered !== modelName) {
+            return this.generateWithGemini(prompt, width, height);
+          }
+        }
         return { success: false, error: `Gemini image error (model ${modelName}): ${response.status} ${errText.slice(0, 250)}` };
       }
 
@@ -574,16 +769,19 @@ export class ImageGenService {
           // Treat it as "model exists" — the next real call will succeed
           // or surface a more useful error.
           this.cachedGeminiImageModel = candidate;
+          await this.saveCachedGeminiImageModel(candidate);
           return candidate;
         }
         if (response.ok) {
           this.cachedGeminiImageModel = candidate;
+          await this.saveCachedGeminiImageModel(candidate);
           return candidate;
         }
         // Other errors (403 quota, 429 rate-limit, 500): the model is
         // likely valid but unusable right now. Cache anyway so subsequent
         // calls fail fast with the right error.
         this.cachedGeminiImageModel = candidate;
+        await this.saveCachedGeminiImageModel(candidate);
         return candidate;
       } catch {
         continue;
