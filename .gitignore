@@ -4,20 +4,21 @@ gateway/dist/
 config/.vault/
 config/user.json
 
-# Workspace runtime data (user-generated, not code)
-workspace/projects/
-workspace/research/
-workspace/exports/
-workspace/.memory/
-workspace/.audit/
-workspace/.agent/
-workspace/.audio/
-workspace/audio/
-workspace/documents/
-workspace/memory/
-workspace/.config/
-workspace/.activity/
-workspace/test-upload.txt
+# ── Workspace runtime data (manuscripts, memory, images, configs) — NEVER commit ──
+# Deny-by-default: ignore everything under workspace/, then re-include ONLY the
+# product-default files meant to ship with the open-source repo. This prevents a
+# stray `git add -A` from ever sweeping in the author's private manuscripts,
+# conversation logs, goals, launch plans, website configs, or generated covers.
+workspace/*
+!workspace/soul/
+!workspace/SKILLS.txt
+!workspace/projects/
+workspace/projects/*
+!workspace/projects/.template/
+
+# Generated audit/report artifacts (not for repo)
+SECURITY-AUDIT-REPORT.md
+*-AUDIT-REPORT.md
 *.log
 .DS_Store
 nul
