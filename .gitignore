@@ -11,6 +11,10 @@ config/user.json
 # conversation logs, goals, launch plans, website configs, or generated covers.
 workspace/*
 !workspace/soul/
+# ...but the live VOICE-PROFILE becomes the author's personal writing
+# fingerprint once analyzed — ship only VOICE-PROFILE.template.md, never the
+# live file.
+workspace/soul/VOICE-PROFILE.md
 !workspace/SKILLS.txt
 !workspace/projects/
 workspace/projects/*
