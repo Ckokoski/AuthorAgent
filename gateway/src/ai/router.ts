@@ -7,6 +7,9 @@
 import { createHash } from 'crypto';
 import { Vault } from '../security/vault.js';
 import { CostTracker } from '../services/costs.js';
+import { logger } from '../services/logger.js';
+
+const log = logger.child('[router]');
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -326,9 +329,9 @@ export class AIRouter {
       }
       // For Ollama, re-check availability in case it came online after startup
       if (effectivePref === 'ollama' && !pref) {
-        console.warn(`[router] Ollama preferred but not in provider list — will be checked on next reinitialize`);
+        log.warn(`Ollama preferred but not in provider list — will be checked on next reinitialize`);
       } else {
-        console.warn(`[router] Preferred provider '${effectivePref}' not available, falling back to tier routing`);
+        log.warn(`Preferred provider '${effectivePref}' not available, falling back to tier routing`);
       }
     }
 
@@ -545,7 +548,7 @@ export class AIRouter {
 
     const data = await response.json() as any;
     if (data.error) {
-      console.error(`  ✗ Gemini API error: ${data.error.message || JSON.stringify(data.error)}`);
+      log.error(`  ✗ Gemini API error: ${data.error.message || JSON.stringify(data.error)}`);
       throw new Error(`Gemini API error: ${data.error.message || 'Unknown error'}`);
     }
     const candidate = data.candidates?.[0];
@@ -615,7 +618,7 @@ export class AIRouter {
 
     const data = await response.json() as any;
     if (data.error) {
-      console.error(`  ✗ Claude API error: ${data.error.message || JSON.stringify(data.error)}`);
+      log.error(`  ✗ Claude API error: ${data.error.message || JSON.stringify(data.error)}`);
       throw new Error(`Claude API error: ${data.error.message || 'Unknown error'}`);
     }
     // When thinking is enabled, content array contains a 'thinking' block
@@ -713,7 +716,7 @@ export class AIRouter {
 
     const data = await response.json() as any;
     if (data.error) {
-      console.error(`  ✗ ${provider.name} API error: ${data.error.message || JSON.stringify(data.error)}`);
+      log.error(`  ✗ ${provider.name} API error: ${data.error.message || JSON.stringify(data.error)}`);
       throw new Error(`${provider.name} API error: ${data.error.message || 'Unknown error'}`);
     }
     const text = data.choices?.[0]?.message?.content || '';

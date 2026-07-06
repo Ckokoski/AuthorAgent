@@ -20,6 +20,9 @@ import { generateDocxBuffer } from './docx-export.js';
 import { readFile } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { logger } from './logger.js';
+
+const log = logger.child('[projects]');
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -1161,7 +1164,7 @@ export class ProjectEngine {
         const { writeFile: wf } = await import('fs/promises');
         await wf(this.stateFilePath, JSON.stringify(state, null, 2), 'utf-8');
       } catch (err) {
-        console.error('  ⚠ Failed to persist project state:', err);
+        log.error('  ⚠ Failed to persist project state:', err);
       }
     }, 1000);
   }
@@ -1220,13 +1223,13 @@ export class ProjectEngine {
           }
           this.projects.set(p.id, p);
         }
-        console.log(`  ✓ Restored ${state.projects.length} projects from disk` +
+        log.info(`  ✓ Restored ${state.projects.length} projects from disk` +
           (migrated > 0 ? ` (migrated ${migrated} legacy self-review step${migrated === 1 ? '' : 's'} to polish)` : ''));
         // Persist the migration so it doesn't run again on next boot.
         if (migrated > 0) this.persistState();
       }
     } catch (err) {
-      console.error('  ⚠ Failed to load project state:', err);
+      log.error('  ⚠ Failed to load project state:', err);
     }
   }
 
@@ -1425,7 +1428,7 @@ export class ProjectEngine {
 
     this.projects.set(id, project);
     this.persistState();
-    console.log(`  ✓ Novel pipeline created: "${title}" — ${steps.length} steps, ${chapters} chapters, ~${(chapters * wordsPerChapter).toLocaleString()} words target`);
+    log.info(`  ✓ Novel pipeline created: "${title}" — ${steps.length} steps, ${chapters} chapters, ~${(chapters * wordsPerChapter).toLocaleString()} words target`);
     return project;
   }
 
@@ -1460,7 +1463,7 @@ export class ProjectEngine {
   ): Promise<Project> {
     if (!this.aiComplete || !this.aiSelectProvider) {
       // No AI wired — fall back to template
-      console.log('  \u26a0 AI not wired for planning \u2014 falling back to template');
+      log.warn('  \u26a0 AI not wired for planning \u2014 falling back to template');
       const type = this.inferProjectType(description);
       return this.createProject(type, title, description, context);
     }
@@ -1553,17 +1556,17 @@ Description: ${description}`;
 
         this.projects.set(id, project);
         this.persistState();
-        console.log(`  \u2713 AI planned ${steps.length} steps for "${title}" (via ${result.provider})`);
+        log.info(`  \u2713 AI planned ${steps.length} steps for "${title}" (via ${result.provider})`);
         return project;
       }
 
       // If parsing failed, fall back to template
-      console.log('  \u26a0 AI plan parsing failed \u2014 falling back to template');
+      log.warn('  \u26a0 AI plan parsing failed \u2014 falling back to template');
       const type = this.inferProjectType(description);
       return this.createProject(type, title, description, context);
 
     } catch (error) {
-      console.error('  \u2717 AI planning failed:', error);
+      log.error('  \u2717 AI planning failed:', error);
       const type = this.inferProjectType(description);
       return this.createProject(type, title, description, context);
     }
@@ -1613,7 +1616,7 @@ Description: ${description}`;
     let steps: ProjectStep[];
 
     if (template) {
-      console.log(`  Project "${title}": using template "${type}" with ${template.steps.length} steps`);
+      log.debug(`  Project "${title}": using template "${type}" with ${template.steps.length} steps`);
       steps = template.steps.map((s: any, i) => ({
         id: `${id}-step-${i + 1}`,
         label: s.label,
@@ -1629,7 +1632,7 @@ Description: ${description}`;
       }));
     } else {
       // Custom project — single step with the user's description
-      console.warn(`  Project "${title}": no template found for type "${type}" — creating single-step project`);
+      log.warn(`  Project "${title}": no template found for type "${type}" — creating single-step project`);
       steps = [{
         id: `${id}-step-1`,
         label: title,
@@ -1738,9 +1741,12 @@ Description: ${description}`;
       // Fire-and-forget so persistence isn't blocked by hook latency.
       try {
         for (const fn of this.completionHooks) {
-          Promise.resolve(fn(project)).catch(err => console.error('[project-completion-hook] error:', err));
+          Promise.resolve(fn(project)).catch(err => log.error('[project-completion-hook] error:', err));
         }
-      } catch { /* hook crashes never block completeStep */ }
+      } catch (err) {
+        // hook crashes never block completeStep
+        logger.debug('project-completion hook dispatch failed', err);
+      }
     }
     this.persistState();
     return null;
@@ -2033,7 +2039,7 @@ Description: ${description}`;
 
       // Retry once with 'general' routing if the response is too short
       if (!response || response.length < 50) {
-        console.log(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
+        log.warn(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
         response = '';
         await this.messageHandler(
           userMessage,
@@ -2130,7 +2136,7 @@ Description: ${description}`;
         // Retry once with 'general' routing if the response is too short
         // This catches cases where a premium/mid provider fails but free providers work fine
         if (!response || response.length < 50) {
-          console.log(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
+          log.warn(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
           response = '';
           await this.messageHandler(
             userMessage,
@@ -2170,7 +2176,7 @@ Description: ${description}`;
             while (wc < wcTarget && continuations < 6) {
               continuations++;
               const remaining = wcTarget - wc;
-              console.log(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Response word count: ${wc}/${wcTarget} — requesting continuation #${continuations} (~${remaining} more words)`);
+              log.debug(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Response word count: ${wc}/${wcTarget} — requesting continuation #${continuations} (~${remaining} more words)`);
               let contResponse = '';
               try {
                 const contPrompt = isRevisionApply
@@ -2194,7 +2200,7 @@ Description: ${description}`;
               }
             }
             if (continuations > 0) {
-              console.log(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Final word count after ${continuations} continuation(s): ${response.split(/\s+/).length}`);
+              log.debug(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Final word count after ${continuations} continuation(s): ${response.split(/\s+/).length}`);
             }
           }
         }
@@ -2228,7 +2234,7 @@ Description: ${description}`;
                 threshold: qualityThreshold,
                 dualJudge: dualJudgeEnabled,
               });
-              console.log(`  [judge] "${activeStep.label}" attempt ${attempt + 1}: ${verdict.summary}`);
+              log.debug(`  [judge] "${activeStep.label}" attempt ${attempt + 1}: ${verdict.summary}`);
               if (verdict.score > bestScore) {
                 bestScore = verdict.score;
                 bestResponse = response;
@@ -2237,7 +2243,7 @@ Description: ${description}`;
 
               // Retry with feedback as additional steering.
               attempt++;
-              console.log(`  [judge] Retrying with feedback (attempt ${attempt + 1}/${maxRetries + 1})...`);
+              log.debug(`  [judge] Retrying with feedback (attempt ${attempt + 1}/${maxRetries + 1})...`);
               const userMsgWithFeedback = userMessage +
                 '\n\n## Quality feedback on your previous draft\n\n' + verdict.retryFeedback +
                 '\n\nProduce a NEW draft that fixes these specific issues. Output ONLY the chapter prose — no commentary.';
@@ -2274,7 +2280,7 @@ Description: ${description}`;
           }
         } catch (judgeErr) {
           // Judge failures should NEVER block step completion — degrade gracefully.
-          console.warn('  [judge] evaluation hook failed:', (judgeErr as Error)?.message || judgeErr);
+          log.warn('  [judge] evaluation hook failed:', (judgeErr as Error)?.message || judgeErr);
         }
 
         const wordCount = response.split(/\s+/).length;
@@ -2285,7 +2291,9 @@ Description: ${description}`;
           await mkdir(projectDir, { recursive: true });
           const stepFileName = `${activeStep.id}-${activeStep.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
           await writeFile(join(projectDir, stepFileName), `# ${activeStep.label}\n\n${response}`, 'utf-8');
-        } catch { /* non-fatal */ }
+        } catch (err) {
+          logger.debug('step output file save failed', err);
+        }
 
         this.completeStep(currentProject.id, activeStep.id, response);
         // Track words for Morning Briefing
@@ -2327,15 +2335,15 @@ Description: ${description}`;
               contextEngine.generateSummary(
                 currentProject.id, activeStep.id, stepLabel, chapterNum, response,
                 aiCompleteFn, aiSelectFn
-              ).catch((err: any) => console.error('[context-engine] Summary error:', err.message)),
+              ).catch((err: any) => log.error('[context-engine] Summary error:', err.message)),
               contextEngine.extractEntities(
                 currentProject.id, activeStep.id, response,
                 aiCompleteFn, aiSelectFn
-              ).catch((err: any) => console.error('[context-engine] Entity extraction error:', err.message)),
+              ).catch((err: any) => log.error('[context-engine] Entity extraction error:', err.message)),
             ]);
           }
         } catch (contextErr) {
-          console.error('[context-engine] Hook error:', contextErr);
+          log.error('[context-engine] Hook error:', contextErr);
         }
 
         // ── Auto-narrate completed chapter (opt-in via project.context.autoNarrate) ──
@@ -2375,13 +2383,13 @@ Description: ${description}`;
                     metadata: { audioFile: result.filename, voice, provider: result.provider },
                   });
                 } else {
-                  console.error('[auto-narrate] failed:', result.error);
+                  log.error('[auto-narrate] failed:', result.error);
                 }
               })
-              .catch((err: any) => console.error('[auto-narrate] error:', err));
+              .catch((err: any) => log.error('[auto-narrate] error:', err));
           }
         } catch (narrationErr) {
-          console.error('[auto-narrate] hook error:', narrationErr);
+          log.error('[auto-narrate] hook error:', narrationErr);
         }
 
         // ── Manuscript Assembly: combine chapter files after assembly step ──
@@ -2417,9 +2425,11 @@ Description: ${description}`;
                 content: manuscriptMd,
               });
               await writeFile(join(projectDir, 'manuscript.docx'), docxBuffer);
-              console.log(`  [assembly] Manuscript assembled: ${chapterContents.length} chapters`);
+              log.info(`  [assembly] Manuscript assembled: ${chapterContents.length} chapters`);
             }
-          } catch { /* non-fatal */ }
+          } catch (err) {
+            logger.debug('manuscript assembly save failed', err);
+          }
         }
 
         // Re-check pause AFTER step completes (catches /stop sent during long AI call)

@@ -7,6 +7,7 @@ import { readFile, writeFile, readdir, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { sanitizeSegment } from '../security/paths.js';
+import { logger } from './logger.js';
 
 interface MemoryConfig {
   maxConversationHistory: number;
@@ -180,7 +181,10 @@ export class MemoryService {
         personaId,
         projectId,
       });
-    } catch { /* search indexing failures should never block memory writes */ }
+    } catch (err) {
+      // search indexing failures should never block memory writes
+      logger.debug('FTS live-index failed', err);
+    }
   }
 
   async setActiveProject(projectId: string): Promise<void> {

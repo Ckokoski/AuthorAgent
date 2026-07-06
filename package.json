@@ -15,7 +15,10 @@
     "docker:down": "docker-compose -f docker/docker-compose.yml down",
     "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
     "security-audit": "node scripts/security-check.js",
-    "export-book": "bash scripts/export-book.sh"
+    "export-book": "bash scripts/export-book.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit && vitest run"
   },
   "keywords": [
     "ai",
@@ -56,7 +59,8 @@
     "@types/cors": "^2.8.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=22.0.0"

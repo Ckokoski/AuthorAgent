@@ -80,6 +80,7 @@ import { WebsiteBuilderService } from './services/website-builder.js';
 import { TelegramBridge } from './bridges/telegram.js';
 import { DiscordBridge } from './bridges/discord.js';
 import { createAPIRoutes } from './api/routes.js';
+import { logger } from './services/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -199,49 +200,49 @@ class AuthorClawGateway {
   }
 
   async initialize(): Promise<void> {
-    console.log('');
-    console.log('  ✍️  AuthorClaw v3.0.0');
-    console.log('  ═══════════════════════════════════');
-    console.log('  The Autonomous AI Writing Agent');
-    console.log('  An OpenClaw fork for authors');
-    console.log('');
+    logger.info('');
+    logger.info('  ✍️  AuthorClaw v3.0.0');
+    logger.info('  ═══════════════════════════════════');
+    logger.info('  The Autonomous AI Writing Agent');
+    logger.info('  An OpenClaw fork for authors');
+    logger.info('');
 
     // ── Phase 1: Configuration ──
     this.config = new ConfigService(join(ROOT_DIR, 'config'));
     await this.config.load();
-    console.log('  ✓ Configuration loaded');
+    logger.info('  ✓ Configuration loaded');
 
     // ── Phase 2: Security Layer ──
     this.vault = new Vault(join(ROOT_DIR, 'config', '.vault'));
     await this.vault.initialize();
-    console.log('  ✓ Encrypted vault initialized (AES-256-GCM)');
+    logger.info('  ✓ Encrypted vault initialized (AES-256-GCM)');
 
     this.permissions = new PermissionManager(this.config.get('security.permissionPreset', 'standard'));
-    console.log(`  ✓ Permissions: ${this.permissions.preset} mode`);
+    logger.info(`  ✓ Permissions: ${this.permissions.preset} mode`);
 
     this.audit = new AuditLog(join(ROOT_DIR, 'workspace', '.audit'));
     await this.audit.initialize();
-    console.log('  ✓ Audit logging active');
+    logger.info('  ✓ Audit logging active');
 
     this.sandbox = new SandboxGuard(join(ROOT_DIR, 'workspace'));
-    console.log('  ✓ Sandbox: workspace-only file access');
+    logger.info('  ✓ Sandbox: workspace-only file access');
 
     this.injectionDetector = new InjectionDetector();
-    console.log('  ✓ Prompt injection detection active');
+    logger.info('  ✓ Prompt injection detection active');
 
     // ── Phase 2b: Activity Log ──
     this.activityLog = new ActivityLog(join(ROOT_DIR, 'workspace'));
     await this.activityLog.initialize();
-    console.log('  ✓ Activity log initialized');
+    logger.info('  ✓ Activity log initialized');
 
     // ── Phase 3: Soul & Memory ──
     this.soul = new SoulService(join(ROOT_DIR, 'workspace', 'soul'));
     await this.soul.load();
-    console.log(`  ✓ Soul loaded: "${this.soul.getName()}"`);
+    logger.info(`  ✓ Soul loaded: "${this.soul.getName()}"`);
 
     this.memory = new MemoryService(join(ROOT_DIR, 'workspace', 'memory'), this.config.get('memory'));
     await this.memory.initialize();
-    console.log('  ✓ Memory system initialized');
+    logger.info('  ✓ Memory system initialized');
 
     // ── Phase 3b: Memory Search (FTS5 over conversations + project outputs) ──
     // Hermes-inspired persistent cross-session search. Falls back gracefully
@@ -255,12 +256,12 @@ class AuthorClawGateway {
       try {
         const result = await this.memorySearch.reindexAll();
         const stats = this.memorySearch.getStats();
-        console.log(`  ✓ Memory search ready: ${stats.totalEntries} entries indexed (added ${result.indexed}, skipped ${result.skipped})`);
+        logger.info(`  ✓ Memory search ready: ${stats.totalEntries} entries indexed (added ${result.indexed}, skipped ${result.skipped})`);
       } catch (err) {
-        console.warn(`  ⚠ Memory search reindex failed: ${(err as Error)?.message || err}`);
+        logger.warn(`  ⚠ Memory search reindex failed: ${(err as Error)?.message || err}`);
       }
     } else {
-      console.log('  ⚠ Memory search unavailable (search will be disabled, rest of AuthorClaw works)');
+      logger.warn('  ⚠ Memory search unavailable (search will be disabled, rest of AuthorClaw works)');
     }
 
     // ── Phase 4: AI Providers ──
@@ -268,7 +269,7 @@ class AuthorClawGateway {
     costsConfig.persistPath = join(ROOT_DIR, 'workspace', 'costs.json');
     this.costs = new CostTracker(costsConfig);
     await this.costs.initialize();
-    console.log(`  ✓ Budget: $${this.costs.dailyLimit}/day, $${this.costs.monthlyLimit}/month (persisted)`);
+    logger.info(`  ✓ Budget: $${this.costs.dailyLimit}/day, $${this.costs.monthlyLimit}/month (persisted)`);
 
     this.aiRouter = new AIRouter(this.config.get('ai'), this.vault, this.costs);
     await this.aiRouter.initialize();
@@ -276,12 +277,12 @@ class AuthorClawGateway {
     const globalPref = this.config.get('ai.preferredProvider');
     if (globalPref) {
       this.aiRouter.setGlobalPreferredProvider(globalPref);
-      console.log(`  ✓ Global preferred provider: ${globalPref}`);
+      logger.info(`  ✓ Global preferred provider: ${globalPref}`);
     }
     const providers = this.aiRouter.getActiveProviders();
     for (const p of providers) {
       const tier = p.tier === 'free' ? '🆓 FREE' : p.tier === 'cheap' ? '💰 CHEAP' : '💎 PAID';
-      console.log(`  ✓ AI: ${p.name} (${p.model}) — ${tier}`);
+      logger.info(`  ✓ AI: ${p.name} (${p.model}) — ${tier}`);
     }
 
     // ── Phase 5: Research Gate ──
@@ -290,14 +291,14 @@ class AuthorClawGateway {
       this.audit
     );
     await this.research.initialize();
-    console.log(`  ✓ Research gate: ${this.research.getAllowedDomainCount()} approved domains`);
+    logger.info(`  ✓ Research gate: ${this.research.getAllowedDomainCount()} approved domains`);
 
     // ── Phase 6: Skills ──
     this.skills = new SkillLoader(join(ROOT_DIR, 'skills'), this.permissions);
     await this.skills.loadAll();
     const premiumCount = this.skills.getPremiumSkillCount();
     const premiumLabel = premiumCount > 0 ? `, ${premiumCount} premium ★` : '';
-    console.log(`  ✓ Skills: ${this.skills.getLoadedCount()} loaded (${this.skills.getAuthorSkillCount()} author-specific${premiumLabel})`);
+    logger.info(`  ✓ Skills: ${this.skills.getLoadedCount()} loaded (${this.skills.getAuthorSkillCount()} author-specific${premiumLabel})`);
 
     // ── Phase 6a: Auto-generate SKILLS.txt reference file ──
     await this.writeSkillsReference(ROOT_DIR);
@@ -323,8 +324,8 @@ class AuthorClawGateway {
       await this.authorOS.initialize();
       const osTools = this.authorOS.getAvailableTools();
       if (osTools.length > 0) {
-        console.log(`  ✓ Author OS: ${osTools.length} tools found at ${authorOSPath}`);
-        console.log(`    (${osTools.join(', ')})`);
+        logger.info(`  ✓ Author OS: ${osTools.length} tools found at ${authorOSPath}`);
+        logger.info(`    (${osTools.join(', ')})`);
 
         // Auto-generate synthetic skills from Author OS so users don't have to
         // hand-write SKILL.md files for every tool. The skills become matchable
@@ -333,20 +334,20 @@ class AuthorClawGateway {
           const synthSkills = await this.authorOS.generateSyntheticSkills();
           const added = this.skills.registerSynthetic(synthSkills);
           if (added > 0) {
-            console.log(`  ✓ Author OS skills auto-registered: ${added} skill(s) (${synthSkills.map(s => s.name).join(', ')})`);
+            logger.info(`  ✓ Author OS skills auto-registered: ${added} skill(s) (${synthSkills.map(s => s.name).join(', ')})`);
             // Refresh SKILLS.txt so the synthetic skills are visible to the AI's prompt context.
             await this.writeSkillsReference(ROOT_DIR);
           }
         } catch (err) {
-          console.warn(`  ⚠ Could not auto-generate Author OS skills: ${(err as Error)?.message || err}`);
+          logger.warn(`  ⚠ Could not auto-generate Author OS skills: ${(err as Error)?.message || err}`);
         }
       } else {
-        console.log(`  ℹ Author OS folder found at ${authorOSPath} but no recognized tools inside.`);
-        console.log(`    Expected subfolders: "Author Workflow Engine", "Book Bible Engine", "Manuscript Autopsy", "AI Author Library".`);
+        logger.info(`  ℹ Author OS folder found at ${authorOSPath} but no recognized tools inside.`);
+        logger.info(`    Expected subfolders: "Author Workflow Engine", "Book Bible Engine", "Manuscript Autopsy", "AI Author Library".`);
       }
     } else {
-      console.log('  ℹ Author OS: not installed (optional — AuthorClaw works without it).');
-      console.log('    To enable: place the Author OS folder next to AuthorClaw, or set AUTHOR_OS_PATH in .env');
+      logger.info('  ℹ Author OS: not installed (optional — AuthorClaw works without it).');
+      logger.info('    To enable: place the Author OS folder next to AuthorClaw, or set AUTHOR_OS_PATH in .env');
     }
 
     // ── Phase 6c: TTS Service (Piper) — silent init, optional feature ──
@@ -360,7 +361,7 @@ class AuthorClawGateway {
     // ── Phase 6d: Author Personas ──
     this.personas = new PersonaService(join(ROOT_DIR, 'workspace'));
     await this.personas.initialize();
-    console.log(`  ✓ Personas: ${this.personas.getCount()} author persona(s) loaded`);
+    logger.info(`  ✓ Personas: ${this.personas.getCount()} author persona(s) loaded`);
 
     // ── Phase 6e: Project Engine ──
     this.projectEngine = new ProjectEngine(this.authorOS, ROOT_DIR);
@@ -370,12 +371,12 @@ class AuthorClawGateway {
       (taskType) => this.aiRouter.selectProvider(taskType)
     );
     const templates = this.projectEngine.getTemplates();
-    console.log(`  ✓ Project engine: ${templates.length} templates + dynamic AI planning`);
+    logger.info(`  ✓ Project engine: ${templates.length} templates + dynamic AI planning`);
 
     // ── Phase 6f: Context Engine ──
     this.contextEngine = new ContextEngine(join(ROOT_DIR, 'workspace'));
     this.projectEngine.setContextEngine(this.contextEngine);
-    console.log('  ✓ Context Engine: manuscript memory + continuity checking');
+    logger.info('  ✓ Context Engine: manuscript memory + continuity checking');
 
     // Wire the message pipeline + step-hook services so the ProjectEngine can
     // execute steps (single + autonomous loop) without importing the gateway
@@ -390,12 +391,12 @@ class AuthorClawGateway {
     // ── Phase 6g: Lessons & Preferences (from Sneakers) ──
     this.lessons = new LessonStore(join(ROOT_DIR, 'workspace', 'memory'));
     await this.lessons.initialize();
-    console.log(`  ✓ Lessons: ${this.lessons.getAll().length} learned`);
+    logger.info(`  ✓ Lessons: ${this.lessons.getAll().length} learned`);
 
     this.preferences = new PreferenceStore(join(ROOT_DIR, 'workspace', 'memory'));
     await this.preferences.initialize();
     const prefCount = Object.keys(this.preferences.getAll()).length;
-    console.log(`  ✓ Preferences: ${prefCount} tracked`);
+    logger.info(`  ✓ Preferences: ${prefCount} tracked`);
 
     // ── Phase 6g2: User Model (Honcho-style dialectic, simplified) ──
     // Tracks behavioral observations + per-persona breakdown + periodically
@@ -407,7 +408,7 @@ class AuthorClawGateway {
     );
     await this.userModel.initialize();
     const um = this.userModel.getSnapshot();
-    console.log(`  ✓ User model: ${um?.observationCount || 0} observations${um?.narrative.confidence ? `, narrative confidence ${(um.narrative.confidence * 100).toFixed(0)}%` : ''}`);
+    logger.info(`  ✓ User model: ${um?.observationCount || 0} observations${um?.narrative.confidence ? `, narrative confidence ${(um.narrative.confidence * 100).toFixed(0)}%` : ''}`);
 
     // ── Phase 6g3: Cron Scheduler (Hermes-inspired) ──
     this.cronScheduler = new CronSchedulerService(join(ROOT_DIR, 'workspace'));
@@ -424,11 +425,15 @@ class AuthorClawGateway {
     });
     this.cronScheduler.registerHandler('heartbeat-broadcast', async (payload) => {
       const message = String(payload?.message || 'Scheduled check-in.');
-      try { this.io.emit('cron-broadcast', { message, at: new Date().toISOString() }); } catch {}
+      try {
+        this.io.emit('cron-broadcast', { message, at: new Date().toISOString() });
+      } catch (err) {
+        logger.debug('cron broadcast emit failed', err);
+      }
       return { success: true, message: `Broadcast: ${message.substring(0, 80)}` };
     });
     this.cronScheduler.start();
-    console.log(`  ✓ Cron scheduler: ${this.cronScheduler.list().length} job(s) scheduled, ${this.cronScheduler.listHandlers().length} handlers`);
+    logger.info(`  ✓ Cron scheduler: ${this.cronScheduler.list().length} job(s) scheduled, ${this.cronScheduler.listHandlers().length} handlers`);
 
     // ── Phase 6g4: Auto-Skill Creator ──
     // Drafts SKILL.md files from completed projects. Drafts go to
@@ -445,7 +450,7 @@ class AuthorClawGateway {
     });
     await this.autoSkill.initialize();
     const drafts = this.autoSkill.list({ status: 'pending_review' });
-    console.log(`  ✓ Auto-skill drafter: ${drafts.length} draft(s) pending review`);
+    logger.info(`  ✓ Auto-skill drafter: ${drafts.length} draft(s) pending review`);
 
     // ── Phase 6g5: Writing Judge (AutoNovel-inspired evaluate-retry loop) ──
     // Mechanical screen (regex) + LLM judge runs on every chapter draft.
@@ -453,7 +458,7 @@ class AuthorClawGateway {
     // judge's feedback as steering input. Capped at 1 retry by default to
     // keep AI cost predictable.
     this.writingJudge = new WritingJudgeService();
-    console.log('  ✓ Writing judge: mechanical screen + LLM judge ready');
+    logger.info('  ✓ Writing judge: mechanical screen + LLM judge ready');
 
     // ── Phase 6g6: Research services (sourced lookup + video extraction) ──
     this.researchLookup = new ResearchLookupService();
@@ -463,25 +468,25 @@ class AuthorClawGateway {
     this.videoResearch.setDependencies(this.vault, this.aiRouter);
     const videoDoctor = await this.videoResearch.doctor();
     if (videoDoctor.ready) {
-      console.log(`  ✓ Research lookup ready (Perplexity via OpenRouter or fallback) | Video research ready (yt-dlp${videoDoctor.ffmpegInstalled ? ' + ffmpeg' : ''}${videoDoctor.whisperKeyConfigured ? ' + Whisper' : ''})`);
+      logger.info(`  ✓ Research lookup ready (Perplexity via OpenRouter or fallback) | Video research ready (yt-dlp${videoDoctor.ffmpegInstalled ? ' + ffmpeg' : ''}${videoDoctor.whisperKeyConfigured ? ' + Whisper' : ''})`);
     } else {
-      console.log('  ✓ Research lookup ready | Video research disabled (yt-dlp not installed — see /api/video/doctor)');
+      logger.info('  ✓ Research lookup ready | Video research disabled (yt-dlp not installed — see /api/video/doctor)');
     }
 
     // ── Phase 6g7: Story Structures (smart-recommend, not forced) ──
     this.storyStructures = new StoryStructureService();
-    console.log(`  ✓ Story structures: ${this.storyStructures.list().length} structures available (Save the Cat, three-act, five-act / Freytag, Seven-Point / Wells, Hero's Journey, Romancing the Beat, Story Circle, Mystery 5-Stage, Martell Thematic, none)`);
+    logger.info(`  ✓ Story structures: ${this.storyStructures.list().length} structures available (Save the Cat, three-act, five-act / Freytag, Seven-Point / Wells, Hero's Journey, Romancing the Beat, Story Circle, Mystery 5-Stage, Martell Thematic, none)`);
 
     // ── Phase 6g8: Plot Promises (Sanderson-style promises + payoffs) ──
     this.plotPromises = new PlotPromisesService(join(ROOT_DIR, 'workspace'));
     await this.plotPromises.initialize();
-    console.log(`  ✓ Plot promises: tracker ready`);
+    logger.info(`  ✓ Plot promises: tracker ready`);
 
     // ── Phase 6g9: Character voices (per-character StyleClone fingerprinting) ──
     this.characterVoices = new CharacterVoicesService(join(ROOT_DIR, 'workspace'));
     this.characterVoices.setStyleClone(this.styleClone);
     await this.characterVoices.initialize();
-    console.log(`  ✓ Character voices: per-character voice drift tracker ready`);
+    logger.info(`  ✓ Character voices: per-character voice drift tracker ready`);
 
     // ── Phase 6h: Website management — auto-add-book, blog drafter, deploy ──
     this.websiteSites = new WebsiteSiteService(join(ROOT_DIR, 'workspace'));
@@ -489,7 +494,7 @@ class AuthorClawGateway {
     this.blogPostDrafter = new BlogPostDrafterService();
     this.websiteDeploy = new WebsiteDeployService();
     const sitesCount = this.websiteSites.list().length;
-    console.log(`  ✓ Website management: ${sitesCount} site${sitesCount === 1 ? '' : 's'} registered, blog drafter + deploy adapters ready`);
+    logger.info(`  ✓ Website management: ${sitesCount} site${sitesCount === 1 ? '' : 's'} registered, blog drafter + deploy adapters ready`);
 
     // Register the project-completion hook for auto-add-book.
     // When a book-production project completes AND has linked sites, the
@@ -531,7 +536,7 @@ class AuthorClawGateway {
           });
         }
       } catch (err) {
-        console.warn('  [website-sites] auto-add-book hook failed:', (err as Error)?.message || err);
+        logger.warn('  [website-sites] auto-add-book hook failed:', (err as Error)?.message || err);
       }
     });
 
@@ -554,14 +559,14 @@ class AuthorClawGateway {
         title: project.title,
         description: project.description,
         steps: project.steps || [],
-      }).catch(err => console.error('[auto-skill] draft error:', err));
+      }).catch(err => logger.error('[auto-skill] draft error:', err));
     });
 
     // ── Phase 6h: Orchestrator (script manager) ──
     this.orchestrator = new OrchestratorService(join(ROOT_DIR, 'workspace'));
     await this.orchestrator.initialize();
     const scriptCount = this.orchestrator.getConfigs().length;
-    console.log(`  ✓ Orchestrator: ${scriptCount} script(s) configured`);
+    logger.info(`  ✓ Orchestrator: ${scriptCount} script(s) configured`);
     await this.orchestrator.autoStartAll();
     this.orchestrator.startHealthCheck();
 
@@ -573,41 +578,41 @@ class AuthorClawGateway {
     this.coverTypography = new CoverTypographyService();
     this.externalTools = new ExternalToolsService(ROOT_DIR);
     this.trackChanges = new TrackChangesService();
-    console.log('  ✓ KDP exporter, beta reader, dialogue auditor, hub, cover typography, external tools, track-changes ready');
+    logger.info('  ✓ KDP exporter, beta reader, dialogue auditor, hub, cover typography, external tools, track-changes ready');
 
     // ── Phase 6j: Wave 2 — career/craft/series/audiobook/voice ──
     this.goalsService = new GoalsService(join(ROOT_DIR, 'workspace'));
     await this.goalsService.initialize();
-    console.log(`  ✓ Author goals: ${this.goalsService.listGoals().length} tracked`);
+    logger.info(`  ✓ Author goals: ${this.goalsService.listGoals().length} tracked`);
 
     this.seriesBible = new SeriesBibleService(join(ROOT_DIR, 'workspace'));
     await this.seriesBible.initialize();
-    console.log(`  ✓ Series bible: ${this.seriesBible.listSeries().length} series`);
+    logger.info(`  ✓ Series bible: ${this.seriesBible.listSeries().length} series`);
 
     this.craftCritic = new CraftCriticService();
     this.audiobookPrep = new AudiobookPrepService();
     this.styleClone = new StyleCloneService();
-    console.log('  ✓ Craft critic, audiobook prep, style clone ready');
+    logger.info('  ✓ Craft critic, audiobook prep, style clone ready');
 
     // ── Phase 6k: Wave 3 — autonomous career agent (gated) ──
     this.confirmationGate = new ConfirmationGateService(join(ROOT_DIR, 'workspace'));
     this.confirmationGate.setAuditLogger((category, action, meta) => this.audit.log(category, action, meta));
     await this.confirmationGate.initialize();
-    console.log(`  ✓ Confirmation gate: ${this.confirmationGate.list({ status: 'pending' }).length} pending`);
+    logger.info(`  ✓ Confirmation gate: ${this.confirmationGate.list({ status: 'pending' }).length} pending`);
 
     this.disclosures = new DisclosuresService();
 
     this.launchOrchestrator = new LaunchOrchestratorService(join(ROOT_DIR, 'workspace'));
     this.launchOrchestrator.setDependencies(this.confirmationGate, this.disclosures);
     await this.launchOrchestrator.initialize();
-    console.log(`  ✓ Launch orchestrator: ${this.launchOrchestrator.listLaunches().length} launch(es) tracked`);
+    logger.info(`  ✓ Launch orchestrator: ${this.launchOrchestrator.listLaunches().length} launch(es) tracked`);
 
     this.amsAds = new AMSAdsService();
     this.bookbub = new BookBubSubmitterService();
 
     this.releaseCalendar = new ReleaseCalendarService(join(ROOT_DIR, 'workspace'));
     await this.releaseCalendar.initialize();
-    console.log(`  ✓ Release calendar: ${this.releaseCalendar.list().length} event(s)`);
+    logger.info(`  ✓ Release calendar: ${this.releaseCalendar.list().length} event(s)`);
 
     this.readerIntel = new ReaderIntelService();
 
@@ -619,8 +624,8 @@ class AuthorClawGateway {
     );
 
     this.websiteBuilder = new WebsiteBuilderService(join(ROOT_DIR, 'workspace'));
-    console.log('  ✓ AMS, BookBub, Reader Intel, Translation, Website Builder ready');
-    console.log('  ⚠ Wave 3 actions are gated — review SECURITY.md and confirm every external action.');
+    logger.info('  ✓ AMS, BookBub, Reader Intel, Translation, Website Builder ready');
+    logger.warn('  ⚠ Wave 3 actions are gated — review SECURITY.md and confirm every external action.');
 
     // ── Phase 7: Heartbeat ──
     this.heartbeat = new HeartbeatService(this.config.get('heartbeat'), this.memory);
@@ -747,9 +752,9 @@ class AuthorClawGateway {
                 `*Auto-consolidated from ${log.length} project analyses on ${new Date().toISOString().split('T')[0]}*\n\n` +
                 consolidateResult.text;
               await fs.writeFile(coreLessonsPath, coreLessonsContent, 'utf-8');
-              console.log(`  🧠 Core Lessons consolidated from ${log.length} analyses`);
+              logger.info(`  🧠 Core Lessons consolidated from ${log.length} analyses`);
             } catch (consolidateErr) {
-              console.log(`  ⚠ Core Lessons consolidation failed: ${consolidateErr}`);
+              logger.warn(`  ⚠ Core Lessons consolidation failed: ${consolidateErr}`);
             }
           }
 
@@ -851,7 +856,7 @@ class AuthorClawGateway {
     const autonomousLabel = this.config.get('heartbeat.autonomousEnabled')
       ? ` + autonomous every ${this.config.get('heartbeat.autonomousIntervalMinutes', 30)}min`
       : '';
-    console.log(`  ✓ Heartbeat: every ${this.config.get('heartbeat.intervalMinutes', 15)} minutes${autonomousLabel}`);
+    logger.info(`  ✓ Heartbeat: every ${this.config.get('heartbeat.intervalMinutes', 15)} minutes${autonomousLabel}`);
 
     // Now that heartbeat + writing judge + activity log all exist, hand the
     // ProjectEngine the service bundle its step-execution hooks use (quality
@@ -876,9 +881,9 @@ class AuthorClawGateway {
         );
         this.telegram.setCommandHandlers(commandHandlers);
         await this.telegram.connect();
-        console.log('  ✓ Telegram bridge connected (command center mode)');
+        logger.info('  ✓ Telegram bridge connected (command center mode)');
       } else {
-        console.log('  ⚠ Telegram enabled but no token in vault');
+        logger.warn('  ⚠ Telegram enabled but no token in vault');
       }
     }
 
@@ -887,19 +892,19 @@ class AuthorClawGateway {
       if (token) {
         this.discord = new DiscordBridge(token, this.config.get('bridges.discord'));
         await this.discord.connect();
-        console.log('  ✓ Discord bridge connected');
+        logger.info('  ✓ Discord bridge connected');
       } else {
-        console.log('  ⚠ Discord enabled but no token in vault');
+        logger.warn('  ⚠ Discord enabled but no token in vault');
       }
     }
 
     // ── Phase 9: API Routes ──
     createAPIRoutes(this.app, this, ROOT_DIR);
-    console.log('  ✓ API routes registered');
+    logger.info('  ✓ API routes registered');
 
     // ── Phase 10: WebSocket ──
     this.setupWebSocket();
-    console.log('  ✓ WebSocket ready');
+    logger.info('  ✓ WebSocket ready');
 
     // ── Phase 11: Static Dashboard ──
     const dashboardPath = join(ROOT_DIR, 'dashboard', 'dist');
@@ -927,7 +932,7 @@ class AuthorClawGateway {
 
     // Global JSON error handler — ensures API errors never return HTML
     this.app.use((err: any, _req: any, res: any, _next: any) => {
-      console.error('Unhandled API error:', err);
+      logger.error('Unhandled API error:', err);
       if (!res.headersSent) {
         res.status(500).json({ error: String(err?.message || err || 'Internal server error') });
       }
@@ -944,12 +949,12 @@ class AuthorClawGateway {
       },
     });
 
-    console.log('');
-    console.log('  ═══════════════════════════════════');
-    console.log('  ✍️  AuthorClaw is ready to write');
-    console.log(`  📡 Dashboard: http://localhost:${this.config.get('server.port', 3847)}`);
-    console.log('  ═══════════════════════════════════');
-    console.log('');
+    logger.info('');
+    logger.info('  ═══════════════════════════════════');
+    logger.info('  ✍️  AuthorClaw is ready to write');
+    logger.info(`  📡 Dashboard: http://localhost:${this.config.get('server.port', 3847)}`);
+    logger.info('  ═══════════════════════════════════');
+    logger.info('');
   }
 
   private setupWebSocket(): void {
@@ -1025,7 +1030,7 @@ class AuthorClawGateway {
         patterns: injection.patterns.map(p => p.type),
         reason: decision.reason,
       });
-      console.warn(
+      logger.warn(
         `  ⚠ [injection:warn] channel=${channel} patterns=${injection.patterns.map(p => p.type).join(',')} ` +
         `— allowed as ${decision.reason}. Added system-prompt caution.`
       );
@@ -1058,8 +1063,9 @@ class AuthorClawGateway {
           metadata: { preferences: detected },
         });
       }
-    } catch {
+    } catch (err) {
       // Preference detection should never block message handling
+      logger.debug('preference detection failed', err);
     }
 
     // ── Build context ──
@@ -1174,7 +1180,10 @@ class AuthorClawGateway {
         });
         // Trigger consolidation if threshold reached. Fire-and-forget.
         this.userModel?.maybeConsolidate().catch(() => {});
-      } catch { /* observation failures should never block messaging */ }
+      } catch (err) {
+        // observation failures should never block messaging
+        logger.debug('user-model observation failed', err);
+      }
       this.costs.record(provider.id, response.tokensUsed, response.estimatedCost);
       this.heartbeat.recordActivity('message', { channel });
 
@@ -1217,7 +1226,7 @@ class AuthorClawGateway {
       const primaryErrorText = (error instanceof Error ? error.message : String(error)).substring(0, 250);
       if (fallback) {
         try {
-          console.log(`  ↻ Falling back to ${fallback.id}...`);
+          logger.warn(`  ↻ Falling back to ${fallback.id}...`);
           const response = await this.aiRouter.complete({
             provider: fallback.id,
             system: systemPrompt,
@@ -1387,9 +1396,9 @@ class AuthorClawGateway {
       }
 
       await fs.writeFile(skillsRefPath, refContent, 'utf-8');
-      console.log(`  ✓ SKILLS.txt auto-updated (${catalog.length} skills)`);
+      logger.info(`  ✓ SKILLS.txt auto-updated (${catalog.length} skills)`);
     } catch (e) {
-      console.log(`  ⚠ Failed to update SKILLS.txt: ${e}`);
+      logger.warn(`  ⚠ Failed to update SKILLS.txt: ${e}`);
     }
   }
 
@@ -2171,7 +2180,7 @@ class AuthorClawGateway {
         source: 'internal',
         message: 'Telegram bridge connected',
       });
-      console.log('  ✓ Telegram bridge connected (via dashboard, command center mode)');
+      logger.info('  ✓ Telegram bridge connected (via dashboard, command center mode)');
       return {};
     } catch (error) {
       this.telegram = undefined;
@@ -2185,7 +2194,7 @@ class AuthorClawGateway {
       this.telegram = undefined;
       this.config.set('bridges.telegram.enabled', false);
       this.audit.log('bridge', 'telegram_disconnected', {});
-      console.log('  ⚠ Telegram bridge disconnected (via dashboard)');
+      logger.warn('  ⚠ Telegram bridge disconnected (via dashboard)');
     }
   }
 
@@ -2331,7 +2340,7 @@ class AuthorClawGateway {
 
           // Retry once with 'general' routing if response is too short
           if (!aiResponse || aiResponse.length < 50) {
-            console.log(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
+            logger.warn(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
             aiResponse = '';
             await new Promise<void>((resolve, reject) => {
               gateway.handleMessage(
@@ -2364,7 +2373,7 @@ class AuthorClawGateway {
           while (wc < wcTarget && continuations < 3) {
             continuations++;
             const remaining = wcTarget - wc;
-            console.log(`  [novel-pipeline] Chapter word count: ${wc}/${wcTarget} — requesting continuation #${continuations} (~${remaining} more words)`);
+            logger.debug(`  [novel-pipeline] Chapter word count: ${wc}/${wcTarget} — requesting continuation #${continuations} (~${remaining} more words)`);
             let contResponse = '';
             try {
               await new Promise<void>((resolve, reject) => {
@@ -2386,7 +2395,7 @@ class AuthorClawGateway {
             }
           }
           if (continuations > 0) {
-            console.log(`  [novel-pipeline] Final word count after ${continuations} continuation(s): ${aiResponse.split(/\s+/).length}`);
+            logger.debug(`  [novel-pipeline] Final word count after ${continuations} continuation(s): ${aiResponse.split(/\s+/).length}`);
           }
         }
 
@@ -2413,7 +2422,7 @@ class AuthorClawGateway {
             metadata: { fileName: savedFileName, wordCount },
           });
         } catch (fileErr) {
-          console.error('Failed to save project step output:', fileErr);
+          logger.error('Failed to save project step output:', fileErr);
         }
 
         // Complete the step and advance
@@ -2442,15 +2451,15 @@ class AuthorClawGateway {
             gateway.contextEngine.generateSummary(
               projectId, activeStep.id, stepLabel, chapterNum, aiResponse,
               aiCompleteFn, aiSelectFn
-            ).catch(err => console.error('[context-engine] Summary error:', err.message));
+            ).catch(err => logger.error('[context-engine] Summary error:', err.message));
 
             gateway.contextEngine.extractEntities(
               projectId, activeStep.id, aiResponse,
               aiCompleteFn, aiSelectFn
-            ).catch(err => console.error('[context-engine] Entity extraction error:', err.message));
+            ).catch(err => logger.error('[context-engine] Entity extraction error:', err.message));
           }
         } catch (contextErr) {
-          console.error('[context-engine] Hook error:', contextErr);
+          logger.error('[context-engine] Hook error:', contextErr);
         }
 
         // Track words for Morning Briefing
@@ -2500,7 +2509,7 @@ class AuthorClawGateway {
               await fs.writeFile(join(projectDir, 'manuscript.docx'), docxBuffer);
 
               const totalWords = manuscriptMd.split(/\s+/).length;
-              console.log(`  [assembly] Manuscript assembled: ${chapterContents.length} chapters, ~${totalWords.toLocaleString()} words`);
+              logger.info(`  [assembly] Manuscript assembled: ${chapterContents.length} chapters, ~${totalWords.toLocaleString()} words`);
 
               gateway.activityLog.log({
                 type: 'file_saved',
@@ -2511,7 +2520,7 @@ class AuthorClawGateway {
               });
             }
           } catch (assemblyErr) {
-            console.error('  [assembly] Manuscript assembly failed:', assemblyErr);
+            logger.error('  [assembly] Manuscript assembly failed:', assemblyErr);
           }
         }
 
@@ -2715,12 +2724,16 @@ class AuthorClawGateway {
                       files.push(`  📄 ${prefix}${entry.name}/${sub}`);
                     }
                   }
-                } catch { /* skip */ }
+                } catch (err) {
+                  logger.debug(`file listing: could not read subdir ${join(dir, entry.name)}`, err);
+                }
               } else {
                 files.push(`📄 ${prefix}${entry.name}`);
               }
             }
-          } catch { /* skip */ }
+          } catch (err) {
+            logger.debug(`file listing: could not read dir ${dir}`, err);
+          }
         }
 
         await listDir(targetDir);
@@ -2762,7 +2775,7 @@ class AuthorClawGateway {
   }
 
   async shutdown(): Promise<void> {
-    console.log('\n  Shutting down AuthorClaw...');
+    logger.info('\n  Shutting down AuthorClaw...');
     this.heartbeat?.stop();
     this.telegram?.disconnect();
     this.discord?.disconnect();
@@ -2773,7 +2786,7 @@ class AuthorClawGateway {
     });
     await this.audit?.log('system', 'shutdown', {});
     this.server.close();
-    console.log('  ✍️  AuthorClaw stopped. Happy writing!\n');
+    logger.info('  ✍️  AuthorClaw stopped. Happy writing!\n');
   }
 }
 
@@ -2791,7 +2804,7 @@ process.on('SIGTERM', async () => {
 });
 
 gateway.start().catch((error) => {
-  console.error('Failed to start AuthorClaw:', error);
+  logger.error('Failed to start AuthorClaw:', error);
   process.exit(1);
 });
 
