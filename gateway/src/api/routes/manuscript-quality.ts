@@ -607,4 +607,66 @@ export function registerManuscriptQualityRoutes(ctx: ApiContext): void {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // Character Persona Agents — per-character dialogue self-critique
+  // ═══════════════════════════════════════════════════════════
+  // Each major character becomes a standing critic of their OWN dialogue in a
+  // chapter, flagging off-voice / anachronistic-knowledge / off-motivation
+  // lines with in-voice rewrites. ONE mid-tier ('style_analysis') AI call per
+  // reviewed character, capped at the top speakers. The knowledge horizon is
+  // derived from which chapters each character has appeared in (per the entity
+  // DB + chapter summaries). A report may be empty if no character entities are
+  // cached yet — extract entities on the chapters first.
+
+  /**
+   * POST /api/projects/:id/character-critique { chapterText, chapterId?, characters? }
+   *   Runs the character persona agents against the project's character entity
+   *   DB + chapter summaries. chapterText required. Optional `characters` filters
+   *   to specific characters (by name/alias). 503 if the agent/context engine is
+   *   unavailable. 404 if the project is unknown. 400 if chapterText is missing.
+   */
+  app.post('/api/projects/:id/character-critique', async (req: Request, res: Response) => {
+    const agent = services.characterAgent;
+    const ctxEngine = services.contextEngine;
+    if (!agent || !ctxEngine) {
+      return res.status(503).json({ error: 'Character agent not initialized' });
+    }
+
+    const engine = gateway.getProjectEngine?.();
+    const project = engine?.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const chapterText: string | undefined =
+      typeof req.body?.chapterText === 'string' ? req.body.chapterText : undefined;
+    if (!chapterText || chapterText.trim().length === 0) {
+      return res.status(400).json({ error: 'chapterText (string) required' });
+    }
+    const chapterId = typeof req.body?.chapterId === 'string' ? req.body.chapterId : undefined;
+    const characters = Array.isArray(req.body?.characters)
+      ? req.body.characters.filter((c: any) => typeof c === 'string')
+      : undefined;
+
+    try {
+      // Hydrate the in-memory cache, then read the canonical entity DB +
+      // summaries (pure getters — never AI-call, never throw).
+      await ctxEngine.loadContext(req.params.id);
+      const entities = ctxEngine.getEntities(req.params.id);
+      const summaries = ctxEngine.getSummaries(req.params.id);
+
+      const aiCompleteFn = (r: any) => services.aiRouter.complete(r);
+      const aiSelectFn = (t: string) => services.aiRouter.selectProvider(t);
+
+      const report = await agent.critiqueDialogue(
+        { projectId: req.params.id, chapterText, chapterId, characters },
+        aiCompleteFn,
+        aiSelectFn,
+        entities,
+        summaries,
+      );
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Character critique failed' });
+    }
+  });
+
 }

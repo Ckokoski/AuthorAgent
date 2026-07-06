@@ -68,6 +68,7 @@ import { CraftCriticService } from './craft-critic.js';
 import { AudiobookPrepService } from './audiobook-prep.js';
 import { StyleCloneService } from './style-clone.js';
 import { ContradictionDetector } from './contradiction-detector.js';
+import { CharacterAgentService } from './character-agent.js';
 import { RevisionOrchestrator } from './revision-orchestrator.js';
 import { ConfirmationGateService } from './confirmation-gate.js';
 import { DisclosuresService } from './disclosures.js';
@@ -132,6 +133,7 @@ export interface GatewayServices {
   audiobookPrep: AudiobookPrepService;
   styleClone: StyleCloneService;
   contradictionDetector: ContradictionDetector;
+  characterAgent: CharacterAgentService;
   revisionOrchestrator: RevisionOrchestrator;
   confirmationGate: ConfirmationGateService;
   disclosures: DisclosuresService;
@@ -209,6 +211,7 @@ export class ServiceContainer {
   audiobookPrep!: AudiobookPrepService;
   styleClone!: StyleCloneService;
   contradictionDetector!: ContradictionDetector;
+  characterAgent!: CharacterAgentService;
   revisionOrchestrator!: RevisionOrchestrator;
   // Wave 3 — autonomous career agent with safety rails
   confirmationGate!: ConfirmationGateService;
@@ -275,6 +278,7 @@ export class ServiceContainer {
       audiobookPrep: this.audiobookPrep,
       styleClone: this.styleClone,
       contradictionDetector: this.contradictionDetector,
+      characterAgent: this.characterAgent,
       revisionOrchestrator: this.revisionOrchestrator,
       confirmationGate: this.confirmationGate,
       disclosures: this.disclosures,

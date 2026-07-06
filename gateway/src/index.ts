@@ -72,6 +72,7 @@ import { CraftCriticService } from './services/craft-critic.js';
 import { AudiobookPrepService } from './services/audiobook-prep.js';
 import { StyleCloneService } from './services/style-clone.js';
 import { ContradictionDetector } from './services/contradiction-detector.js';
+import { CharacterAgentService } from './services/character-agent.js';
 import { RevisionOrchestrator } from './services/revision-orchestrator.js';
 import { ConfirmationGateService } from './services/confirmation-gate.js';
 import { DisclosuresService } from './services/disclosures.js';
@@ -226,6 +227,8 @@ class AuthorClawGateway {
   private set styleClone(v: StyleCloneService) { this.services.styleClone = v; }
   private get contradictionDetector(): ContradictionDetector { return this.services.contradictionDetector; }
   private set contradictionDetector(v: ContradictionDetector) { this.services.contradictionDetector = v; }
+  private get characterAgent(): CharacterAgentService { return this.services.characterAgent; }
+  private set characterAgent(v: CharacterAgentService) { this.services.characterAgent = v; }
   private get revisionOrchestrator(): RevisionOrchestrator { return this.services.revisionOrchestrator; }
   private set revisionOrchestrator(v: RevisionOrchestrator) { this.services.revisionOrchestrator = v; }
   private get confirmationGate(): ConfirmationGateService { return this.services.confirmationGate; }
@@ -746,6 +749,17 @@ class AuthorClawGateway {
     // before the revision orchestrator so the continuity pass can use it.
     this.contradictionDetector = new ContradictionDetector();
     logger.info('  ✓ Contradiction detector: active consistency checking (ConStory taxonomy) ready');
+
+    // ── Character persona agents ──
+    // Each major character becomes a standing critic of their OWN dialogue: the
+    // service extracts a character's lines from a chapter and runs ONE mid-tier
+    // ('style_analysis') critique per character, flagging off-voice /
+    // anachronistic-knowledge / off-motivation lines with in-voice rewrites.
+    // Reuses the CharacterVoices fingerprint store (built above) for each
+    // character's voice signature. Stateless per call (entities/summaries passed
+    // in), so a single shared instance.
+    this.characterAgent = new CharacterAgentService(this.characterVoices);
+    logger.info('  ✓ Character persona agents: per-character dialogue self-critique ready');
 
     // ── Specialist revision passes ──
     // Coordinates narrow expert passes (continuity, voice, craft, anti-slop)
