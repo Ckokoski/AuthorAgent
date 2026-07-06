@@ -43,6 +43,7 @@ import { UserModelService } from './user-model.js';
 import { CronSchedulerService } from './cron-scheduler.js';
 import { AutoSkillService } from './auto-skill.js';
 import { WritingJudgeService } from './writing-judge.js';
+import { ReaderPanelService } from './reader-panel.js';
 import { ResearchLookupService } from './research-lookup.js';
 import { VideoResearchService } from './video-research.js';
 import { StoryStructureService } from './story-structures.js';
@@ -106,6 +107,7 @@ export interface GatewayServices {
   cronScheduler: CronSchedulerService;
   autoSkill: AutoSkillService;
   writingJudge: WritingJudgeService;
+  readerPanel: ReaderPanelService;
   researchLookup: ResearchLookupService;
   videoResearch: VideoResearchService;
   storyStructures: StoryStructureService;
@@ -182,6 +184,7 @@ export class ServiceContainer {
   cronScheduler!: CronSchedulerService;
   autoSkill!: AutoSkillService;
   writingJudge!: WritingJudgeService;
+  readerPanel!: ReaderPanelService;
   researchLookup!: ResearchLookupService;
   videoResearch!: VideoResearchService;
   storyStructures!: StoryStructureService;
@@ -247,6 +250,7 @@ export class ServiceContainer {
       cronScheduler: this.cronScheduler,
       autoSkill: this.autoSkill,
       writingJudge: this.writingJudge,
+      readerPanel: this.readerPanel,
       researchLookup: this.researchLookup,
       videoResearch: this.videoResearch,
       storyStructures: this.storyStructures,

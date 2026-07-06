@@ -44,6 +44,7 @@ import { registerVideoResearchRoutes } from './routes/video-research.js';
 import { registerStructuresPlotRoutes } from './routes/structures-plot.js';
 import { registerWave3GatedRoutes } from './routes/wave3-gated.js';
 import { registerWebsiteRoutes } from './routes/website.js';
+import { registerReaderPanelRoutes } from './routes/reader-panel.js';
 
 export function createAPIRoutes(app: Application, gateway: any, rootDir?: string): void {
   const ctx = createApiContext(app, gateway, rootDir);
@@ -75,4 +76,5 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
   registerStructuresPlotRoutes(ctx);
   registerWave3GatedRoutes(ctx);
   registerWebsiteRoutes(ctx);
+  registerReaderPanelRoutes(ctx);
 }

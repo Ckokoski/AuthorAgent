@@ -47,6 +47,7 @@ import { UserModelService } from './services/user-model.js';
 import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
 import { WritingJudgeService } from './services/writing-judge.js';
+import { ReaderPanelService } from './services/reader-panel.js';
 import { ResearchLookupService } from './services/research-lookup.js';
 import { VideoResearchService } from './services/video-research.js';
 import { StoryStructureService } from './services/story-structures.js';
@@ -175,6 +176,8 @@ class AuthorClawGateway {
   private set autoSkill(v: AutoSkillService) { this.services.autoSkill = v; }
   private get writingJudge(): WritingJudgeService { return this.services.writingJudge; }
   private set writingJudge(v: WritingJudgeService) { this.services.writingJudge = v; }
+  private get readerPanel(): ReaderPanelService { return this.services.readerPanel; }
+  private set readerPanel(v: ReaderPanelService) { this.services.readerPanel = v; }
   private get researchLookup(): ResearchLookupService { return this.services.researchLookup; }
   private set researchLookup(v: ResearchLookupService) { this.services.researchLookup = v; }
   private get videoResearch(): VideoResearchService { return this.services.videoResearch; }
@@ -574,6 +577,13 @@ class AuthorClawGateway {
     // keep AI cost predictable.
     this.writingJudge = new WritingJudgeService();
     logger.info('  ✓ Writing judge: mechanical screen + LLM judge ready');
+
+    // ── Synthetic Reader Panels — tournament-based marketing-asset testing ──
+    // Pairwise persona tournament for blurbs/titles/cover-concepts with
+    // anti-slop safeguards (clustering, repetition, position-bias, confidence).
+    // Stateless; the router closures are passed per-request from the route.
+    this.readerPanel = new ReaderPanelService();
+    logger.info('  ✓ Reader panels: synthetic persona tournament ready');
 
     // ── Phase 6g6: Research services (sourced lookup + video extraction) ──
     this.researchLookup = new ResearchLookupService();
