@@ -878,6 +878,53 @@ export class ContextEngine {
   }
 
   /**
+   * Returns the deduped union of open plot threads across all chapter summaries.
+   * Pure in-memory read over cached ProjectContext — never AI-calls, never
+   * throws. Returns [] if nothing is cached. Order follows first appearance
+   * (chapter order, which loadContext keeps sorted). Case-insensitive dedupe,
+   * preserving the first-seen casing.
+   */
+  getOpenPlotThreads(projectId: string): string[] {
+    const ctx = this.contexts.get(projectId);
+    if (!ctx || ctx.summaries.length === 0) return [];
+
+    const seen = new Set<string>();
+    const threads: string[] = [];
+    for (const summary of ctx.summaries) {
+      for (const raw of summary.plotThreads ?? []) {
+        const thread = (raw ?? '').trim();
+        if (!thread) continue;
+        const key = thread.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        threads.push(thread);
+      }
+    }
+    return threads;
+  }
+
+  /**
+   * Returns cached entities filtered by type. Pure in-memory read over cached
+   * ProjectContext — never AI-calls, never throws. Returns [] if nothing is
+   * cached.
+   */
+  getEntitiesByType(projectId: string, type: EntityEntry['type']): EntityEntry[] {
+    const ctx = this.contexts.get(projectId);
+    if (!ctx) return [];
+    return ctx.entities.filter(e => e.type === type);
+  }
+
+  /**
+   * Returns the cached chapter summaries for a project (chapter-sorted, as
+   * generateSummary keeps them). Pure in-memory read — never AI-calls, never
+   * throws. Returns [] if nothing is cached.
+   */
+  getSummaries(projectId: string): ChapterSummary[] {
+    const ctx = this.contexts.get(projectId);
+    return ctx?.summaries ?? [];
+  }
+
+  /**
    * Returns the stored continuity report, if any.
    */
   getReport(projectId: string): ContinuityReport | null {
