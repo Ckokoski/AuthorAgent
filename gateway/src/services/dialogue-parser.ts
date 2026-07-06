@@ -53,7 +53,11 @@ export function startsWithQuote(trimmedParagraph: string): boolean {
 /** Extract and join the spoken (quoted) portion(s) of a paragraph, stripping
  *  quote marks. Returns '' if no quoted text is found. */
 export function extractSpokenText(trimmedParagraph: string): string {
-  const spokenMatches = trimmedParagraph.match(/["“”]([^"“”]+)["“”]/g) || [];
+  // Require at least one non-space, non-quote char between the quotes. Straight
+  // quotes are ambiguous (the same char opens and closes), so a whitespace-only
+  // pair like `"  "` would otherwise match first and consume the opening quote
+  // of the *next* real line, silently dropping it.
+  const spokenMatches = trimmedParagraph.match(/["“”][^"“”]*[^\s"“”][^"“”]*["“”]/g) || [];
   return spokenMatches
     .map(m => m.replace(/^["“”]/, '').replace(/["“”]$/, '').trim())
     .filter(s => s.length > 0)
@@ -108,11 +112,13 @@ export function buildNameLookup(
 ): Map<string, string> {
   const lookup = new Map<string, string>();
   for (const n of characterNames) {
-    const k = n.toLowerCase().trim();
-    if (k) lookup.set(k, n);
+    const canon = n.trim();
+    const k = canon.toLowerCase();
+    if (k) lookup.set(k, canon);
   }
   for (const [canon, aliasList] of Object.entries(aliases)) {
-    for (const a of aliasList) lookup.set(a.toLowerCase().trim(), canon);
+    const canonTrimmed = canon.trim();
+    for (const a of aliasList) lookup.set(a.toLowerCase().trim(), canonTrimmed);
   }
   return lookup;
 }

@@ -78,16 +78,12 @@ describe('extractSpokenText', () => {
     expect(extractSpokenText('She walked to the door.')).toBe('');
   });
 
-  it('a leading empty-quote pair swallows the next quote char, losing the following text', () => {
-    // POTENTIAL BUG (documented, not fixed — source is out of scope for this test task):
-    // The regex /["“”]([^"“”]+)["“”]/g is greedy/non-overlapping. For input
-    // `""  "Real line."` it matches `"  "` as the first pair (quote, two
-    // spaces, quote) and consumes the 3rd quote character in the process,
-    // leaving `Real line."` with no matching opening quote. Net result: the
-    // trimmed capture is blank, gets filtered by `.filter(s => s.length > 0)`,
-    // and "Real line." is silently dropped instead of extracted.
+  it('does not let a leading empty-quote pair swallow the next real line', () => {
+    // Regression guard: extractSpokenText now requires a non-space, non-quote
+    // char between the quotes, so the whitespace-only pair `"  "` no longer
+    // matches and consumes the opening quote of the following real line.
     const para = '""  "Real line."';
-    expect(extractSpokenText(para)).toBe('');
+    expect(extractSpokenText(para)).toBe('Real line.');
   });
 
   it('filters out an empty quoted segment when it is the only segment', () => {
@@ -165,15 +161,12 @@ describe('buildNameLookup', () => {
     expect(lookup.get('bob')).toBe('Bob');
   });
 
-  it('trims whitespace for the lookup KEY but not for the stored canonical VALUE', () => {
-    // POTENTIAL BUG (documented, not fixed — source is out of scope for this
-    // test task): `buildNameLookup` trims `n` when building the lowercase
-    // lookup key (`n.toLowerCase().trim()`) but stores the original,
-    // untrimmed `n` as the map value. A name with stray whitespace is
-    // therefore still reachable by its trimmed lowercase key, but the
-    // canonical name returned to callers retains the whitespace.
+  it('trims whitespace for both the lookup KEY and the stored canonical VALUE', () => {
+    // Regression guard: buildNameLookup now stores the trimmed canonical name,
+    // so a name with stray whitespace is reachable by its trimmed lowercase
+    // key AND returns the clean canonical name to callers.
     const lookup = buildNameLookup(['  Sarah  ']);
-    expect(lookup.get('sarah')).toBe('  Sarah  ');
+    expect(lookup.get('sarah')).toBe('Sarah');
   });
 
   it('skips empty names', () => {
