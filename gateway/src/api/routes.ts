@@ -12,13 +12,16 @@ import multer from 'multer';
 import path from 'path';
 import { generateDocxBuffer } from '../services/docx-export.js';
 import { generateEpubBuffer } from '../services/epub-export.js';
+import { safeResolveWithin } from '../security/paths.js';
 
-/** Verify resolved path stays within the allowed base directory */
+/**
+ * Verify a resolved path stays within the allowed base directory.
+ * Thin wrapper over the shared path-safety helper (security/paths.ts) — kept
+ * as a local alias so existing call sites read unchanged. Returns null on
+ * escape so handlers can respond with 403.
+ */
 function safePath(base: string, userInput: string): string | null {
-  const resolved = path.resolve(base, userInput);
-  const resolvedBase = path.resolve(base);
-  if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) return null;
-  return resolved;
+  return safeResolveWithin(base, userInput);
 }
 
 export function createAPIRoutes(app: Application, gateway: any, rootDir?: string): void {
@@ -2502,9 +2505,9 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
       return res.status(404).json({ error: 'Input file not found: ' + inputFile + '. Use /files to see available files.' });
     }
 
-    // Security: must be within project
-    const resolvedBase = r(baseDir);
-    if (!resolvedInput.startsWith(resolvedBase + path.sep) && resolvedInput !== resolvedBase) {
+    // Security: must be within project root (baseDir). safePath re-verifies the
+    // already-resolved candidate stays inside baseDir with Windows-safe compare.
+    if (!safePath(baseDir, resolvedInput)) {
       return res.status(403).json({ error: 'Path traversal blocked' });
     }
 
@@ -3750,10 +3753,12 @@ ${sourceCode.substring(0, 15000)}
     }
 
     // Harden against path traversal — imagePath must be inside workspace.
-    const { resolve } = await import('path');
+    // safePath handles absolute inputs (resolve(base, absPath) === absPath) and
+    // rejects anything that escapes workspace/, with Windows case + separator
+    // normalization via the shared helper.
     const workspaceDir = path.join(baseDir, 'workspace');
-    const resolved = resolve(String(imagePath));
-    if (!resolved.startsWith(resolve(workspaceDir))) {
+    const resolved = safePath(workspaceDir, String(imagePath));
+    if (!resolved) {
       return res.status(400).json({ error: 'imagePath must be inside workspace/' });
     }
 
@@ -3887,10 +3892,13 @@ ${sourceCode.substring(0, 15000)}
 
   // Get the stored beta-reader report
   app.get('/api/projects/:id/beta-reader/report', async (req: Request, res: Response) => {
-    const { join: j } = await import('path');
     const { readFile: rf } = await import('fs/promises');
     const { existsSync: ex } = await import('fs');
-    const file = j(baseDir, 'workspace', 'beta-reports', `${req.params.id}.json`);
+    // req.params.id is user-controlled and joined into a filename — constrain
+    // to the beta-reports directory to block traversal (e.g. ../../ or null byte).
+    const betaDir = path.join(baseDir, 'workspace', 'beta-reports');
+    const file = safePath(betaDir, `${req.params.id}.json`);
+    if (!file) return res.status(400).json({ error: 'Invalid project id' });
     if (!ex(file)) return res.json({ report: null });
     try {
       const raw = await rf(file, 'utf-8');
