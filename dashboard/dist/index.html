@@ -990,6 +990,38 @@ textarea { resize: vertical; min-height: 60px; }
         <div id="qlPanelResults" style="margin-top:16px;"></div>
       </div>
 
+      <!-- Prose Evolve -->
+      <div class="card">
+        <div class="card-title">Prose Evolve</div>
+        <p class="hint" style="margin-bottom:10px;">Runs a GEPA-style evolve loop: scores your passage, reflects on its weakest points, revises, and keeps only rounds that beat the running best. Works with any active AI provider, including free tiers (Ollama/Gemini) — the judge may be weaker on smaller models.</p>
+        <div class="form-group">
+          <label>Passage</label>
+          <textarea id="qlEvolveText" rows="8" placeholder="Paste a passage to evolve (at least 40 characters)..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Rounds</label>
+          <input type="number" id="qlEvolveRounds" value="2" min="1" max="5" style="max-width:100px;">
+        </div>
+        <button id="qlEvolveBtn">Evolve</button>
+        <div id="qlEvolveResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Learn from Chapter -->
+      <div class="card">
+        <div class="card-title">Learn from Chapter</div>
+        <p class="hint" style="margin-bottom:10px;">Runs the quality tools (revision, contradiction, character critique) against a chapter and learns durable lessons from recurring patterns. Learned lessons feed forward into future writing via the project's lesson store.</p>
+        <div class="form-group">
+          <label>Project</label>
+          <select id="qlLearnProject"><option value="">Select a project...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Chapter text</label>
+          <textarea id="qlLearnText" rows="8" placeholder="Paste chapter text to learn from..."></textarea>
+        </div>
+        <button id="qlLearnBtn">Learn</button>
+        <div id="qlLearnResults" style="margin-top:16px;"></div>
+      </div>
+
     </div>
 
     <!-- ═══════════════════════════════
@@ -4000,6 +4032,7 @@ function loadQualityLab() {
       { el: document.getElementById('qlRevisionProject'), placeholder: 'None — mechanical passes only' },
       { el: document.getElementById('qlContraProject'), placeholder: 'Select a project...' },
       { el: document.getElementById('qlCritiqueProject'), placeholder: 'Select a project...' },
+      { el: document.getElementById('qlLearnProject'), placeholder: 'Select a project...' },
     ];
     sels.forEach(function(s) {
       if (!s.el) return;
@@ -4222,6 +4255,127 @@ function renderPanelReport(report) {
       '</div>';
   });
 
+  el.innerHTML = html;
+}
+
+// ── Prose Evolve ──
+document.getElementById('qlEvolveBtn').addEventListener('click', function() {
+  var btn = this;
+  var passage = document.getElementById('qlEvolveText').value.trim();
+  var roundsRaw = parseInt(document.getElementById('qlEvolveRounds').value, 10);
+  var rounds = isNaN(roundsRaw) ? 2 : Math.min(5, Math.max(1, roundsRaw));
+  var el = document.getElementById('qlEvolveResults');
+  if (!passage || passage.length < 40) { showToast('Paste a passage of at least 40 characters', 'error'); return; }
+  qlSetRunning(btn, true, 'Evolve', 'Evolving...');
+  el.innerHTML = '<div style="color:var(--muted);">Scoring, reflecting, and revising across ' + rounds + ' round(s)...</div>';
+  api('POST', '/api/prose/evolve', { passage: passage, rounds: rounds }).then(function(result) {
+    renderEvolveResult(result);
+  }).catch(function(e) {
+    showToast('Prose evolve failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Evolve failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Evolve', 'Evolving...');
+  });
+});
+
+function renderEvolveResult(result) {
+  var el = document.getElementById('qlEvolveResults');
+  if (!result) { el.innerHTML = ''; return; }
+
+  var delta = (result.best.score || 0) - (result.original.score || 0);
+  var deltaColor = result.improved ? 'var(--success)' : 'var(--muted)';
+  var deltaSign = delta > 0 ? '+' : '';
+
+  var html = '';
+  if (result.warnings && result.warnings.length) {
+    html += '<div style="margin-bottom:12px;">' + result.warnings.map(function(w) {
+      return '<div style="padding:8px 12px;background:rgba(245,158,11,0.12);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;margin-bottom:6px;color:var(--muted);">' + esc(w) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+    '<div style="font-size:13px;">' + (result.improved ? '<strong style="color:var(--success);">Improved</strong>' : '<span style="color:var(--muted);">No improvement — original kept</span>') + '</div>' +
+    '<div style="font-size:13px;color:' + deltaColor + ';font-weight:700;">' + result.original.score + ' &rarr; ' + result.best.score + ' (' + deltaSign + delta + ')</div>' +
+    '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">' +
+    '<div style="padding:10px;background:var(--bg);border-radius:6px;">' +
+    '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--muted);">BEFORE &middot; score ' + result.original.score + '</div>' +
+    '<div style="font-size:13px;white-space:pre-wrap;">' + esc(result.original.text) + '</div>' +
+    '</div>' +
+    '<div style="padding:10px;background:var(--bg);border-radius:6px;border:1px solid rgba(39,174,96,0.35);">' +
+    '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--success);">AFTER &middot; score ' + result.best.score + '</div>' +
+    '<div style="font-size:13px;white-space:pre-wrap;">' + esc(result.best.text) + '</div>' +
+    '</div>' +
+    '</div>';
+
+  if (result.rounds && result.rounds.length) {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Round trace</div>';
+    result.rounds.forEach(function(r) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge badge-type">Round ' + r.round + '</span> ' +
+        '<span class="badge ' + (r.accepted ? 'badge-muted' : 'badge-warn') + '" style="' + (r.accepted ? 'background:rgba(39,174,96,0.18);color:var(--success);border-color:rgba(39,174,96,0.35);' : '') + '">' + (r.accepted ? 'accepted' : 'rejected') + '</span> ' +
+        '<span style="color:var(--muted);">score: ' + (r.candidateScore === null || r.candidateScore === undefined ? 'n/a' : r.candidateScore) + '</span></div>' +
+        '<div style="margin-bottom:4px;"><strong>Reflection:</strong> ' + esc(r.reflection) + '</div>' +
+        '<div style="color:var(--muted);font-size:12px;">' + esc(r.changeSummary) + '</div>' +
+        '</div>';
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Learn from Chapter ──
+document.getElementById('qlLearnBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('qlLearnProject').value;
+  var text = document.getElementById('qlLearnText').value.trim();
+  var el = document.getElementById('qlLearnResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  qlSetRunning(btn, true, 'Learn', 'Learning...');
+  el.innerHTML = '<div style="color:var(--muted);">Running the quality tools and learning from the results...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/learn', { chapterText: text }).then(function(outcome) {
+    renderLearnOutcome(outcome);
+  }).catch(function(e) {
+    showToast('Learn from chapter failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Learn failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Learn', 'Learning...');
+  });
+});
+
+function renderLearnOutcome(outcome) {
+  var el = document.getElementById('qlLearnResults');
+  if (!outcome) { el.innerHTML = ''; return; }
+
+  var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--muted);">' +
+    '<span>Reports run: ' + ((outcome.reportsRun || []).length ? outcome.reportsRun.map(esc).join(', ') : 'none') + '</span>';
+  if (outcome.reportsSkipped && outcome.reportsSkipped.length) {
+    html += '<span>&middot; Skipped: ' + outcome.reportsSkipped.map(esc).join(', ') + '</span>';
+  }
+  html += '</div>';
+
+  if (outcome.summary) {
+    html += '<div style="font-size:13px;margin-bottom:12px;">' + esc(outcome.summary) + '</div>';
+  }
+
+  if (!outcome.lessonsAdded || !outcome.lessonsAdded.length) {
+    html += '<div style="text-align:center;padding:20px;color:var(--muted);"><strong>No new lessons this pass.</strong><br><span style="font-size:12px;">' + (outcome.lessonsSkippedDuplicate || []).length + ' duplicate(s) had their confidence bumped instead.</span></div>';
+  } else {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Lessons added (' + outcome.lessonsAdded.length + ')</div>';
+    outcome.lessonsAdded.forEach(function(l) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;">' + esc(l.text) + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);"><span class="badge badge-type">' + esc(l.source) + '</span> confidence: ' + Math.round((l.confidence || 0) * 100) + '%</div>' +
+        '</div>';
+    });
+    if (outcome.lessonsSkippedDuplicate && outcome.lessonsSkippedDuplicate.length) {
+      html += '<div style="font-size:12px;color:var(--muted);margin-top:6px;">' + outcome.lessonsSkippedDuplicate.length + ' duplicate lesson(s) skipped (confidence bumped instead).</div>';
+    }
+  }
+
+  html += '<div class="hint" style="margin-top:10px;">Learned lessons feed forward into future writing via the project\'s lesson store.</div>';
   el.innerHTML = html;
 }
 
