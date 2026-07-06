@@ -75,6 +75,7 @@ import { StyleCloneService } from './services/style-clone.js';
 import { ContradictionDetector } from './services/contradiction-detector.js';
 import { CharacterAgentService } from './services/character-agent.js';
 import { RevisionOrchestrator } from './services/revision-orchestrator.js';
+import { LearningService } from './services/learning.js';
 import { ConfirmationGateService } from './services/confirmation-gate.js';
 import { DisclosuresService } from './services/disclosures.js';
 import { LaunchOrchestratorService } from './services/launch-orchestrator.js';
@@ -234,6 +235,8 @@ class AuthorClawGateway {
   private set characterAgent(v: CharacterAgentService) { this.services.characterAgent = v; }
   private get revisionOrchestrator(): RevisionOrchestrator { return this.services.revisionOrchestrator; }
   private set revisionOrchestrator(v: RevisionOrchestrator) { this.services.revisionOrchestrator = v; }
+  private get learning(): LearningService { return this.services.learning; }
+  private set learning(v: LearningService) { this.services.learning = v; }
   private get confirmationGate(): ConfirmationGateService { return this.services.confirmationGate; }
   private set confirmationGate(v: ConfirmationGateService) { this.services.confirmationGate = v; }
   private get disclosures(): DisclosuresService { return this.services.disclosures; }
@@ -829,6 +832,18 @@ class AuthorClawGateway {
       aiSelectProvider: (taskType: string) => this.aiRouter.selectProvider(taskType),
     });
     logger.info('  ✓ Revision orchestrator: specialist passes (continuity · voice · craft · anti-slop) ready');
+
+    // ── Learn-from-experience loop ──
+    // Distils the RECURRING flags across the quality tools' reports (revision,
+    // contradiction, character) into durable LESSONS written to the LessonStore.
+    // LessonStore.buildContext() already injects high-confidence lessons into the
+    // writing system prompt (message-pipeline buildSystemPrompt → "# Lessons
+    // Learned"), so a learned lesson feeds forward into the next draft — the
+    // improvement loop closes automatically. Aggregation is pure code; at most
+    // ONE free-tier ('general') AI call phrases the top patterns. Stateless per
+    // call apart from its LessonStore handle, so a single shared instance.
+    this.learning = new LearningService(this.lessons);
+    logger.info('  ✓ Learning service: recurring-issue → durable-lesson loop ready');
 
     // ── Phase 6k: Wave 3 — autonomous career agent (gated) ──
     this.confirmationGate = new ConfirmationGateService(join(ROOT_DIR, 'workspace'));

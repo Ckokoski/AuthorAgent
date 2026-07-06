@@ -669,4 +669,141 @@ export function registerManuscriptQualityRoutes(ctx: ApiContext): void {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // Learn-from-experience — distil recurring flags into durable lessons
+  // ═══════════════════════════════════════════════════════════
+  // Aggregates the RECURRING findings across the quality tools' reports and
+  // writes them as lessons into the LessonStore. Those lessons already inject
+  // into the writing system prompt (message-pipeline "# Lessons Learned"), so
+  // learning here feeds forward into the next draft — the loop closes. CODE
+  // aggregation + at most ONE free-tier AI phrasing call. Never throws.
+
+  /**
+   * POST /api/learn/from-reports { projectId?, reports: [{type, report}] }
+   *   Learn directly from already-computed reports. `reports` is an array of
+   *   { type: 'revision'|'contradiction'|'character', report }. Returns the
+   *   LearnOutcome (patternsFound, lessonsAdded, lessonsSkippedDuplicate,
+   *   summary). 503 if the learning service / lesson store is unavailable.
+   */
+  app.post('/api/learn/from-reports', async (req: Request, res: Response) => {
+    const learning = services.learning;
+    if (!learning || !services.lessons) {
+      return res.status(503).json({ error: 'Learning service not initialized' });
+    }
+    const reports = Array.isArray(req.body?.reports) ? req.body.reports : null;
+    if (!reports) {
+      return res.status(400).json({ error: 'reports (array of {type, report}) required' });
+    }
+    const projectId = typeof req.body?.projectId === 'string' ? req.body.projectId : undefined;
+
+    try {
+      const aiCompleteFn = (r: any) => services.aiRouter.complete(r);
+      const aiSelectFn = (t: string) => services.aiRouter.selectProvider(t);
+      const outcome = await learning.learnFromReports({ projectId, reports }, aiCompleteFn, aiSelectFn);
+      res.json(outcome);
+    } catch (err: any) {
+      // learnFromReports never throws, but guard the AI-closure construction too.
+      res.status(500).json({ error: err?.message || 'Learning failed' });
+    }
+  });
+
+  /**
+   * POST /api/projects/:id/learn { chapterText, chapterId?, characters? }
+   *   Convenience one-shot: runs the revision orchestrator + contradiction
+   *   detector (and character critique when available) on the provided
+   *   chapterText, then learns from whatever results came back. Each tool is
+   *   guarded — an unavailable or throwing tool is skipped, not fatal. Returns
+   *   the LearnOutcome plus which reports fed it. 503 if learning is missing.
+   */
+  app.post('/api/projects/:id/learn', async (req: Request, res: Response) => {
+    const learning = services.learning;
+    if (!learning || !services.lessons) {
+      return res.status(503).json({ error: 'Learning service not initialized' });
+    }
+
+    const engine = gateway.getProjectEngine?.();
+    const project = engine?.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    let chapterText: string | undefined =
+      typeof req.body?.chapterText === 'string' ? req.body.chapterText : undefined;
+    if (!chapterText) {
+      const chapters = await gatherChapters(baseDir, project);
+      if (chapters.length === 0) {
+        return res.status(400).json({ error: 'No chapterText provided and no completed chapters found.' });
+      }
+      chapterText = chapters.map(c => `# ${c.title}\n\n${c.text}`).join('\n\n');
+    }
+    const chapterId = typeof req.body?.chapterId === 'string' ? req.body.chapterId : undefined;
+    const characters = Array.isArray(req.body?.characters)
+      ? req.body.characters.filter((c: any) => typeof c === 'string')
+      : undefined;
+
+    const aiCompleteFn = (r: any) => services.aiRouter.complete(r);
+    const aiSelectFn = (t: string) => services.aiRouter.selectProvider(t);
+
+    // ── Run the quality tools, each guarded — a missing/throwing tool is
+    // simply skipped so the loop still learns from whatever succeeded. ──
+    const reports: Array<{ type: 'revision' | 'contradiction' | 'character'; report: any }> = [];
+    const reportsRun: string[] = [];
+    const reportsSkipped: string[] = [];
+
+    // Revision orchestrator (project-scoped: enables continuity + voice passes).
+    if (services.revisionOrchestrator) {
+      try {
+        const report = await services.revisionOrchestrator.analyze({
+          chapterText, projectId: project.id, chapterId,
+        });
+        reports.push({ type: 'revision', report });
+        reportsRun.push('revision');
+      } catch { reportsSkipped.push('revision'); }
+    } else {
+      reportsSkipped.push('revision');
+    }
+
+    // Contradiction detector + character agent both need the entity DB.
+    let entities: any[] = [];
+    let summaries: any[] = [];
+    if (services.contextEngine) {
+      try {
+        await services.contextEngine.loadContext(project.id);
+        entities = services.contextEngine.getEntities(project.id);
+        summaries = services.contextEngine.getSummaries(project.id);
+      } catch { /* no cached context — detector/agent still run, just anchorless */ }
+    }
+
+    if (services.contradictionDetector && services.contextEngine) {
+      try {
+        const report = await services.contradictionDetector.detect(
+          { projectId: project.id, chapterText, chapterId, priorSummaries: summaries, entities },
+          aiCompleteFn, aiSelectFn,
+        );
+        reports.push({ type: 'contradiction', report });
+        reportsRun.push('contradiction');
+      } catch { reportsSkipped.push('contradiction'); }
+    } else {
+      reportsSkipped.push('contradiction');
+    }
+
+    if (services.characterAgent && services.contextEngine) {
+      try {
+        const report = await services.characterAgent.critiqueDialogue(
+          { projectId: project.id, chapterText, chapterId, characters },
+          aiCompleteFn, aiSelectFn, entities, summaries,
+        );
+        reports.push({ type: 'character', report });
+        reportsRun.push('character');
+      } catch { reportsSkipped.push('character'); }
+    } else {
+      reportsSkipped.push('character');
+    }
+
+    try {
+      const outcome = await learning.learnFromReports({ projectId: project.id, reports }, aiCompleteFn, aiSelectFn);
+      res.json({ ...outcome, reportsRun, reportsSkipped });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Learning failed' });
+    }
+  });
+
 }

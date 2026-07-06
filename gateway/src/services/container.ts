@@ -71,6 +71,7 @@ import { StyleCloneService } from './style-clone.js';
 import { ContradictionDetector } from './contradiction-detector.js';
 import { CharacterAgentService } from './character-agent.js';
 import { RevisionOrchestrator } from './revision-orchestrator.js';
+import { LearningService } from './learning.js';
 import { ConfirmationGateService } from './confirmation-gate.js';
 import { DisclosuresService } from './disclosures.js';
 import { LaunchOrchestratorService } from './launch-orchestrator.js';
@@ -137,6 +138,7 @@ export interface GatewayServices {
   contradictionDetector: ContradictionDetector;
   characterAgent: CharacterAgentService;
   revisionOrchestrator: RevisionOrchestrator;
+  learning: LearningService;
   confirmationGate: ConfirmationGateService;
   disclosures: DisclosuresService;
   launchOrchestrator: LaunchOrchestratorService;
@@ -216,6 +218,7 @@ export class ServiceContainer {
   contradictionDetector!: ContradictionDetector;
   characterAgent!: CharacterAgentService;
   revisionOrchestrator!: RevisionOrchestrator;
+  learning!: LearningService;
   // Wave 3 — autonomous career agent with safety rails
   confirmationGate!: ConfirmationGateService;
   disclosures!: DisclosuresService;
@@ -284,6 +287,7 @@ export class ServiceContainer {
       contradictionDetector: this.contradictionDetector,
       characterAgent: this.characterAgent,
       revisionOrchestrator: this.revisionOrchestrator,
+      learning: this.learning,
       confirmationGate: this.confirmationGate,
       disclosures: this.disclosures,
       launchOrchestrator: this.launchOrchestrator,
