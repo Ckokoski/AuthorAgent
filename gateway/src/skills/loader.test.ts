@@ -354,3 +354,72 @@ describe('SkillLoader.matchSkills — ranking, cap, budget', () => {
     expect(second).not.toContain('w'.repeat(50));
   });
 });
+
+describe('SkillLoader — usage logging', () => {
+  let skillsDir: string;
+  let loader: SkillLoader;
+
+  beforeEach(async () => {
+    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-usage-test-'));
+    // No workspaceDir → in-memory-only usage (no disk writes to assert on).
+    loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
+  });
+
+  afterEach(async () => {
+    await rm(skillsDir, { recursive: true, force: true });
+  });
+
+  it('starts with empty usage stats', () => {
+    expect(loader.getUsageStats()).toEqual({});
+  });
+
+  it('recordUsage increments the count and sets lastUsedIso', () => {
+    loader.recordUsage(['skill-a', 'skill-b']);
+    loader.recordUsage(['skill-a']);
+    const stats = loader.getUsageStats();
+    expect(stats['skill-a'].count).toBe(2);
+    expect(stats['skill-b'].count).toBe(1);
+    expect(typeof stats['skill-a'].lastUsedIso).toBe('string');
+    expect(Date.parse(stats['skill-a'].lastUsedIso!)).not.toBeNaN();
+  });
+
+  it('recordUsage ignores empty input and never throws', () => {
+    expect(() => loader.recordUsage([])).not.toThrow();
+    expect(() => loader.recordUsage(['', ''] as any)).not.toThrow();
+    expect(() => loader.recordUsage(null as any)).not.toThrow();
+    // Empty names should not create phantom entries.
+    expect(Object.keys(loader.getUsageStats())).toHaveLength(0);
+  });
+
+  it('matchSkills records a usage tick for each selected skill', async () => {
+    await writeSkillFixture(skillsDir, 'core', 'matched-skill', {
+      description: 'Matched',
+      triggers: ['sparkletrigger'],
+    });
+    await writeSkillFixture(skillsDir, 'core', 'unmatched-skill', {
+      description: 'Unmatched',
+      triggers: ['nevermatched'],
+    });
+    await loader.loadAll();
+    loader.matchSkills('please use the sparkletrigger now');
+    const stats = loader.getUsageStats();
+    expect(stats['matched-skill']?.count).toBe(1);
+    expect(stats['unmatched-skill']).toBeUndefined();
+  });
+
+  it('the match path does not throw even if usage persistence fails', async () => {
+    await writeSkillFixture(skillsDir, 'core', 'boom-skill', {
+      description: 'Boom',
+      triggers: ['boomtrigger'],
+    });
+    await loader.loadAll();
+    // Force the internal persist scheduler to blow up; matchSkills must still
+    // return results and not surface the error (recordUsage is try/catch'd).
+    (loader as any).scheduleUsagePersist = () => { throw new Error('disk on fire'); };
+    let results: string[] = [];
+    expect(() => { results = loader.matchSkills('boomtrigger please'); }).not.toThrow();
+    expect(results).toHaveLength(1);
+    // Usage was still tallied in memory before the (simulated) persist failure.
+    expect(loader.getUsageStats()['boom-skill']?.count).toBe(1);
+  });
+});

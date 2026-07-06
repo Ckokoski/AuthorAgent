@@ -39,6 +39,28 @@ export function registerSkillDraftRoutes(ctx: ApiContext): void {
     res.json(result);
   });
 
+  // ── Skill Curator (Hermes-pattern library health) ──
+  // Read-only: runs the consolidation pass and returns the CurationReport
+  // (unused / overlapping / service-redundant proposals). NEVER deletes or
+  // rewrites a skill — the author acts on the proposals.
+  app.get('/api/skills/curation', async (req: Request, res: Response) => {
+    if (!services.skillCurator) return res.status(503).json({ error: 'Skill curator not initialized' });
+    try {
+      // Optional query overrides: ?staleAfterDays=30&overlapThreshold=0.6&useAI=false
+      const opts: any = {};
+      const stale = Number(req.query.staleAfterDays);
+      if (Number.isFinite(stale) && stale >= 0) opts.staleAfterDays = stale;
+      const thr = Number(req.query.overlapThreshold);
+      if (Number.isFinite(thr) && thr >= 0 && thr <= 1) opts.overlapThreshold = thr;
+      if (req.query.useAI === 'false') opts.useAI = false;
+      const report = await services.skillCurator.curate(opts);
+      res.json({ report });
+    } catch (err: any) {
+      // curate() never throws, but guard the route anyway.
+      res.status(500).json({ error: err?.message || 'Curation failed' });
+    }
+  });
+
   /** Manually request a draft from any completed project. */
   app.post('/api/projects/:id/draft-skill', async (req: Request, res: Response) => {
     if (!services.autoSkill) return res.status(503).json({ error: 'Auto-skill not initialized' });

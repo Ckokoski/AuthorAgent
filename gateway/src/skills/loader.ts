@@ -3,7 +3,7 @@
  * Discovers, validates, and loads skills from the skills directory
  */
 
-import { readFile, readdir } from 'fs/promises';
+import { readFile, readdir, writeFile, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { PermissionManager } from '../security/permissions.js';
@@ -25,14 +25,115 @@ export interface SkillCatalogEntry {
   premium: boolean;
 }
 
+/** Per-skill usage tally: how many times matched + when last matched. */
+export interface SkillUsageStat {
+  count: number;
+  lastUsedIso: string | null;
+}
+
 export class SkillLoader {
   private skillsDir: string;
   private permissions: PermissionManager;
   private skills: Map<string, Skill> = new Map();
 
-  constructor(skillsDir: string, permissions: PermissionManager) {
+  // ── Usage logging (Skill Curator, Hermes-pattern) ──
+  // In-memory tally of which skills matchSkills() actually selected, mirrored
+  // to a lightweight JSON under workspace/data/skill-usage.json via a debounced
+  // atomic write (same shape as ContextEngine.debouncedPersist). The whole path
+  // is best-effort — a failure to persist NEVER propagates into the match path.
+  private usage: Map<string, SkillUsageStat> = new Map();
+  private usagePath: string | null = null;
+  private usageWriteTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * @param workspaceDir Optional. When provided, skill usage is persisted to
+   *   `<workspaceDir>/data/skill-usage.json`. Tests / callers that omit it get
+   *   in-memory-only usage tracking (no disk writes), matching how AIRouter
+   *   makes its persistence store optional on the workspace dir.
+   */
+  constructor(skillsDir: string, permissions: PermissionManager, workspaceDir?: string) {
     this.skillsDir = skillsDir;
     this.permissions = permissions;
+    this.usagePath = workspaceDir ? join(workspaceDir, 'data', 'skill-usage.json') : null;
+    this.loadUsage();
+  }
+
+  /**
+   * Load persisted usage counters from disk (best-effort, synchronous-free).
+   * A missing / corrupt file simply starts the tally fresh — never throws.
+   */
+  private loadUsage(): void {
+    if (!this.usagePath || !existsSync(this.usagePath)) return;
+    try {
+      // Fire-and-forget async read; usage stats are advisory, so a late load is
+      // fine and we never want to block construction on disk I/O.
+      readFile(this.usagePath, 'utf-8')
+        .then((raw) => {
+          const parsed = JSON.parse(raw);
+          const rows = parsed?.skills && typeof parsed.skills === 'object' ? parsed.skills : {};
+          for (const [name, stat] of Object.entries(rows)) {
+            const s = stat as any;
+            if (typeof s?.count === 'number') {
+              this.usage.set(name, {
+                count: s.count,
+                lastUsedIso: typeof s.lastUsedIso === 'string' ? s.lastUsedIso : null,
+              });
+            }
+          }
+        })
+        .catch(() => { /* advisory data — ignore */ });
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * Record a usage tick for each named skill. Called by matchSkills() for the
+   * skills it selected. Cheap + non-throwing: increments an in-memory counter
+   * and schedules a debounced persist. Any failure is swallowed so usage
+   * logging can never break message handling.
+   */
+  recordUsage(names: string[]): void {
+    try {
+      if (!Array.isArray(names) || names.length === 0) return;
+      const nowIso = new Date().toISOString();
+      for (const name of names) {
+        if (!name) continue;
+        const prev = this.usage.get(name);
+        this.usage.set(name, { count: (prev?.count ?? 0) + 1, lastUsedIso: nowIso });
+      }
+      this.scheduleUsagePersist();
+    } catch { /* never throw into the match path */ }
+  }
+
+  /**
+   * Return a snapshot of usage stats keyed by skill name. Skills that have
+   * never matched are absent (the curator treats absence as zero usage).
+   */
+  getUsageStats(): Record<string, SkillUsageStat> {
+    const out: Record<string, SkillUsageStat> = {};
+    for (const [name, stat] of this.usage) {
+      out[name] = { count: stat.count, lastUsedIso: stat.lastUsedIso };
+    }
+    return out;
+  }
+
+  /** Debounced atomic write of the usage tally (tmp + rename), like context-engine. */
+  private scheduleUsagePersist(): void {
+    if (!this.usagePath || this.usageWriteTimer) return;
+    this.usageWriteTimer = setTimeout(() => {
+      this.usageWriteTimer = null;
+      this.persistUsage().catch(() => { /* advisory — ignore */ });
+    }, 2000);
+  }
+
+  private async persistUsage(): Promise<void> {
+    if (!this.usagePath) return;
+    try {
+      await mkdir(join(this.usagePath, '..'), { recursive: true });
+      const payload = { updatedAt: new Date().toISOString(), skills: this.getUsageStats() };
+      const tmp = this.usagePath + '.tmp';
+      await writeFile(tmp, JSON.stringify(payload, null, 2));
+      await rename(tmp, this.usagePath);
+    } catch { /* best-effort; usage data is advisory */ }
   }
 
   async loadAll(): Promise<void> {
@@ -212,6 +313,10 @@ export class SkillLoader {
 
     scored.sort((a, b) => b.score - a.score);
     const top = scored.slice(0, MAX_MATCHED_SKILLS);
+
+    // ── Usage logging ── record a tick for every skill we selected. Guarded
+    // internally so a persistence failure can never throw into this hot path.
+    this.recordUsage(top.map(({ skill }) => skill.name));
 
     // ── Assemble within budget ──
     const results: string[] = [];

@@ -42,6 +42,7 @@ import { SleepConsolidationService } from './sleep-consolidation.js';
 import { UserModelService } from './user-model.js';
 import { CronSchedulerService } from './cron-scheduler.js';
 import { AutoSkillService } from './auto-skill.js';
+import { SkillCuratorService } from './skill-curator.js';
 import { WritingJudgeService } from './writing-judge.js';
 import { ReaderPanelService } from './reader-panel.js';
 import { ResearchLookupService } from './research-lookup.js';
@@ -107,6 +108,7 @@ export interface GatewayServices {
   userModel: UserModelService;
   cronScheduler: CronSchedulerService;
   autoSkill: AutoSkillService;
+  skillCurator: SkillCuratorService;
   writingJudge: WritingJudgeService;
   readerPanel: ReaderPanelService;
   researchLookup: ResearchLookupService;
@@ -185,6 +187,7 @@ export class ServiceContainer {
   userModel!: UserModelService;
   cronScheduler!: CronSchedulerService;
   autoSkill!: AutoSkillService;
+  skillCurator!: SkillCuratorService;
   writingJudge!: WritingJudgeService;
   readerPanel!: ReaderPanelService;
   researchLookup!: ResearchLookupService;
@@ -252,6 +255,7 @@ export class ServiceContainer {
       userModel: this.userModel,
       cronScheduler: this.cronScheduler,
       autoSkill: this.autoSkill,
+      skillCurator: this.skillCurator,
       writingJudge: this.writingJudge,
       readerPanel: this.readerPanel,
       researchLookup: this.researchLookup,

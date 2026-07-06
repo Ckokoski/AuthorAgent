@@ -46,6 +46,7 @@ import { SleepConsolidationService } from './services/sleep-consolidation.js';
 import { UserModelService } from './services/user-model.js';
 import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
+import { SkillCuratorService } from './services/skill-curator.js';
 import { WritingJudgeService } from './services/writing-judge.js';
 import { ReaderPanelService } from './services/reader-panel.js';
 import { ResearchLookupService } from './services/research-lookup.js';
@@ -175,6 +176,8 @@ class AuthorClawGateway {
   private set cronScheduler(v: CronSchedulerService) { this.services.cronScheduler = v; }
   private get autoSkill(): AutoSkillService { return this.services.autoSkill; }
   private set autoSkill(v: AutoSkillService) { this.services.autoSkill = v; }
+  private get skillCurator(): SkillCuratorService { return this.services.skillCurator; }
+  private set skillCurator(v: SkillCuratorService) { this.services.skillCurator = v; }
   private get writingJudge(): WritingJudgeService { return this.services.writingJudge; }
   private set writingJudge(v: WritingJudgeService) { this.services.writingJudge = v; }
   private get readerPanel(): ReaderPanelService { return this.services.readerPanel; }
@@ -380,7 +383,7 @@ class AuthorClawGateway {
     logger.info(`  ✓ Research gate: ${this.research.getAllowedDomainCount()} approved domains`);
 
     // ── Phase 6: Skills ──
-    this.skills = new SkillLoader(join(ROOT_DIR, 'skills'), this.permissions);
+    this.skills = new SkillLoader(join(ROOT_DIR, 'skills'), this.permissions, join(ROOT_DIR, 'workspace'));
     await this.skills.loadAll();
     const premiumCount = this.skills.getPremiumSkillCount();
     const premiumLabel = premiumCount > 0 ? `, ${premiumCount} premium ★` : '';
@@ -539,6 +542,23 @@ class AuthorClawGateway {
       if (!this.sleepConsolidation) return { success: false, message: 'Sleep consolidation not initialized' };
       return this.sleepConsolidation.run(payload || {});
     });
+    // Skill curation (Skill Curator, Hermes-pattern). The SkillCuratorService is
+    // built later in initialize() (Phase 6g4b), so this handler reads it lazily
+    // and guards on it being ready — mirrors the sleep-consolidation handler.
+    this.cronScheduler.registerHandler('skill-curation', async (payload) => {
+      if (!this.skillCurator) return { success: false, message: 'Skill curator not initialized' };
+      try {
+        const report = await this.skillCurator.curate(payload || {});
+        return {
+          success: true,
+          message:
+            `Curated ${report.totalSkills} skill(s): ${report.unused.length} unused, ` +
+            `${report.overlapping.length} overlapping pair(s), ${report.redundantWithService.length} service-redundant`,
+        };
+      } catch (err: any) {
+        return { success: false, message: err?.message || 'Curation failed' };
+      }
+    });
     this.cronScheduler.start();
     // Seed the daily sleep-consolidation job at 04:00 if it doesn't already
     // exist (idempotent across restarts) — mirrors the design's default schedule.
@@ -552,6 +572,20 @@ class AuthorClawGateway {
         logger.info('  ✓ Registered daily sleep-consolidation cron (0 4 * * *)');
       } catch (err) {
         logger.warn(`  ⚠ Could not seed sleep-consolidation cron: ${(err as any)?.message || err}`);
+      }
+    }
+    // Seed the weekly skill-curation job (Monday 05:00) if absent — idempotent
+    // across restarts, mirroring the sleep-consolidation seeding above.
+    if (!this.cronScheduler.list().some(j => j.handler === 'skill-curation')) {
+      try {
+        await this.cronScheduler.createJob({
+          name: 'Weekly skill-library curation',
+          schedule: '0 5 * * 1',
+          handler: 'skill-curation',
+        });
+        logger.info('  ✓ Registered weekly skill-curation cron (0 5 * * 1)');
+      } catch (err) {
+        logger.warn(`  ⚠ Could not seed skill-curation cron: ${(err as any)?.message || err}`);
       }
     }
     logger.info(`  ✓ Cron scheduler: ${this.cronScheduler.list().length} job(s) scheduled, ${this.cronScheduler.listHandlers().length} handlers`);
@@ -572,6 +606,20 @@ class AuthorClawGateway {
     await this.autoSkill.initialize();
     const drafts = this.autoSkill.list({ status: 'pending_review' });
     logger.info(`  ✓ Auto-skill drafter: ${drafts.length} draft(s) pending review`);
+
+    // ── Phase 6g4b: Skill Curator (Hermes-pattern library health) ──
+    // Reads the loaded skill catalog + the usage stats logged by
+    // SkillLoader.matchSkills and produces a READ-ONLY curation report: unused
+    // skills, overlapping pairs (cheap non-AI similarity), and skills that
+    // duplicate a backend service (the style-clone split-brain). The optional
+    // summary uses the FREE tier only. Runs weekly via the 'skill-curation'
+    // cron handler registered above; also exposed at GET /api/skills/curation.
+    this.skillCurator = new SkillCuratorService(
+      this.skills,
+      (req) => this.aiRouter.complete(req),
+      (taskType: string) => this.aiRouter.selectProvider(taskType),
+    );
+    logger.info('  ✓ Skill curator: usage tracking + weekly consolidation pass ready');
 
     // ── Phase 6g5: Writing Judge (AutoNovel-inspired evaluate-retry loop) ──
     // Mechanical screen (regex) + LLM judge runs on every chapter draft.
