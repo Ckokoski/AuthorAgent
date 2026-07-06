@@ -928,6 +928,13 @@ textarea { resize: vertical; min-height: 60px; }
         <p class="hint" style="margin-top:12px;font-size:12px;">Need to load keys from a shared folder (VM / Docker)? <button class="small" id="btnLoadKeysFromFiles" style="font-size:11px;padding:3px 8px;">Load from files</button></p>
       </div>
 
+      <!-- AI Models (per-provider model picker — additive, wired to GET/POST /api/models) -->
+      <div class="card" id="aiModelsCard">
+        <div class="card-title">AI Models</div>
+        <p class="hint" style="margin-bottom:12px;">Pick which model each provider uses. Providers without an API key are shown greyed out — add a key above to enable them.</p>
+        <div id="aiModelsList"><div style="color:var(--muted);">Loading...</div></div>
+      </div>
+
       <!-- OpenRouter (model selector) — only useful when an OpenRouter key is configured -->
       <div class="card" id="openrouterCard">
         <div class="card-title">OpenRouter Model</div>
@@ -1270,6 +1277,7 @@ function switchPanel(name) {
   } else if (name === 'settings') {
     updateQuickStartBanner();
     loadKeys();
+    loadAiModels();
     loadOllamaConfig();
     loadOpenrouterConfig();
     loadGlobalProvider();
@@ -2802,6 +2810,106 @@ if (btnLoadKeysFromFiles) {
                 n > 0 ? 'success' : 'info');
       loadKeys(); loadStatus();
     }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+  });
+}
+
+// ── AI Models (per-provider model picker) ──
+// Wired to GET/POST /api/models (built alongside the AIRouter model-config
+// feature). Renders one row per known provider with a <select> of
+// knownModels + a "Custom…" option, current price, and a Save button that
+// POSTs { provider, model } and patches the row from the response.
+var providerLabels = {
+  ollama: 'Ollama (local)', gemini: 'Gemini', deepseek: 'DeepSeek',
+  claude: 'Claude / Anthropic', openai: 'OpenAI GPT', openrouter: 'OpenRouter'
+};
+
+function formatModelPrice(price) {
+  if (!price) return '';
+  var perM = function(n) { return '$' + (n * 1000).toFixed(2) + '/1M'; };
+  var txt = 'in ' + perM(price.costPer1kInput) + ' · out ' + perM(price.costPer1kOutput);
+  if (price.confidence === 'rough') {
+    txt += ' <span title="Pricing for this model is not confirmed — rough estimate only." style="color:var(--muted);">(rough estimate)</span>';
+  }
+  return txt;
+}
+
+function renderAiModels(providers) {
+  var el = document.getElementById('aiModelsList');
+  if (!el) return;
+  el.innerHTML = '';
+  providers.forEach(function(p) {
+    var isCustom = p.knownModels.indexOf(p.currentModel) === -1;
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);' + (p.available ? '' : 'opacity:0.55;');
+    wrap.setAttribute('data-provider-row', p.id);
+
+    var tierColor = p.tier === 'free' ? 'var(--success)' : (p.tier === 'cheap' ? 'var(--warn)' : 'var(--info)');
+    var availTag = p.available ? '' : ' <span class="hint" style="margin-left:6px;">(no API key — add one above)</span>';
+
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+    row.innerHTML =
+      '<span style="min-width:150px;font-weight:600;font-size:14px;">' + esc(providerLabels[p.id] || p.id) + '</span>' +
+      '<span class="badge" style="background:' + tierColor + '22;color:' + tierColor + ';border:1px solid ' + tierColor + '44;">' + esc(p.tier) + '</span>' +
+      '<select class="ai-model-select" data-provider="' + esc(p.id) + '" style="min-width:220px;">' +
+        p.knownModels.map(function(m) {
+          return '<option value="' + esc(m) + '"' + (m === p.currentModel ? ' selected' : '') + '>' + esc(m) + '</option>';
+        }).join('') +
+        '<option value="__custom__"' + (isCustom ? ' selected' : '') + '>Custom…</option>' +
+      '</select>' +
+      '<input type="text" class="ai-model-custom" data-provider="' + esc(p.id) + '" placeholder="custom model name" ' +
+        'style="min-width:180px;display:' + (isCustom ? 'inline-block' : 'none') + ';" value="' + (isCustom ? esc(p.currentModel) : '') + '">' +
+      '<button class="small btn-save-model" data-provider="' + esc(p.id) + '">Save</button>' +
+      availTag;
+    wrap.appendChild(row);
+
+    var priceEl = document.createElement('div');
+    priceEl.className = 'hint';
+    priceEl.setAttribute('data-price-for', p.id);
+    priceEl.style.cssText = 'margin-top:4px;';
+    priceEl.innerHTML = 'Current: <code>' + esc(p.currentModel) + '</code> — ' + formatModelPrice(p.price);
+    wrap.appendChild(priceEl);
+
+    el.appendChild(wrap);
+  });
+
+  // Toggle the custom text input when "Custom…" is chosen
+  el.querySelectorAll('.ai-model-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      var providerId = sel.getAttribute('data-provider');
+      var customInput = el.querySelector('.ai-model-custom[data-provider="' + providerId + '"]');
+      if (!customInput) return;
+      customInput.style.display = sel.value === '__custom__' ? 'inline-block' : 'none';
+    });
+  });
+
+  // Save handler — POSTs { provider, model } and patches just this row
+  el.querySelectorAll('.btn-save-model').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var providerId = btn.getAttribute('data-provider');
+      var sel = el.querySelector('.ai-model-select[data-provider="' + providerId + '"]');
+      var customInput = el.querySelector('.ai-model-custom[data-provider="' + providerId + '"]');
+      var model = sel.value === '__custom__' ? (customInput.value || '').trim() : sel.value;
+      if (!model) { showToast('Enter a model name', 'error'); return; }
+      api('POST', '/api/models', { provider: providerId, model: model }).then(function(data) {
+        showToast((providerLabels[providerId] || providerId) + ' set to ' + model, 'success');
+        if (data && data.provider) {
+          var priceEl = el.querySelector('[data-price-for="' + providerId + '"]');
+          if (priceEl) {
+            priceEl.innerHTML = 'Current: <code>' + esc(data.provider.currentModel) + '</code> — ' + formatModelPrice(data.provider.price);
+          }
+        }
+      }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+    });
+  });
+}
+
+function loadAiModels() {
+  var el = document.getElementById('aiModelsList');
+  api('GET', '/api/models').then(function(data) {
+    renderAiModels((data && data.providers) || []);
+  }).catch(function(e) {
+    if (el) el.innerHTML = '<span style="color:var(--danger);">Could not load models: ' + esc(e.message) + '</span>';
   });
 }
 
