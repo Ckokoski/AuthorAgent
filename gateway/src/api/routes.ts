@@ -715,175 +715,50 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     res.json({ step, project: engine.getProject(req.params.id) });
   });
 
-  /**
-   * Smart excerpt builder for large manuscripts.
-   * Reads the full document from disk and extracts a relevant excerpt
-   * that fits within AI context limits while preserving the most useful content.
-   *
-   * Strategy: first 20K chars + last 5K chars (with truncation marker)
-   * This gives the AI the beginning (setup, style, voice) and ending (current state)
-   * which is ideal for revision, editing, and analysis tasks.
-   */
-  async function getSmartExcerpt(filePath: string, wordCount: number, maxChars = 25000): Promise<string> {
-    const { readFile: rf } = await import('fs/promises');
-    const { existsSync: ex } = await import('fs');
-
-    if (!ex(filePath)) {
-      return `[Document not found at ${filePath} — it may have been moved or deleted]`;
-    }
-
-    const fullText = await rf(filePath, 'utf-8');
-
-    if (fullText.length <= maxChars) {
-      return fullText; // Small enough to include everything
-    }
-
-    // Smart split: 80% head + 20% tail
-    const headSize = Math.floor(maxChars * 0.8);
-    const tailSize = maxChars - headSize;
-    const head = fullText.substring(0, headSize);
-    const tail = fullText.substring(fullText.length - tailSize);
-
-    const omittedChars = fullText.length - headSize - tailSize;
-    const omittedWords = Math.round(omittedChars / 5); // rough estimate
-
-    return `${head}\n\n` +
-      `[... ⚠️ MIDDLE SECTION OMITTED: ~${omittedWords.toLocaleString()} words skipped to fit context. ` +
-      `Full document (${wordCount.toLocaleString()} words) is saved in workspace/documents/. ...]\n\n` +
-      `${tail}`;
-  }
-
-  // Returns true if the step requires the FULL manuscript in context (not a truncated excerpt).
-  // Revision-apply steps must see the whole book to rewrite it correctly.
-  function stepNeedsFullManuscript(step: any): boolean {
-    const phase = String(step?.phase || '').toLowerCase();
-    const label = String(step?.label || '').toLowerCase();
-    return phase === 'revision_apply' ||
-      label.includes('apply macro revision') ||
-      label.includes('apply scene-level revision') ||
-      label.includes('apply line-level revision') ||
-      label.includes('full manuscript rewrite');
-  }
-
-  // Helper: build user message for project step execution
-  // Injects uploaded manuscript DIRECTLY into the user message so the AI can't miss it
-  // For large documents (15K+ words): reads from disk and applies smart truncation
-  async function buildStepUserMessage(project: any, step: any): Promise<string> {
-    let message = step.prompt;
-    const uploads = project.context?.uploads || [];
-    const fileList = uploads.map((u: any) => `${u.filename} (${u.wordCount?.toLocaleString() || '?'} words)`).join(', ');
-
-    // Revision-apply steps need to see the full manuscript; analysis steps get a smart excerpt.
-    const fullNeeded = stepNeedsFullManuscript(step);
-    const charCap = fullNeeded ? 600000 : 30000;  // ~120K words when needed (fits Claude/Gemini context)
-
-    // Large document path: read from disk with cap-aware truncation
-    if (project.context?.documentLibraryFile) {
-      const excerpt = await getSmartExcerpt(
-        project.context.documentLibraryFile,
-        project.context.documentWordCount || 0,
-        charCap
-      );
-      const headerNote = fullNeeded
-        ? `\n\n⚠️ This is a REVISION APPLY step. You MUST rewrite the ENTIRE manuscript below (or as much as fits in your response — the system will ask for continuations).\n\n`
-        : '';
-      message = `## Manuscript to Work With\n\nUploaded files: ${fileList}${headerNote}\n\n${excerpt}\n\n---\n\n## Your Task\n\n${message}`;
-      return message;
-    }
-
-    // Small document path: use inline uploaded content
-    if (project.context?.uploadedContent) {
-      const uploaded = String(project.context.uploadedContent).substring(0, charCap);
-      const headerNote = fullNeeded
-        ? `\n\n⚠️ This is a REVISION APPLY step. You MUST rewrite the ENTIRE manuscript below (or as much as fits in your response — the system will ask for continuations).\n\n`
-        : '';
-      message = `## Manuscript to Work With\n\nUploaded files: ${fileList}${headerNote}\n\n${uploaded}\n\n---\n\n## Your Task\n\n${message}`;
-    }
-
-    return message;
-  }
-
+  // Single-step execution. All retry/failure-detection/response-shape logic now
+  // lives in ProjectEngine.executeStepWithRetry — this handler just parses the
+  // request, calls the engine, and maps the result to the original HTTP shapes.
   app.post('/api/projects/:id/execute', async (req: Request, res: Response) => {
     const engine = gateway.getProjectEngine?.();
     if (!engine) {
       return res.status(503).json({ error: 'Project engine not initialized' });
     }
-    const project = engine.getProject(req.params.id);
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
+
+    const result = await engine.executeStepWithRetry(req.params.id);
+
+    if (result.ok) {
+      return res.json({
+        success: true,
+        completedStep: result.completedStep,
+        response: result.response,
+        nextStep: result.nextStep,
+        project: result.project,
+      });
     }
 
-    const activeStep = project.steps.find((s: any) => s.status === 'active');
-    if (!activeStep) {
-      return res.status(400).json({ error: 'No active step. Start the project first.' });
-    }
-
-    try {
-      const projectContext = await engine.buildProjectContext(project, activeStep);
-      const userMessage = await buildStepUserMessage(project, activeStep);
-      let response = '';
-
-      await gateway.handleMessage(
-        userMessage,
-        'projects',
-        (text: string) => { response = text; },
-        projectContext,
-        activeStep.taskType || undefined  // Use step's own taskType for routing
-      );
-
-      // Retry once with 'general' routing if the response is too short
-      if (!response || response.length < 50) {
-        console.log(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
-        response = '';
-        await gateway.handleMessage(
-          userMessage,
-          'projects',
-          (text: string) => { response = text; },
-          projectContext,
-          'general'
-        );
-      }
-
-      // Detect the [AI provider failure] sentinel from handleMessage when both
-      // primary and fallback errored. Treat as failure with the real reason
-      // instead of writing the error message into the manuscript file.
-      if (response && response.startsWith('[AI provider failure]')) {
-        const detail = response.replace(/^\[AI provider failure\]\s*/, '').substring(0, 500);
-        engine.failStep(project.id, activeStep.id, detail);
+    switch (result.kind) {
+      case 'no-project':
+        return res.status(404).json({ error: 'Project not found' });
+      case 'no-active-step':
+        return res.status(400).json({ error: 'No active step. Start the project first.' });
+      case 'provider-failure':
         return res.json({
           success: false,
           error: 'AI provider failure — see detail',
-          detail,
-          project: engine.getProject(project.id),
+          detail: result.detail,
+          project: result.project,
         });
-      }
-      if (!response || response.length < 50) {
-        const reason = `AI returned an unusably short response (${response?.length ?? 0} chars). ` +
-          `This usually means the chosen provider hit a safety filter, ran out of context, or the model is misconfigured. ` +
-          `Try a different provider in Settings, shorten the project description, or split the task.`;
-        engine.failStep(project.id, activeStep.id, reason);
+      case 'short-response':
         return res.json({
           success: false,
-          error: reason,
-          project: engine.getProject(project.id),
+          error: result.reason,
+          project: result.project,
         });
-      }
-
-      const nextStep = engine.completeStep(project.id, activeStep.id, response);
-
-      res.json({
-        success: true,
-        completedStep: activeStep.id,
-        response,
-        nextStep,
-        project: engine.getProject(project.id),
-      });
-    } catch (error) {
-      engine.failStep(project.id, activeStep.id, String(error));
-      res.status(500).json({
-        error: 'Step execution failed: ' + String(error),
-        project: engine.getProject(project.id),
-      });
+      case 'error':
+        return res.status(500).json({
+          error: 'Step execution failed: ' + result.error,
+          project: result.project,
+        });
     }
   });
 
@@ -969,339 +844,13 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
       if (firstPending) firstPending.status = 'active';
     }
 
-    const results: Array<{ step: string; success: boolean; wordCount?: number; error?: string }> = [];
+    // The full autonomous loop — retry, word-count continuation, quality loop,
+    // file save, and the context-engine / auto-narrate / assembly hooks — now
+    // lives in ProjectEngine.autoExecuteLoop. It re-checks pause/complete state
+    // internally so /pause and /stop keep working during long runs.
     const { join } = await import('path');
-    const { mkdir, writeFile } = await import('fs/promises');
     const workspaceDir = join(baseDir, 'workspace');
-
-    while (true) {
-      const currentProject = engine.getProject(req.params.id);
-      if (!currentProject) break;
-
-      // Check if project was paused externally (via /stop or dashboard)
-      if (currentProject.status === 'paused' || currentProject.status === 'completed') break;
-
-      const activeStep = currentProject.steps.find((s: any) => s.status === 'active');
-      if (!activeStep) break;
-
-      try {
-        const projectContext = await engine.buildProjectContext(currentProject, activeStep);
-        const userMessage = await buildStepUserMessage(currentProject, activeStep);
-        let response = '';
-
-        await gateway.handleMessage(
-          userMessage,
-          'project-engine',
-          (text: string) => { response = text; },
-          projectContext,
-          activeStep.taskType || undefined  // Use step's own taskType for routing
-        );
-
-        // Retry once with 'general' routing if the response is too short
-        // This catches cases where a premium/mid provider fails but free providers work fine
-        if (!response || response.length < 50) {
-          console.log(`  ↻ Step "${activeStep.label}" got short response — retrying with general routing...`);
-          response = '';
-          await gateway.handleMessage(
-            userMessage,
-            'project-engine',
-            (text: string) => { response = text; },
-            projectContext,
-            'general'  // Force free-tier routing (Gemini first)
-          );
-        }
-
-        if (response && response.startsWith('[AI provider failure]')) {
-          const detail = response.replace(/^\[AI provider failure\]\s*/, '').substring(0, 500);
-          engine.failStep(currentProject.id, activeStep.id, detail);
-          results.push({ step: activeStep.label, success: false, error: detail });
-          break;
-        }
-        if (!response || response.length < 50) {
-          const reason = `AI returned an unusably short response (${response?.length ?? 0} chars). ` +
-            `Cause is usually a safety filter trip, context overflow, or misconfigured provider. ` +
-            `Switch providers in Settings or shorten the project description.`;
-          engine.failStep(currentProject.id, activeStep.id, reason);
-          results.push({ step: activeStep.label, success: false, error: reason });
-          break;
-        }
-
-        // ── Continuation logic for long-output steps (revision-apply + novel writing) ──
-        // Revision-apply steps must produce a FULL manuscript. If the response is shorter
-        // than the source (or shorter than the explicit wordCountTarget), ask the AI to
-        // continue. This prevents the user from getting a half-revised book.
-        {
-          const isRevisionApply = stepNeedsFullManuscript(activeStep);
-          const wcTarget = (activeStep as any).wordCountTarget ||
-            (isRevisionApply ? Math.floor((currentProject.context?.documentWordCount || 0) * 0.9) : 0);
-          if (wcTarget && wcTarget > 0) {
-            let wc = response.split(/\s+/).length;
-            let continuations = 0;
-            while (wc < wcTarget && continuations < 6) {
-              continuations++;
-              const remaining = wcTarget - wc;
-              console.log(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Response word count: ${wc}/${wcTarget} — requesting continuation #${continuations} (~${remaining} more words)`);
-              let contResponse = '';
-              try {
-                const contPrompt = isRevisionApply
-                  ? `Continue the revised manuscript from EXACTLY where you left off. You've produced ${wc} words so far; the target is ${wcTarget}. Output at least ${Math.min(remaining, 15000)} more words of the revised manuscript, continuing from the last chapter boundary. Do NOT repeat content. Do NOT summarize. Do NOT add commentary. Output ONLY the continued manuscript prose.`
-                  : `Continue writing from where you left off. You wrote ${wc} words so far but the target is ${wcTarget}. Write at least ${remaining} more words of prose narrative, continuing the story seamlessly. Do NOT repeat what was already written. Do NOT summarize.`;
-                await gateway.handleMessage(
-                  contPrompt,
-                  'project-engine',
-                  (text: string) => { contResponse = text; },
-                  projectContext,
-                  activeStep.taskType || undefined,
-                );
-                if (contResponse.length > 100) {
-                  response = response + '\n\n' + contResponse;
-                  wc = response.split(/\s+/).length;
-                } else {
-                  break;
-                }
-              } catch {
-                break;
-              }
-            }
-            if (continuations > 0) {
-              console.log(`  [${isRevisionApply ? 'revision-apply' : 'writing'}] Final word count after ${continuations} continuation(s): ${response.split(/\s+/).length}`);
-            }
-          }
-        }
-
-        // ── Quality loop: evaluate + retry on write/polish steps ──
-        // AutoNovel-inspired modify-evaluate-retry. Defaults to 1 retry
-        // (so each chapter costs at most 3 AI calls: draft + judge + retry).
-        // Authors can disable per-project via context.qualityLoopEnabled=false.
-        try {
-          const judge = services.writingJudge;
-          const stepSkill = (activeStep as any).skill || '';
-          const stepPhase = (activeStep as any).phase || '';
-          const isQualityCandidate = stepSkill === 'write' || stepPhase === 'polish';
-          const qualityLoopEnabled = currentProject.context?.qualityLoopEnabled !== false;
-          const qualityThreshold = Number(currentProject.context?.qualityThreshold) || 70;
-          const maxRetries = Number(currentProject.context?.qualityMaxRetries) ?? 1;
-          // Per-project flag for the dual Craft + Market judge mode.
-          // Doubles the judge AI cost (one extra call per attempt) but
-          // surfaces craft↔market disagreement, which is the most
-          // actionable signal. Off by default — opt-in per project.
-          const dualJudgeEnabled = currentProject.context?.dualJudge === true;
-
-          if (judge && isQualityCandidate && qualityLoopEnabled && response.length > 500) {
-            let attempt = 0;
-            let bestResponse = response;
-            let bestScore = -1;
-            while (attempt <= maxRetries) {
-              const verdict = await judge.evaluate(response, {
-                aiComplete: (r: any) => services.aiRouter.complete(r),
-                aiSelectProvider: (taskType: string) => services.aiRouter.selectProvider(taskType),
-                threshold: qualityThreshold,
-                dualJudge: dualJudgeEnabled,
-              });
-              console.log(`  [judge] "${activeStep.label}" attempt ${attempt + 1}: ${verdict.summary}`);
-              if (verdict.score > bestScore) {
-                bestScore = verdict.score;
-                bestResponse = response;
-              }
-              if (!verdict.retry || attempt >= maxRetries) break;
-
-              // Retry with feedback as additional steering.
-              attempt++;
-              console.log(`  [judge] Retrying with feedback (attempt ${attempt + 1}/${maxRetries + 1})...`);
-              const userMsgWithFeedback = userMessage +
-                '\n\n## Quality feedback on your previous draft\n\n' + verdict.retryFeedback +
-                '\n\nProduce a NEW draft that fixes these specific issues. Output ONLY the chapter prose — no commentary.';
-              let retryResponse = '';
-              try {
-                await gateway.handleMessage(
-                  userMsgWithFeedback,
-                  'project-engine',
-                  (text: string) => { retryResponse = text; },
-                  projectContext,
-                  activeStep.taskType || undefined,
-                );
-                if (retryResponse && retryResponse.length > 500 &&
-                    !retryResponse.startsWith('[AI provider failure]')) {
-                  response = retryResponse;
-                } else {
-                  // Retry failed — keep previous best and stop looping.
-                  break;
-                }
-              } catch {
-                break;
-              }
-            }
-            // Always keep the highest-scoring version we saw.
-            response = bestResponse;
-            services.activityLog?.log({
-              type: 'step_completed',
-              source: 'internal',
-              goalId: currentProject.id,
-              stepLabel: activeStep.label,
-              message: `Quality score: ${bestScore.toFixed(1)}/100 after ${attempt + 1} attempt(s)`,
-              metadata: { qualityScore: bestScore, attempts: attempt + 1 },
-            });
-          }
-        } catch (judgeErr) {
-          // Judge failures should NEVER block step completion — degrade gracefully.
-          console.warn('  [judge] evaluation hook failed:', (judgeErr as Error)?.message || judgeErr);
-        }
-
-        const wordCount = response.split(/\s+/).length;
-
-        // Save to file
-        try {
-          const projectDir = join(workspaceDir, 'projects', currentProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-          await mkdir(projectDir, { recursive: true });
-          const stepFileName = `${activeStep.id}-${activeStep.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
-          await writeFile(join(projectDir, stepFileName), `# ${activeStep.label}\n\n${response}`, 'utf-8');
-        } catch { /* non-fatal */ }
-
-        engine.completeStep(currentProject.id, activeStep.id, response);
-        // Track words for Morning Briefing
-        services.heartbeat.addWords(wordCount);
-        results.push({ step: activeStep.label, success: true, wordCount });
-
-        // ── ContextEngine: summarize + extract entities for canonical chapter prose ──
-        // Bug fix (2026-04): the previous heuristic matched any step whose label
-        // contained "chapter" or "write" — which included "Self-review Chapter N"
-        // and other analysis steps. That doubled AI cost AND polluted the entity
-        // index with character/location names mentioned in critique form ("Sarah's
-        // motivation feels weak" → indexed as a Sarah attribute change). Now uses
-        // the precise skill+phase signal: only `skill === 'write'` (first-draft
-        // chapter prose) OR `phase === 'polish'` (revised chapter prose) qualify.
-        // The polish step replaces the prior summary because its chapterNumber
-        // matches the write step and the summary upserts on (projectId, chapterId)
-        // — so the polished version becomes canonical without dropping memory.
-        try {
-          const contextEngine = services.contextEngine;
-          const stepLabel = (activeStep as any).label || '';
-          const stepSkill = (activeStep as any).skill || '';
-          const stepPhase = (activeStep as any).phase || '';
-          const isCanonicalChapter = stepSkill === 'write' || stepPhase === 'polish';
-          const isBibleStep = currentProject.type === 'book-bible' ||
-            stepLabel.toLowerCase().includes('bible') ||
-            stepLabel.toLowerCase().includes('world') ||
-            (stepLabel.toLowerCase().includes('character') && stepSkill !== 'revise');
-
-          if (contextEngine && response.length > 200 && (isCanonicalChapter || isBibleStep)) {
-            const chapterNum = currentProject.steps.filter((s: any) =>
-              s.status === 'completed' && s.id !== activeStep.id
-            ).length + 1;
-
-            const aiCompleteFn = (req: any) => services.aiRouter.complete(req);
-            const aiSelectFn = (taskType: string) => services.aiRouter.selectProvider(taskType);
-
-            // Await context engine calls so they complete before moving to next step
-            await Promise.allSettled([
-              contextEngine.generateSummary(
-                currentProject.id, activeStep.id, stepLabel, chapterNum, response,
-                aiCompleteFn, aiSelectFn
-              ).catch((err: any) => console.error('[context-engine] Summary error:', err.message)),
-              contextEngine.extractEntities(
-                currentProject.id, activeStep.id, response,
-                aiCompleteFn, aiSelectFn
-              ).catch((err: any) => console.error('[context-engine] Entity extraction error:', err.message)),
-            ]);
-          }
-        } catch (contextErr) {
-          console.error('[context-engine] Hook error:', contextErr);
-        }
-
-        // ── Auto-narrate completed chapter (opt-in via project.context.autoNarrate) ──
-        // Inspired by OpenClaw's chat-scoped /tts auto controls. Generates an audio
-        // preview of the just-completed chapter so the author can listen back without
-        // manually triggering the TTS endpoint. Fire-and-forget — never blocks step flow.
-        try {
-          const autoNarrate = !!currentProject.context?.autoNarrate;
-          const stepLabel = String((activeStep as any).label || '').toLowerCase();
-          // Match the same canonical-chapter signal as the ContextEngine hook so
-          // we don't auto-narrate review/polish notes — only first-draft prose
-          // and polished revisions get audio.
-          const stepSkill = (activeStep as any).skill || '';
-          const stepPhase = (activeStep as any).phase || '';
-          const isWritingStep = stepSkill === 'write' || stepPhase === 'polish';
-          if (autoNarrate && isWritingStep && services.tts && response.length > 200) {
-            // Resolve the persona's voice if the project has one — keeps each pen
-            // name's narration consistent across chapters.
-            let voice: string | undefined;
-            const personaId = (currentProject as any).personaId;
-            if (personaId && services.personas) {
-              const persona = services.personas.get?.(personaId);
-              if (persona?.ttsVoice) voice = persona.ttsVoice;
-            }
-            // ElevenLabs costs credits per call. Cap auto-narrate text to a safe length
-            // and warn in the audit log when ElevenLabs is the active provider.
-            const activeProvider = services.tts.getActiveProvider();
-            const cap = activeProvider === 'elevenlabs' ? 3000 : 30000;
-            const narrationText = response.replace(/^#[^\n]+\n+/, '').substring(0, cap);
-            services.tts.generate(narrationText, { voice })
-              .then((result: any) => {
-                if (result.success) {
-                  services.activityLog?.log({
-                    type: 'file_saved',
-                    source: 'internal',
-                    goalId: currentProject.id,
-                    message: `🔊 Auto-narrated "${activeStep.label}" (${result.provider}, ~${result.duration}s) → ${result.filename}`,
-                    metadata: { audioFile: result.filename, voice, provider: result.provider },
-                  });
-                } else {
-                  console.error('[auto-narrate] failed:', result.error);
-                }
-              })
-              .catch((err: any) => console.error('[auto-narrate] error:', err));
-          }
-        } catch (narrationErr) {
-          console.error('[auto-narrate] hook error:', narrationErr);
-        }
-
-        // ── Manuscript Assembly: combine chapter files after assembly step ──
-        if ((activeStep as any).phase === 'assembly' && currentProject.type === 'novel-pipeline') {
-          try {
-            const { existsSync: exLocal } = await import('fs');
-            const { readFile: readF } = await import('fs/promises');
-            const projectSlug = currentProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            const projectDir = join(workspaceDir, 'projects', projectSlug);
-
-            const writingSteps = currentProject.steps
-              .filter((s: any) => s.phase === 'writing' && s.status === 'completed')
-              .sort((a: any, b: any) => (a.chapterNumber || 0) - (b.chapterNumber || 0));
-
-            const chapterContents: string[] = [];
-            for (const ws of writingSteps) {
-              const expectedFile = `${(ws as any).id}-${(ws as any).label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
-              const fullPath = join(projectDir, expectedFile);
-              if (exLocal(fullPath)) {
-                const raw = await readF(fullPath, 'utf-8');
-                const content = raw.replace(/^# .+\n\n/, '');
-                chapterContents.push(`## Chapter ${(ws as any).chapterNumber || chapterContents.length + 1}\n\n${content}`);
-              }
-            }
-
-            if (chapterContents.length > 0) {
-              const manuscriptMd = `# ${currentProject.title}\n\n` + chapterContents.join('\n\n---\n\n');
-              await writeFile(join(projectDir, 'manuscript.md'), manuscriptMd, 'utf-8');
-
-              const docxBuffer = await generateDocxBuffer({
-                title: currentProject.title,
-                author: 'AuthorClaw',
-                content: manuscriptMd,
-              });
-              await writeFile(join(projectDir, 'manuscript.docx'), docxBuffer);
-              console.log(`  [assembly] Manuscript assembled: ${chapterContents.length} chapters`);
-            }
-          } catch { /* non-fatal */ }
-        }
-
-        // Re-check pause AFTER step completes (catches /stop sent during long AI call)
-        const freshProject = engine.getProject(req.params.id);
-        if (freshProject?.status === 'paused' || freshProject?.status === 'completed') break;
-      } catch (error) {
-        engine.failStep(currentProject.id, activeStep.id, String(error));
-        results.push({ step: activeStep.label, success: false, error: String(error) });
-        break;
-      }
-    }
+    const { results } = await engine.autoExecuteLoop(req.params.id, { workspaceDir });
 
     res.json({
       success: true,
@@ -1309,6 +858,7 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
       project: engine.getProject(req.params.id),
     });
   });
+
 
   app.post('/api/projects/:id/skip/:stepId', (req: Request, res: Response) => {
     const engine = gateway.getProjectEngine?.();

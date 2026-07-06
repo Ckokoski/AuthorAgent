@@ -377,6 +377,16 @@ class AuthorClawGateway {
     this.projectEngine.setContextEngine(this.contextEngine);
     console.log('  ✓ Context Engine: manuscript memory + continuity checking');
 
+    // Wire the message pipeline + step-hook services so the ProjectEngine can
+    // execute steps (single + autonomous loop) without importing the gateway
+    // (which would create a circular dependency). The service bundle is filled
+    // lazily inside the arrow fns so services constructed after this phase
+    // (writingJudge, tts) are picked up when a step actually runs.
+    this.projectEngine.setMessageHandler(
+      (content, channel, respond, extraContext, overrideTaskType, preferredProvider) =>
+        this.handleMessage(content, channel, respond, extraContext, overrideTaskType, preferredProvider)
+    );
+
     // ── Phase 6g: Lessons & Preferences (from Sneakers) ──
     this.lessons = new LessonStore(join(ROOT_DIR, 'workspace', 'memory'));
     await this.lessons.initialize();
@@ -838,6 +848,19 @@ class AuthorClawGateway {
       ? ` + autonomous every ${this.config.get('heartbeat.autonomousIntervalMinutes', 30)}min`
       : '';
     console.log(`  ✓ Heartbeat: every ${this.config.get('heartbeat.intervalMinutes', 15)} minutes${autonomousLabel}`);
+
+    // Now that heartbeat + writing judge + activity log all exist, hand the
+    // ProjectEngine the service bundle its step-execution hooks use (quality
+    // loop, activity feed, word tracking, auto-narrate). Stable references on
+    // `this`, so passing them directly is safe.
+    this.projectEngine.setStepServices({
+      writingJudge: this.writingJudge,
+      activityLog: this.activityLog,
+      heartbeat: this.heartbeat,
+      tts: this.tts,
+      personas: this.personas,
+      aiRouter: this.aiRouter,
+    });
 
     // ── Phase 8: Bridges ──
     if (this.config.get('bridges.telegram.enabled')) {
