@@ -70,6 +70,7 @@ import { SeriesBibleService } from './services/series-bible.js';
 import { CraftCriticService } from './services/craft-critic.js';
 import { AudiobookPrepService } from './services/audiobook-prep.js';
 import { StyleCloneService } from './services/style-clone.js';
+import { RevisionOrchestrator } from './services/revision-orchestrator.js';
 import { ConfirmationGateService } from './services/confirmation-gate.js';
 import { DisclosuresService } from './services/disclosures.js';
 import { LaunchOrchestratorService } from './services/launch-orchestrator.js';
@@ -219,6 +220,8 @@ class AuthorClawGateway {
   private set audiobookPrep(v: AudiobookPrepService) { this.services.audiobookPrep = v; }
   private get styleClone(): StyleCloneService { return this.services.styleClone; }
   private set styleClone(v: StyleCloneService) { this.services.styleClone = v; }
+  private get revisionOrchestrator(): RevisionOrchestrator { return this.services.revisionOrchestrator; }
+  private set revisionOrchestrator(v: RevisionOrchestrator) { this.services.revisionOrchestrator = v; }
   private get confirmationGate(): ConfirmationGateService { return this.services.confirmationGate; }
   private set confirmationGate(v: ConfirmationGateService) { this.services.confirmationGate = v; }
   private get disclosures(): DisclosuresService { return this.services.disclosures; }
@@ -722,6 +725,24 @@ class AuthorClawGateway {
     this.audiobookPrep = new AudiobookPrepService();
     this.styleClone = new StyleCloneService();
     logger.info('  ✓ Craft critic, audiobook prep, style clone ready');
+
+    // ── Specialist revision passes ──
+    // Coordinates narrow expert passes (continuity, voice, craft, anti-slop)
+    // into ONE prioritized findings report. Each pass routes to its own
+    // cost-appropriate tier; anti-slop is a free mechanical screen. Built here
+    // now that every analyzer it composes exists. All deps are optional — a
+    // pass whose analyzer is missing is skipped gracefully.
+    this.revisionOrchestrator = new RevisionOrchestrator({
+      contextEngine: this.contextEngine,
+      characterVoices: this.characterVoices,
+      styleClone: this.styleClone,
+      craftCritic: this.craftCritic,
+      dialogueAuditor: this.dialogueAuditor,
+      writingJudge: this.writingJudge,
+      aiComplete: (req) => this.aiRouter.complete(req),
+      aiSelectProvider: (taskType: string) => this.aiRouter.selectProvider(taskType),
+    });
+    logger.info('  ✓ Revision orchestrator: specialist passes (continuity · voice · craft · anti-slop) ready');
 
     // ── Phase 6k: Wave 3 — autonomous career agent (gated) ──
     this.confirmationGate = new ConfirmationGateService(join(ROOT_DIR, 'workspace'));

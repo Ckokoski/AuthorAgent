@@ -483,4 +483,74 @@ export function registerManuscriptQualityRoutes(ctx: ApiContext): void {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // Specialist Revision Passes — one prioritized findings report
+  // ═══════════════════════════════════════════════════════════
+  // Runs the coordinated set of narrow expert passes (continuity, voice,
+  // craft, anti-slop) and aggregates them into a single RevisionReport. Each
+  // pass routes to its own cost-appropriate tier; anti-slop is free/mechanical
+  // (works with no API keys configured).
+
+  /**
+   * POST /api/revision/analyze { chapterText, projectId?, chapterId?, passes? }
+   *   Body-driven — score arbitrary chapter text. projectId is optional; when
+   *   omitted, project-scoped passes (continuity, voice) skip gracefully and
+   *   the mechanical anti-slop + craft passes still run.
+   */
+  app.post('/api/revision/analyze', async (req: Request, res: Response) => {
+    const orchestrator = services.revisionOrchestrator;
+    if (!orchestrator) return res.status(503).json({ error: 'Revision orchestrator not initialized' });
+    const { chapterText, projectId, chapterId, passes } = req.body || {};
+    if (!chapterText || typeof chapterText !== 'string') {
+      return res.status(400).json({ error: 'chapterText (string) required' });
+    }
+    try {
+      const report = await orchestrator.analyze({
+        chapterText,
+        projectId: typeof projectId === 'string' ? projectId : undefined,
+        chapterId: typeof chapterId === 'string' ? chapterId : undefined,
+        passes: Array.isArray(passes) ? passes : undefined,
+      });
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Revision analysis failed' });
+    }
+  });
+
+  /**
+   * POST /api/projects/:id/revision-report { chapterText?, chapterId?, passes? }
+   *   Project-scoped. Runs the full specialist set against the project's entity
+   *   DB (enables continuity + voice passes). chapterText may be passed
+   *   explicitly; otherwise the project's completed chapters are combined.
+   */
+  app.post('/api/projects/:id/revision-report', async (req: Request, res: Response) => {
+    const orchestrator = services.revisionOrchestrator;
+    if (!orchestrator) return res.status(503).json({ error: 'Revision orchestrator not initialized' });
+    const engine = gateway.getProjectEngine?.();
+    const project = engine?.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    let chapterText: string | undefined =
+      typeof req.body?.chapterText === 'string' ? req.body.chapterText : undefined;
+    if (!chapterText) {
+      const chapters = await gatherChapters(baseDir, project);
+      if (chapters.length === 0) {
+        return res.status(400).json({ error: 'No chapterText provided and no completed chapters found.' });
+      }
+      chapterText = chapters.map(c => `# ${c.title}\n\n${c.text}`).join('\n\n');
+    }
+
+    try {
+      const report = await orchestrator.analyze({
+        chapterText,
+        projectId: project.id,
+        chapterId: typeof req.body?.chapterId === 'string' ? req.body.chapterId : undefined,
+        passes: Array.isArray(req.body?.passes) ? req.body.passes : undefined,
+      });
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Revision analysis failed' });
+    }
+  });
+
 }
