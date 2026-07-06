@@ -380,6 +380,67 @@ export class MemorySearchService {
   }
 
   /**
+   * Backfill project_id / persona_id on manuscript + project_step rows (Tiered
+   * Memory Chunk C, sleep-job step 7).
+   *
+   * reindexAll() inserts manuscript/project_step rows with personaId=null and
+   * projectId=null because the ownership can't be resolved from the .md path
+   * alone. This pass fills them in from a caller-supplied map keyed by the
+   * project SLUG (the leading path segment of source_ref, e.g. `debug-test`
+   * from `debug-test/manuscript.md`).
+   *
+   * Ambiguity rule: only rows whose slug maps to EXACTLY one { projectId,
+   * personaId } entry are updated. If a slug isn't in the map, we leave the row
+   * untouched (null stays null — never guess). Rows are updated only when a
+   * field is currently NULL so we never clobber an already-resolved value.
+   *
+   * Returns the number of rows updated. Never throws — a DB error degrades to 0.
+   */
+  backfillOwnership(
+    slugMap: Map<string, { projectId: string; personaId: string | null }>,
+  ): { updated: number } {
+    if (!this.db || slugMap.size === 0) return { updated: 0 };
+    let updated = 0;
+    try {
+      // Pull the manuscript/project_step rows still missing an owner.
+      const rows = this.db.prepare(`
+        SELECT id, source_ref, project_id, persona_id
+        FROM entries
+        WHERE source IN ('manuscript', 'project_step')
+          AND (project_id IS NULL OR persona_id IS NULL)
+      `).all() as any[];
+
+      const setStmt = this.db.prepare(`
+        UPDATE entries
+        SET project_id = @projectId, persona_id = @personaId
+        WHERE id = @id
+      `);
+
+      const apply = this.db.transaction((items: any[]) => {
+        for (const r of items) {
+          // source_ref is `${slug}/${file}` — take the leading segment.
+          const slug = String(r.source_ref || '').split('/')[0];
+          const owner = slugMap.get(slug);
+          if (!owner) continue; // unknown slug → leave null (don't guess)
+
+          // Fill only currently-null fields; keep any resolved value intact.
+          const projectId = r.project_id ?? owner.projectId;
+          const personaId = r.persona_id ?? owner.personaId;
+          if (projectId === r.project_id && personaId === r.persona_id) continue;
+
+          setStmt.run({ id: r.id, projectId, personaId });
+          updated++;
+        }
+      });
+      apply(rows);
+    } catch (err) {
+      console.warn('  [memory-search] backfillOwnership failed:', (err as any)?.message || err);
+      return { updated };
+    }
+    return { updated };
+  }
+
+  /**
    * Index a single conversation turn as it happens (called from MemoryService).
    * Cheap — just one insert.
    */

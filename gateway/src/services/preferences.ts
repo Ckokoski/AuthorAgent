@@ -219,6 +219,86 @@ export class PreferenceStore {
     return { ...this.data.preferences };
   }
 
+  /**
+   * Sleep-job maintenance pass (Tiered Memory Chunk C, step 6).
+   *
+   * Removes low-value inferred/observed preferences that have gone stale, plus
+   * collapses exact-duplicate values (noise from the same phrase being
+   * re-detected under different keys). Returns the list of removed keys.
+   *
+   * Rules (never destructive to intentional state):
+   *   - A key is a prune candidate ONLY if its source is NOT in `protectSources`
+   *     (default protects 'explicit') AND its `updatedAt` is older than
+   *     `maxAgeDays`. Explicit preferences are NEVER removed regardless of age.
+   *   - Duplicate collapse: when two or more prunable keys share the exact same
+   *     value, keep the most-recently-updated one and remove the rest — even if
+   *     the older duplicates are not yet past `maxAgeDays` (they add no signal).
+   *     Protected keys are never collapsed away.
+   *
+   * `nowIso` is injected so the caller (sleep job) controls the clock, keeping
+   * this deterministic and testable.
+   */
+  async prune(
+    nowIso: string,
+    opts: { maxAgeDays: number; protectSources?: string[] },
+  ): Promise<string[]> {
+    const protect = new Set(opts.protectSources ?? ['explicit']);
+    const maxAgeMs = Math.max(0, opts.maxAgeDays) * 24 * 60 * 60 * 1000;
+    const now = new Date(nowIso).getTime();
+    const nowValid = Number.isFinite(now);
+
+    const { preferences, metadata } = this.getAllWithMetadata();
+    const toRemove = new Set<string>();
+
+    /** A key we are allowed to remove (not protected by source). */
+    const isPrunable = (key: string): boolean => {
+      const meta = metadata[key];
+      const source = meta?.source ?? 'inferred';
+      return !protect.has(source);
+    };
+
+    // ── Pass A: stale removal (prunable source + older than maxAgeDays) ──
+    if (nowValid) {
+      for (const key of Object.keys(preferences)) {
+        if (!isPrunable(key)) continue;
+        const updatedAt = metadata[key]?.updatedAt;
+        const updatedMs = updatedAt ? new Date(updatedAt).getTime() : NaN;
+        // Missing/unparseable timestamp → treat as stale (no evidence it's fresh).
+        const ageMs = Number.isFinite(updatedMs) ? now - updatedMs : Infinity;
+        if (ageMs > maxAgeMs) toRemove.add(key);
+      }
+    }
+
+    // ── Pass B: exact-duplicate-value collapse (among prunable keys) ──
+    // Group surviving prunable keys by their JSON-stringified value; when a
+    // group has >1 member, keep the freshest and mark the rest for removal.
+    const byValue = new Map<string, string[]>();
+    for (const key of Object.keys(preferences)) {
+      if (toRemove.has(key)) continue;   // already going away
+      if (!isPrunable(key)) continue;    // protected keys are never collapsed
+      const valueKey = JSON.stringify(preferences[key]);
+      const arr = byValue.get(valueKey);
+      if (arr) arr.push(key);
+      else byValue.set(valueKey, [key]);
+    }
+    for (const keys of byValue.values()) {
+      if (keys.length < 2) continue;
+      // Keep the most-recently-updated; remove the rest.
+      const ranked = [...keys].sort((a, b) => {
+        const ta = new Date(metadata[a]?.updatedAt ?? 0).getTime() || 0;
+        const tb = new Date(metadata[b]?.updatedAt ?? 0).getTime() || 0;
+        return tb - ta;
+      });
+      for (const key of ranked.slice(1)) toRemove.add(key);
+    }
+
+    const removed: string[] = [];
+    for (const key of toRemove) {
+      if (await this.remove(key)) removed.push(key);
+    }
+    return removed;
+  }
+
   getAllWithMetadata(): PreferenceData {
     return {
       preferences: { ...this.data.preferences },

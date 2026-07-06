@@ -42,6 +42,7 @@ import { PersonaService } from './services/personas.js';
 import { ContextEngine } from './services/context-engine.js';
 import { MemorySearchService } from './services/memory-search.js';
 import { MemoryTierService } from './services/memory-tier.js';
+import { SleepConsolidationService } from './services/sleep-consolidation.js';
 import { UserModelService } from './services/user-model.js';
 import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
@@ -162,6 +163,8 @@ class AuthorClawGateway {
   private set memorySearch(v: MemorySearchService) { this.services.memorySearch = v; }
   private get memoryTier(): MemoryTierService { return this.services.memoryTier; }
   private set memoryTier(v: MemoryTierService) { this.services.memoryTier = v; }
+  private get sleepConsolidation(): SleepConsolidationService { return this.services.sleepConsolidation; }
+  private set sleepConsolidation(v: SleepConsolidationService) { this.services.sleepConsolidation = v; }
   private get userModel(): UserModelService { return this.services.userModel; }
   private set userModel(v: UserModelService) { this.services.userModel = v; }
   private get cronScheduler(): CronSchedulerService { return this.services.cronScheduler; }
@@ -516,7 +519,29 @@ class AuthorClawGateway {
       }
       return { success: true, message: `Broadcast: ${message.substring(0, 80)}` };
     });
+    // Sleep-time consolidation (Tiered Memory Chunk C). The service is built
+    // later in initialize() (after SeriesBible), so this handler reads it
+    // lazily and guards on it being ready — mirrors how the reindex handler
+    // reads this.memorySearch.
+    this.cronScheduler.registerHandler('sleep-consolidation', async (payload) => {
+      if (!this.sleepConsolidation) return { success: false, message: 'Sleep consolidation not initialized' };
+      return this.sleepConsolidation.run(payload || {});
+    });
     this.cronScheduler.start();
+    // Seed the daily sleep-consolidation job at 04:00 if it doesn't already
+    // exist (idempotent across restarts) — mirrors the design's default schedule.
+    if (!this.cronScheduler.list().some(j => j.handler === 'sleep-consolidation')) {
+      try {
+        await this.cronScheduler.createJob({
+          name: 'Sleep-time memory consolidation',
+          schedule: '0 4 * * *',
+          handler: 'sleep-consolidation',
+        });
+        logger.info('  ✓ Registered daily sleep-consolidation cron (0 4 * * *)');
+      } catch (err) {
+        logger.warn(`  ⚠ Could not seed sleep-consolidation cron: ${(err as any)?.message || err}`);
+      }
+    }
     logger.info(`  ✓ Cron scheduler: ${this.cronScheduler.list().length} job(s) scheduled, ${this.cronScheduler.listHandlers().length} handlers`);
 
     // ── Phase 6g4: Auto-Skill Creator ──
@@ -672,6 +697,26 @@ class AuthorClawGateway {
     this.seriesBible = new SeriesBibleService(join(ROOT_DIR, 'workspace'));
     await this.seriesBible.initialize();
     logger.info(`  ✓ Series bible: ${this.seriesBible.listSeries().length} series`);
+
+    // ── Phase 6j2: Sleep-Time Consolidation (Tiered Memory Chunk C) ──
+    // Materializes the CoreDigest read on the hot path, plus prunes prefs,
+    // reindexes + backfills FTS ownership, and refreshes the series bible.
+    // All AI calls go through the FREE tier only (general/research/marketing).
+    // Built here so all its deps (contextEngine, seriesBible, preferences,
+    // memorySearch, memoryTier, projectEngine) already exist; the cron handler
+    // registered earlier reads it lazily.
+    this.sleepConsolidation = new SleepConsolidationService({
+      contextEngine: this.contextEngine,
+      seriesBible: this.seriesBible,
+      preferences: this.preferences,
+      memorySearch: this.memorySearch?.isAvailable() ? this.memorySearch : null,
+      memoryTier: this.memoryTier,
+      projects: this.projectEngine,
+      aiComplete: (request) => this.aiRouter.complete(request),
+      aiSelectProvider: (taskType: string) => this.aiRouter.selectProvider(taskType),
+      workspaceDir: join(ROOT_DIR, 'workspace'),
+    });
+    logger.info('  ✓ Sleep consolidation: CoreDigest materialization + free-tier passes ready');
 
     this.craftCritic = new CraftCriticService();
     this.audiobookPrep = new AudiobookPrepService();

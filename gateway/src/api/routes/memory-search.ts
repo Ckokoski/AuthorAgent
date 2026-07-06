@@ -71,6 +71,25 @@ export function registerMemorySearchRoutes(ctx: ApiContext): void {
     }
   });
 
+  /**
+   * POST /api/memory/consolidate
+   * Trigger the sleep-time consolidation job on demand (materializes the
+   * CoreDigest + prunes prefs + reindexes/backfills FTS + refreshes the series
+   * bible). Body: { projectId?: string } — omit to consolidate every project.
+   * All AI calls inside are free-tier only.
+   */
+  app.post('/api/memory/consolidate', async (req: Request, res: Response) => {
+    const sleep = services.sleepConsolidation;
+    if (!sleep) return res.status(503).json({ error: 'Sleep consolidation service not initialized' });
+    const projectId = req.body?.projectId ? String(req.body.projectId) : undefined;
+    try {
+      const result = await sleep.run(projectId ? { projectId } : {});
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Consolidation failed' });
+    }
+  });
+
   // ─── Active Persona (memory tagging) ───
   // Sets which persona future conversation turns get tagged with so each
   // pen name maintains its own memory boundary in the search index.
