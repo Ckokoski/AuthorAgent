@@ -41,6 +41,7 @@ import { ProjectEngine } from './services/projects.js';
 import { PersonaService } from './services/personas.js';
 import { ContextEngine } from './services/context-engine.js';
 import { MemorySearchService } from './services/memory-search.js';
+import { MemoryTierService } from './services/memory-tier.js';
 import { UserModelService } from './services/user-model.js';
 import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
@@ -159,6 +160,8 @@ class AuthorClawGateway {
   private set contextEngine(v: ContextEngine) { this.services.contextEngine = v; }
   private get memorySearch(): MemorySearchService { return this.services.memorySearch; }
   private set memorySearch(v: MemorySearchService) { this.services.memorySearch = v; }
+  private get memoryTier(): MemoryTierService { return this.services.memoryTier; }
+  private set memoryTier(v: MemoryTierService) { this.services.memoryTier = v; }
   private get userModel(): UserModelService { return this.services.userModel; }
   private set userModel(v: UserModelService) { this.services.userModel = v; }
   private get cronScheduler(): CronSchedulerService { return this.services.cronScheduler; }
@@ -445,6 +448,19 @@ class AuthorClawGateway {
     this.contextEngine = new ContextEngine(join(ROOT_DIR, 'workspace'));
     this.projectEngine.setContextEngine(this.contextEngine);
     logger.info('  ✓ Context Engine: manuscript memory + continuity checking');
+
+    // ── Phase 6f2: Memory Tier Service (Chunk B1) ──
+    // Pure read + budget layer over ContextEngine (CORE tier) + MemorySearch
+    // (ARCHIVAL tier). memorySearch may be internally unavailable (no
+    // better-sqlite3) — MemoryTierService guards on isAvailable() so archival
+    // search degrades to '' and CORE assembly still works from ContextEngine.
+    this.memoryTier = new MemoryTierService(
+      this.contextEngine,
+      this.memorySearch?.isAvailable() ? this.memorySearch : null,
+      join(ROOT_DIR, 'workspace'),
+    );
+    this.projectEngine.setMemoryTier(this.memoryTier);
+    logger.info(`  ✓ Memory tier: CORE budgeting + ARCHIVAL search (${this.memorySearch?.isAvailable() ? 'search on' : 'search off'})`);
 
     // Wire the message pipeline + step-hook services so the ProjectEngine can
     // execute steps (single + autonomous loop) without importing the gateway

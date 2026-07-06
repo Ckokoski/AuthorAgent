@@ -25,6 +25,7 @@
 
 import { AuthorOSService } from './author-os.js';
 import { ContextEngine } from './context-engine.js';
+import type { MemoryTierService } from './memory-tier.js';
 import type { SkillCatalogEntry } from '../skills/loader.js';
 import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
@@ -49,6 +50,17 @@ import {
 } from './step-executor.js';
 
 const log = logger.child('[projects]');
+
+/**
+ * Feature flag (Chunk B1): inject the tiered "# CORE STORY MEMORY" block into
+ * project-step context. Defaults ON. Set AUTHORCLAW_CORE_INJECTION=off (or
+ * 'false'/'0') to disable and fall back to the exact prior context assembly —
+ * a kill switch if CORE ever misbehaves in production. Read once at module
+ * load; the guard is additionally null-checked at every call site.
+ */
+const CORE_INJECTION_ENABLED = !['off', 'false', '0'].includes(
+  String(process.env.AUTHORCLAW_CORE_INJECTION || '').trim().toLowerCase(),
+);
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -95,6 +107,13 @@ export class ProjectEngine {
   private messageHandler: MessageHandler | null = null;
   private stepServices: StepServices = {};
   private contextEngine?: ContextEngine;
+  /**
+   * Tiered-memory budgeting layer (Chunk B1). Optional — when unset (or when
+   * its internal memorySearch is unavailable) every consumer below degrades to
+   * the exact prior behavior, so the CORE/archival integration is fully
+   * guarded. Feature-flagged via CORE_INJECTION_ENABLED.
+   */
+  private memoryTier?: MemoryTierService;
   private coreLessonsCache: string | null = null;
   private coreLessonsCacheTime = 0;
   private stateFilePath: string;
@@ -234,6 +253,15 @@ export class ProjectEngine {
 
   setContextEngine(engine: ContextEngine): void {
     this.contextEngine = engine;
+  }
+
+  /**
+   * Inject the tiered-memory service (Chunk B1). Follows the setContextEngine
+   * pattern. When never called, memoryTier stays undefined and every CORE /
+   * archival integration point falls back to the exact prior behavior.
+   */
+  setMemoryTier(tier: MemoryTierService): void {
+    this.memoryTier = tier;
   }
 
   /**
@@ -839,6 +867,54 @@ Description: ${description}`;
     context += `**Progress**: ${project.progress}% (step ${project.steps.indexOf(step) + 1} of ${project.steps.length})\n`;
     context += `**Current Step**: ${step.label}\n\n`;
 
+    // ── CORE STORY MEMORY (Chunk B1) ──
+    // Prepend the tiered CORE block (budgeted ≤3,500 chars) so the always-in
+    // active chapter state / key characters / open threads / style / world
+    // rules ride at the top of the project context for EVERY project type —
+    // including book-production and non-novel-pipeline types that never touched
+    // ContextEngine before. Purely additive; guarded on the flag + a non-null
+    // memoryTier + a non-empty result, so search-off / no-cache degrades to the
+    // exact prior context byte-for-byte.
+    if (CORE_INJECTION_ENABLED && this.memoryTier) {
+      try {
+        // buildCore reads the ContextEngine's IN-MEMORY cache, which is lazily
+        // populated. Ensure this project's persisted context (chapter summaries
+        // + entity index) is hydrated before we read it — idempotent + cached,
+        // and it degrades to an empty context if nothing is on disk.
+        if (this.contextEngine) {
+          await this.contextEngine.loadContext(project.id).catch(() => {});
+        }
+        const core = this.memoryTier.buildCore(
+          project.id,
+          this.resolveActiveChapterNumber(project, step),
+          step.prompt || '',
+        );
+        if (core) context += `${core}\n\n`;
+      } catch (err) {
+        // Never let CORE assembly break a step — degrade to no CORE block.
+        logger.debug('[memory-tier] buildCore failed', err);
+      }
+    }
+
+    // ── ARCHIVAL trigger (Chunk B1) ──
+    // On revision / consistency / book-production steps, pull budgeted excerpts
+    // (≤2,000 chars) from the FTS archive keyed on the step prompt + active
+    // character names. Additive; guarded on memoryTier + (internally) on
+    // memorySearch availability, so with search off this contributes nothing.
+    if (CORE_INJECTION_ENABLED && this.memoryTier && this.stepWantsArchival(project, step)) {
+      try {
+        const query = this.buildArchivalQuery(project, step);
+        const archival = this.memoryTier.searchArchival(query, {
+          limit: 6,
+          projectId: project.id,
+          sources: ['manuscript', 'project_step'],
+        });
+        if (archival) context += `${archival}\n\n`;
+      } catch (err) {
+        logger.debug('[memory-tier] searchArchival failed', err);
+      }
+    }
+
     // Novel pipeline: phase-aware context accumulation
     if (project.type === 'novel-pipeline' && step.phase) {
       context += this.buildNovelPipelineContext(project, step);
@@ -866,18 +942,34 @@ Description: ${description}`;
       }
     }
 
-    // Include uploaded manuscript content (from Upload button)
+    // Include uploaded manuscript content (from Upload button).
+    //
+    // DE-DUP (Chunk B1): buildStepUserMessage (step-executor.ts) already injects
+    // the manuscript into the USER message — from uploadedContent (inline) or
+    // documentLibraryFile (disk). Injecting the same text again here in the
+    // SYSTEM context wastes tokens (the manuscript was going out TWICE per
+    // step). Only include the system-side copy when the user message will NOT
+    // already carry it, i.e. when there is no documentLibraryFile. When present,
+    // we still keep the lightweight file-list header for orientation but skip
+    // the (duplicated) body.
     if (project.context?.uploadedContent) {
       const uploads = project.context.uploads || [];
       const fileList = uploads.map((u: any) => `${u.filename} (${u.wordCount} words)`).join(', ');
+      const userMessageCarriesManuscript = !!project.context?.documentLibraryFile
+        || !!project.context?.uploadedContent;
       context += `## Uploaded Manuscript\n\n`;
       context += `**Files**: ${fileList}\n\n`;
-      // Include up to 30k chars of uploaded content for the AI to work with
-      const uploaded = String(project.context.uploadedContent);
-      if (uploaded.length > 30000) {
-        context += uploaded.substring(0, 30000) + '\n\n[...truncated at 30,000 chars — full text available in workspace...]\n\n';
+      if (userMessageCarriesManuscript) {
+        // Body is already in the user message — don't duplicate it here.
+        context += `_(Full manuscript text is provided in the task message below.)_\n\n`;
       } else {
-        context += uploaded + '\n\n';
+        // Include up to 30k chars of uploaded content for the AI to work with
+        const uploaded = String(project.context.uploadedContent);
+        if (uploaded.length > 30000) {
+          context += uploaded.substring(0, 30000) + '\n\n[...truncated at 30,000 chars — full text available in workspace...]\n\n';
+        } else {
+          context += uploaded + '\n\n';
+        }
       }
     }
 
@@ -906,6 +998,93 @@ Description: ${description}`;
     }
 
     return context;
+  }
+
+  // ── Tiered-memory integration helpers (Chunk B1) ──────────
+
+  /**
+   * Best-effort "active chapter number" for CORE assembly. Prefers the current
+   * step's own chapterNumber; else the max chapterNumber across the project's
+   * steps; else the count of completed writing/polish chapters + 1; else 1.
+   * Pure, never throws — CORE degrades to '' if summaries don't line up anyway.
+   */
+  private resolveActiveChapterNumber(project: Project, step: ProjectStep): number {
+    const own = Number((step as any).chapterNumber);
+    if (Number.isFinite(own) && own > 0) return own;
+
+    let maxCh = 0;
+    for (const s of project.steps) {
+      const ch = Number((s as any).chapterNumber);
+      if (Number.isFinite(ch) && ch > maxCh) maxCh = ch;
+    }
+    if (maxCh > 0) return maxCh;
+
+    const writtenDone = project.steps.filter(
+      s => (s.skill === 'write' || s.phase === 'polish' || s.phase === 'writing') && s.status === 'completed',
+    ).length;
+    return writtenDone > 0 ? writtenDone + 1 : 1;
+  }
+
+  /**
+   * True if this step should pull ARCHIVAL excerpts: revision / consistency
+   * steps (by taskType or phase) or ANY step of a book-production project
+   * (design: "revision/consistency/book-production"). Pure, no I/O.
+   */
+  private stepWantsArchival(project: Project, step: ProjectStep): boolean {
+    if (project.type === 'book-production') return true;
+    const taskType = String((step as any).taskType || '').toLowerCase();
+    const phase = String((step as any).phase || '').toLowerCase();
+    return (
+      taskType === 'revision' ||
+      taskType === 'consistency' ||
+      phase === 'revision' ||
+      phase === 'revision_apply'
+    );
+  }
+
+  /**
+   * Build the archival FTS query: the step prompt plus the names of characters
+   * active in (or near) the current chapter, so the search surfaces prior
+   * manuscript passages featuring those characters. Falls back to the prompt
+   * alone when no ContextEngine/entities are available. Pure, never throws.
+   */
+  private buildArchivalQuery(project: Project, step: ProjectStep): string {
+    const promptPart = (step.prompt || '').slice(0, 400);
+    const names = this.getActiveCharacterNames(project, step);
+    return names.length > 0 ? `${promptPart} ${names.join(' ')}` : promptPart;
+  }
+
+  /**
+   * Names of characters active near the current chapter, from the ContextEngine
+   * entity index / chapter summaries. Empty when no context is cached. Capped
+   * so the query stays small. Pure, guarded, never throws.
+   */
+  private getActiveCharacterNames(project: Project, step: ProjectStep): string[] {
+    if (!this.contextEngine) return [];
+    try {
+      const activeCh = this.resolveActiveChapterNumber(project, step);
+      const summaries = this.contextEngine.getSummaries(project.id);
+      const names = new Set<string>();
+      // Characters named in the active (or nearest prior) chapter summary.
+      const nearby = summaries.filter(s => s.chapterNumber <= activeCh).slice(-2);
+      for (const s of nearby) {
+        for (const c of s.characters ?? []) {
+          const n = (c ?? '').trim();
+          if (n) names.add(n);
+        }
+      }
+      // Backfill with top entity-index characters if the summary yielded few.
+      if (names.size < 3) {
+        for (const c of this.contextEngine.getEntitiesByType(project.id, 'character')) {
+          if (names.size >= 6) break;
+          const n = (c.name ?? '').trim();
+          if (n) names.add(n);
+        }
+      }
+      return [...names].slice(0, 6);
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -1124,12 +1303,32 @@ Description: ${description}`;
         if (outlineResults.length > 0) {
           context += `## Outline\n\n${truncate(outlineResults.map(s => s.result).join('\n\n'), 3000)}\n\n`;
         }
-        // Brief summaries of all chapters
+        // Brief summaries of all chapters.
+        //
+        // BUG FIX (Chunk B1): the old code used truncate(ch.result!, 500), which
+        // is slice(0, 500) — it kept only each chapter's OPENING and threw away
+        // the ENDING. For a consistency/revision pass that is exactly backwards:
+        // continuity errors live at chapter boundaries (how a chapter ENDS vs
+        // how the next BEGINS). Prefer the ContextEngine's ChapterSummary (a
+        // real summary of the whole chapter + its endingState) when available;
+        // fall back to the old opening slice only when no summary is cached, so
+        // behavior is a strict superset of before.
         const writtenChapters = getPhaseResults('writing');
         if (writtenChapters.length > 0) {
+          const summaries = this.contextEngine?.getSummaries(project.id) ?? [];
+          const summaryByChapterId = new Map(summaries.map(s => [s.chapterId, s]));
           context += `## Chapter Drafts (summaries)\n\n`;
           for (const ch of writtenChapters) {
-            context += `### ${ch.label}\n${truncate(ch.result!, 500)}\n\n`;
+            const cs = summaryByChapterId.get(ch.id);
+            if (cs && (cs.summary || cs.endingState)) {
+              const body = cs.summary
+                ? `${cs.summary}${cs.endingState ? `\n\n**Chapter ends:** ${cs.endingState}` : ''}`
+                : `**Chapter ends:** ${cs.endingState}`;
+              context += `### ${ch.label}\n${truncate(body, 900)}\n\n`;
+            } else {
+              // No cached summary — fall back to the original opening slice.
+              context += `### ${ch.label}\n${truncate(ch.result!, 500)}\n\n`;
+            }
           }
         }
         break;

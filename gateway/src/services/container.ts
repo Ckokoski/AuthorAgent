@@ -37,6 +37,7 @@ import { ProjectEngine } from './projects.js';
 import { PersonaService } from './personas.js';
 import { ContextEngine } from './context-engine.js';
 import { MemorySearchService } from './memory-search.js';
+import { MemoryTierService } from './memory-tier.js';
 import { UserModelService } from './user-model.js';
 import { CronSchedulerService } from './cron-scheduler.js';
 import { AutoSkillService } from './auto-skill.js';
@@ -96,6 +97,7 @@ export interface GatewayServices {
   personas: PersonaService;
   contextEngine: ContextEngine;
   memorySearch: MemorySearchService;
+  memoryTier: MemoryTierService;
   userModel: UserModelService;
   cronScheduler: CronSchedulerService;
   autoSkill: AutoSkillService;
@@ -168,6 +170,7 @@ export class ServiceContainer {
   projectEngine!: ProjectEngine;
   contextEngine!: ContextEngine;
   memorySearch!: MemorySearchService;
+  memoryTier!: MemoryTierService;
   userModel!: UserModelService;
   cronScheduler!: CronSchedulerService;
   autoSkill!: AutoSkillService;
@@ -229,6 +232,7 @@ export class ServiceContainer {
       personas: this.personas,
       contextEngine: this.contextEngine,
       memorySearch: this.memorySearch,
+      memoryTier: this.memoryTier,
       userModel: this.userModel,
       cronScheduler: this.cronScheduler,
       autoSkill: this.autoSkill,

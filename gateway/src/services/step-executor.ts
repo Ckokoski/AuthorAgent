@@ -138,10 +138,35 @@ export class StepExecutor {
 
   /**
    * Returns true if the step requires the FULL manuscript in context (not a
-   * truncated excerpt). Revision-apply steps must see the whole book to rewrite
-   * it correctly.
+   * truncated excerpt). Revision-apply rewrites AND consistency checks must see
+   * the whole book: a consistency pass can't catch a contradiction between
+   * ch 2 and ch 30 if it only ever sees a 30K-char excerpt.
+   *
+   * (Chunk B1) Extended the allowlist to include consistency steps (by taskType
+   * or phase). This only widens the CONTEXT CAP in buildStepUserMessage — it
+   * does NOT trigger word-count continuation, which is gated on the narrower
+   * stepIsFullRewrite() so a consistency REPORT is never padded to manuscript
+   * length.
    */
   stepNeedsFullManuscript(step: any): boolean {
+    if (this.stepIsFullRewrite(step)) return true;
+    const taskType = String(step?.taskType || '').toLowerCase();
+    const phase = String(step?.phase || '').toLowerCase();
+    const label = String(step?.label || '').toLowerCase();
+    return taskType === 'consistency' ||
+      phase === 'consistency' ||
+      label.includes('consistency check') ||
+      label.includes('continuity scan') ||
+      label.includes('continuity check');
+  }
+
+  /**
+   * Narrower signal: the step actually REWRITES the whole manuscript (macro /
+   * scene / line revision-apply). This is the original stepNeedsFullManuscript
+   * behavior, preserved verbatim so the word-count continuation loop still only
+   * fires for real rewrites — never for analysis/consistency steps.
+   */
+  stepIsFullRewrite(step: any): boolean {
     const phase = String(step?.phase || '').toLowerCase();
     const label = String(step?.label || '').toLowerCase();
     return phase === 'revision_apply' ||
@@ -162,9 +187,14 @@ export class StepExecutor {
     const uploads = project.context?.uploads || [];
     const fileList = uploads.map((u: any) => `${u.filename} (${u.wordCount?.toLocaleString() || '?'} words)`).join(', ');
 
-    // Revision-apply steps need to see the full manuscript; analysis steps get a smart excerpt.
+    // Steps that need the WHOLE book (revision-apply rewrites + consistency
+    // checks) get the full-manuscript cap; analysis steps get a smart excerpt.
+    // The "you MUST rewrite" header note is gated on the narrower rewrite signal
+    // so a consistency step gets the full text WITHOUT being told to rewrite it.
     const fullNeeded = this.stepNeedsFullManuscript(step);
+    const isRewrite = this.stepIsFullRewrite(step);
     const charCap = fullNeeded ? 600000 : 30000;  // ~120K words when needed (fits Claude/Gemini context)
+    const rewriteNote = `\n\n⚠️ This is a REVISION APPLY step. You MUST rewrite the ENTIRE manuscript below (or as much as fits in your response — the system will ask for continuations).\n\n`;
 
     // Large document path: read from disk with cap-aware truncation
     if (project.context?.documentLibraryFile) {
@@ -173,9 +203,7 @@ export class StepExecutor {
         project.context.documentWordCount || 0,
         charCap
       );
-      const headerNote = fullNeeded
-        ? `\n\n⚠️ This is a REVISION APPLY step. You MUST rewrite the ENTIRE manuscript below (or as much as fits in your response — the system will ask for continuations).\n\n`
-        : '';
+      const headerNote = isRewrite ? rewriteNote : '';
       message = `## Manuscript to Work With\n\nUploaded files: ${fileList}${headerNote}\n\n${excerpt}\n\n---\n\n## Your Task\n\n${message}`;
       return message;
     }
@@ -183,9 +211,7 @@ export class StepExecutor {
     // Small document path: use inline uploaded content
     if (project.context?.uploadedContent) {
       const uploaded = String(project.context.uploadedContent).substring(0, charCap);
-      const headerNote = fullNeeded
-        ? `\n\n⚠️ This is a REVISION APPLY step. You MUST rewrite the ENTIRE manuscript below (or as much as fits in your response — the system will ask for continuations).\n\n`
-        : '';
+      const headerNote = isRewrite ? rewriteNote : '';
       message = `## Manuscript to Work With\n\nUploaded files: ${fileList}${headerNote}\n\n${uploaded}\n\n---\n\n## Your Task\n\n${message}`;
     }
 
@@ -366,7 +392,11 @@ export class StepExecutor {
         // than the source (or shorter than the explicit wordCountTarget), ask the AI to
         // continue. This prevents the user from getting a half-revised book.
         {
-          const isRevisionApply = this.stepNeedsFullManuscript(activeStep);
+          // Continuation must only fire for actual full-manuscript REWRITES —
+          // not consistency checks (which stepNeedsFullManuscript now also
+          // covers). Use the narrower rewrite signal here so a consistency
+          // REPORT is never padded out to manuscript length.
+          const isRevisionApply = this.stepIsFullRewrite(activeStep);
           const wcTarget = (activeStep as any).wordCountTarget ||
             (isRevisionApply ? Math.floor((currentProject.context?.documentWordCount || 0) * 0.9) : 0);
           if (wcTarget && wcTarget > 0) {

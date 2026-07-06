@@ -4,7 +4,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { ContextEngine, type ProjectContext, type EntityEntry } from './context-engine.js';
-import { MemoryTierService, CORE_BUDGETS, type CoreDigest } from './memory-tier.js';
+import { MemoryTierService, CORE_BUDGETS, ARCHIVAL_BLOCK_CAP, type CoreDigest } from './memory-tier.js';
+import type { SearchHit, SearchOptions } from './memory-search.js';
 
 // ═══════════════════════════════════════════════════════════
 // Fixtures
@@ -427,5 +428,145 @@ describe('MemoryTierService core digest', () => {
     expect(core).toContain('STYLE START');
     // The 600-char cap means the far-end "STYLE END" marker never makes it in.
     expect(core).not.toContain('STYLE END');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// searchArchival (Chunk B1)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Minimal fake MemorySearchService — MemoryTierService.searchArchival only
+ * calls isAvailable() and search(). Records the queries/opts it receives so
+ * tests can assert on scoping.
+ */
+class FakeSearch {
+  available = true;
+  calls: Array<{ query: string; opts: SearchOptions }> = [];
+  constructor(private hits: SearchHit[] = []) {}
+  isAvailable(): boolean { return this.available; }
+  search(query: string, opts: SearchOptions = {}): SearchHit[] {
+    this.calls.push({ query, opts });
+    // Emulate single-source filtering so the multi-source merge path is exercised.
+    if (opts.source) return this.hits.filter(h => h.source === opts.source);
+    return this.hits;
+  }
+}
+
+function hit(overrides: Partial<SearchHit> = {}): SearchHit {
+  return {
+    id: 1,
+    source: 'manuscript',
+    sourceRef: 'my-novel/manuscript.md',
+    personaId: null,
+    projectId: 'test-project',
+    timestamp: '2026-03-14T12:00:00.000Z',
+    title: 'The Sealed Vault',
+    snippet: 'Aria pressed her palm to the [vault] door and felt it yield…',
+    rank: -1.0,
+    ...overrides,
+  };
+}
+
+describe('MemoryTierService.searchArchival', () => {
+  it('returns "" when memorySearch is null (guard: exact prior behavior)', () => {
+    const t = new MemoryTierService(engine, null, workspaceDir);
+    expect(t.searchArchival('anything', { limit: 6 })).toBe('');
+  });
+
+  it('returns "" when memorySearch is unavailable', () => {
+    const fake = new FakeSearch([hit()]);
+    fake.available = false;
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    expect(t.searchArchival('vault', { limit: 6 })).toBe('');
+  });
+
+  it('returns "" on an empty query without calling search', () => {
+    const fake = new FakeSearch([hit()]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    expect(t.searchArchival('   ', { limit: 6 })).toBe('');
+    expect(fake.calls.length).toBe(0);
+  });
+
+  it('returns "" when there are no hits', () => {
+    const fake = new FakeSearch([]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    expect(t.searchArchival('nothing matches', { limit: 6 })).toBe('');
+  });
+
+  it('formats hits under the labeled header with title, snippet, source, and date', () => {
+    const fake = new FakeSearch([hit()]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    const block = t.searchArchival('vault', { limit: 6, sources: ['manuscript'] });
+    expect(block).toContain('# From Your Manuscript & Past Work');
+    expect(block).toContain('## The Sealed Vault');       // title
+    expect(block).toContain('Aria pressed her palm');     // snippet
+    expect(block).toContain('Source: manuscript');        // source-type label
+    expect(block).toContain('2026-03-14');                // date (YYYY-MM-DD)
+  });
+
+  it('labels project_step hits distinctly from manuscript hits', () => {
+    const fake = new FakeSearch([
+      hit({ id: 2, source: 'project_step', title: 'Consistency check', timestamp: '2026-02-01T00:00:00Z' }),
+    ]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    const block = t.searchArchival('consistency', { limit: 6 });
+    expect(block).toContain('Source: project step');
+  });
+
+  it('hard-caps the block at ARCHIVAL_BLOCK_CAP with whole-hit-or-skip', () => {
+    // 20 fat hits — far more than can fit in 2,000 chars.
+    const big = Array.from({ length: 20 }, (_, i) =>
+      hit({ id: i + 1, title: `Chapter ${i + 1}`, snippet: 'q'.repeat(400), rank: -20 + i }),
+    );
+    const fake = new FakeSearch(big);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    const block = t.searchArchival('anything', { limit: 20 });
+    expect(block.length).toBeLessThanOrEqual(ARCHIVAL_BLOCK_CAP);
+    // whole-hit-or-skip: no truncation marker mid-hit — every rendered snippet
+    // is the full 400 chars, so the block never ends mid-"q"-run + "…cut".
+    expect(block).toContain('# From Your Manuscript & Past Work');
+  });
+
+  it('respects an explicit lower maxChars budget', () => {
+    const big = Array.from({ length: 10 }, (_, i) =>
+      hit({ id: i + 1, title: `Ch ${i + 1}`, snippet: 'z'.repeat(200), rank: -10 + i }),
+    );
+    const fake = new FakeSearch(big);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    const block = t.searchArchival('anything', { limit: 10, maxChars: 400 });
+    expect(block.length).toBeLessThanOrEqual(400);
+  });
+
+  it('merges multi-source results and de-dupes by hit id, best rank wins', () => {
+    // Same id returned from two source queries with different ranks.
+    const fake = new FakeSearch([
+      hit({ id: 7, source: 'manuscript', rank: -0.5 }),
+      hit({ id: 8, source: 'project_step', title: 'Step 8', rank: -2.0 }),
+    ]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    const block = t.searchArchival('vault', { limit: 6, sources: ['manuscript', 'project_step'] });
+    // Both distinct hits present.
+    expect(block).toContain('The Sealed Vault');
+    expect(block).toContain('Step 8');
+    // Ran one query per source.
+    const sources = fake.calls.map(c => c.opts.source);
+    expect(sources).toContain('manuscript');
+    expect(sources).toContain('project_step');
+  });
+
+  it('passes projectId scoping through to search', () => {
+    const fake = new FakeSearch([hit()]);
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    t.searchArchival('vault', { limit: 6, projectId: 'test-project', sources: ['manuscript'] });
+    expect(fake.calls[0].opts.projectId).toBe('test-project');
+  });
+
+  it('never throws when search() throws — degrades to ""', () => {
+    const fake = new FakeSearch([hit()]);
+    fake.search = () => { throw new Error('FTS syntax error'); };
+    const t = new MemoryTierService(engine, fake as any, workspaceDir);
+    expect(() => t.searchArchival('bad(query', { limit: 6 })).not.toThrow();
+    expect(t.searchArchival('bad(query', { limit: 6 })).toBe('');
   });
 });
