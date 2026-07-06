@@ -27,6 +27,28 @@ import { getRecommendedThinking, getOutputBudget } from '../ai/router.js';
 import type { DetectResult } from '../security/injection.js';
 
 /**
+ * Feature flag (Chunk B2): inject the tiered CORE + ARCHIVAL blocks into the
+ * CHAT system prompt. Shares the SAME env kill switch as the project-step path
+ * (AUTHORCLAW_CORE_INJECTION=off / 'false' / '0'), so flipping it off restores
+ * byte-identical chat output. Read once at module load; every call site is
+ * ALSO null-checked on this.deps.memoryTier, so an unwired tier degrades to the
+ * exact prior behavior even with the flag on.
+ */
+const CHAT_CORE_INJECTION_ENABLED = !['off', 'false', '0'].includes(
+  String(process.env.AUTHORCLAW_CORE_INJECTION || '').trim().toLowerCase(),
+);
+
+/**
+ * Soft total-size cap (chars) for the assembled system prompt. buildSystemPrompt
+ * had no total cap before Chunk B2; this bounds context bloat. When exceeded,
+ * the lowest-priority already-capped sections are dropped first (see
+ * applyTotalBudgetGuard). Chosen per design (~24,000 chars) — large enough that
+ * a normal prompt (soul + project + memory + CORE) never trips it, so the guard
+ * is a safety valve, not a routine trimmer.
+ */
+const SYSTEM_PROMPT_SOFT_CAP = 24000;
+
+/**
  * The pipeline owns the per-channel conversation history (moved off the
  * gateway with handleMessage). Keyed by channel/session to prevent
  * cross-contamination between Telegram users, web chat, and API callers.
@@ -37,6 +59,28 @@ export class MessagePipeline {
   private conversationHistories: Map<string, Array<{ role: string; content: string; timestamp: Date }>> = new Map();
 
   constructor(private deps: ServiceContainer) {}
+
+  /**
+   * The "latest chapter" number for CORE assembly in the CHAT path. Chat has no
+   * active project STEP (unlike the project engine), so there is no step-scoped
+   * chapter — we use the highest chapterNumber among the ContextEngine's cached
+   * summaries (i.e. the most recently written chapter). Falls back to 1 when no
+   * summaries are cached. buildCore's P1 slot then surfaces the state of the
+   * chapter BEFORE this (the last completed one). Pure, guarded, never throws.
+   */
+  private latestChapterNumber(projectId: string): number {
+    try {
+      const summaries = this.deps.contextEngine?.getSummaries(projectId) ?? [];
+      let max = 0;
+      for (const s of summaries) {
+        const n = Number(s.chapterNumber);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+      return max > 0 ? max : 1;
+    } catch {
+      return 1;
+    }
+  }
 
   private getHistory(channel: string): Array<{ role: string; content: string; timestamp: Date }> {
     let history = this.conversationHistories.get(channel);
@@ -153,13 +197,17 @@ export class MessagePipeline {
     }
 
     // ── Construct system prompt ──
-    let systemPrompt = this.buildSystemPrompt({
+    // `content` (the user's message) is threaded in so buildSystemPrompt can
+    // (a) drive the CORE promotion match against the active project and
+    // (b) key the ARCHIVAL FTS search. Both are additive + guarded.
+    let systemPrompt = await this.buildSystemPrompt({
       soul,
       memories,
       activeProject,
       skills,
       heartbeatContext,
       channel,
+      userMessage: content,
     });
 
     if (extraContext) {
@@ -427,14 +475,16 @@ export class MessagePipeline {
   /**
    * Build the complete system prompt with soul, memory, skills, and project context
    */
-  private buildSystemPrompt(context: {
+  private async buildSystemPrompt(context: {
     soul: string;
     memories: string;
     activeProject: string | null;
     skills: string[];
     heartbeatContext: string;
     channel?: string;
-  }): string {
+    /** The user's raw message — keys CORE promotion + ARCHIVAL search. */
+    userMessage?: string;
+  }): Promise<string> {
     let prompt = '';
 
     prompt += '# Your Identity\n\n';
@@ -466,10 +516,70 @@ export class MessagePipeline {
       prompt += context.activeProject + '\n\n';
     }
 
+    // ── Story Memory (CORE) — Chunk B2 ──
+    // Chat had ZERO chapter/entity recall before this. When there is an active
+    // project AND a memoryTier is wired, inject the always-in CORE block
+    // (budgeted ≤3,500 chars: active chapter state, key characters, open plot
+    // threads, style digest, world rules). Purely additive; guarded on the flag
+    // + a non-null memoryTier + an active project + a non-empty result, so with
+    // the tier unset (or nothing cached) chat is byte-identical to before.
+    //
+    // Tracked separately from the low-priority sections because the total-budget
+    // guard NEVER trims CORE — it is the highest-value recall we inject.
+    let coreBlock = '';
+    if (CHAT_CORE_INJECTION_ENABLED && this.deps.memoryTier && context.activeProject) {
+      const projectId = this.deps.memory.getActiveProjectId();
+      if (projectId) {
+        try {
+          // buildCore reads the ContextEngine's IN-MEMORY cache, which is lazily
+          // populated. Hydrate this project's persisted context first so chat
+          // (which, unlike the project engine, never ran a step to warm it) can
+          // read chapter summaries + entities. Idempotent + cached; degrades to
+          // an empty context when nothing is on disk.
+          if (this.deps.contextEngine) {
+            await this.deps.contextEngine.loadContext(projectId).catch(() => {});
+          }
+          const core = this.deps.memoryTier.buildCore(
+            projectId,
+            this.latestChapterNumber(projectId),
+            context.userMessage || '',
+          );
+          if (core) coreBlock = `# Story Memory (Core)\n\n${core}\n\n`;
+        } catch (err) {
+          // Never let CORE assembly break chat — degrade to no CORE block.
+          logger.debug('[memory-tier] chat buildCore failed', err);
+        }
+      }
+    }
+    prompt += coreBlock;
+
     if (context.memories) {
       prompt += '# Relevant Memory\n\n';
       prompt += context.memories + '\n\n';
     }
+
+    // ── Archival recall (ARCHIVAL) — Chunk B2 ──
+    // Splice the FTS archive AFTER the existing book-bible keyword scoring in
+    // MemoryService.getRelevant (which is untouched — additive only). This lets
+    // chat recall manuscripts / past chapters that live in the FTS index but not
+    // in the active book-bible dir. Done here (not in MemoryService) so we do NOT
+    // have to inject a new memorySearch dependency into MemoryService — the
+    // pipeline already reads this.deps.memoryTier.
+    //
+    // NO persona/project filter for now: manuscript / project_step FTS rows have
+    // null persona/project until Chunk C backfills them, so a scoped search would
+    // return nothing. Guarded internally on memorySearch availability + empty
+    // query → '' , so with search off this contributes nothing.
+    let archivalBlock = '';
+    if (CHAT_CORE_INJECTION_ENABLED && this.deps.memoryTier && context.userMessage) {
+      try {
+        const archival = this.deps.memoryTier.searchArchival(context.userMessage, { limit: 4 });
+        if (archival) archivalBlock = archival + '\n\n';
+      } catch (err) {
+        logger.debug('[memory-tier] chat searchArchival failed', err);
+      }
+    }
+    prompt += archivalBlock;
 
     if (context.skills.length > 0) {
       prompt += '# Available Skills\n\n';
@@ -483,33 +593,42 @@ export class MessagePipeline {
     }
 
     // ── Lessons Learned (from self-improvement loop) ──
+    // Captured into a named variable (not appended inline) so the total-budget
+    // guard below can drop this LOW-priority already-capped section first if the
+    // assembled prompt overruns. Position/content are unchanged when not trimmed.
+    let lessonsBlock = '';
     if (this.deps.lessons) {
       const lessonsContext = this.deps.lessons.buildContext(500);
       if (lessonsContext) {
-        prompt += '# Lessons Learned\n\n';
-        prompt += 'Apply these lessons from past experience:\n';
-        prompt += lessonsContext + '\n\n';
+        lessonsBlock =
+          '# Lessons Learned\n\n' +
+          'Apply these lessons from past experience:\n' +
+          lessonsContext + '\n\n';
       }
     }
+    prompt += lessonsBlock;
 
     // ── User Preferences ──
+    let preferencesBlock = '';
     if (this.deps.preferences) {
       const prefsContext = this.deps.preferences.buildContext(300);
       if (prefsContext) {
-        prompt += '# User Preferences\n\n';
-        prompt += prefsContext + '\n\n';
+        preferencesBlock = '# User Preferences\n\n' + prefsContext + '\n\n';
       }
     }
+    prompt += preferencesBlock;
 
     // ── User Model (Honcho-style consolidated narrative + metrics) ──
     // Deeper than preferences: tells the AI what kind of author this user
     // IS based on their pattern of work, not just stated likes/dislikes.
+    let userModelBlock = '';
     if (this.deps.userModel) {
       const umContext = this.deps.userModel.buildContext(400);
       if (umContext) {
-        prompt += umContext + '\n\n';
+        userModelBlock = umContext + '\n\n';
       }
     }
+    prompt += userModelBlock;
 
     prompt += '# Your Capabilities\n\n';
     prompt += 'You are a fully autonomous writing agent. You CAN and SHOULD:\n';
@@ -583,6 +702,55 @@ export class MessagePipeline {
     prompt += '- Do NOT access any URL not on this list. If a user asks about a domain not listed, tell them it is approved but you need to use the research gate to fetch it.\n';
     prompt += '- Never share API keys, tokens, or vault contents\n';
 
+    // ── Total budget guard (Chunk B2) ──
+    // buildSystemPrompt had NO total size cap, so a large book-bible + lessons +
+    // preferences + user-model + archival could bloat context unbounded. Apply a
+    // SOFT total-char cap. When exceeded, drop the LOWEST-priority already-capped
+    // sections first, in a fixed order. We NEVER trim: soul, the CORE block, the
+    // injection/security caution (appended by the caller), or the active-project
+    // section. Each trim target is the exact literal substring we concatenated,
+    // so removal is precise and cannot corrupt neighbouring sections.
+    prompt = this.applyTotalBudgetGuard(prompt, [
+      { name: 'lessons', block: lessonsBlock },
+      { name: 'preferences', block: preferencesBlock },
+      { name: 'user-model', block: userModelBlock },
+      { name: 'archival', block: archivalBlock },
+    ]);
+
+    return prompt;
+  }
+
+  /**
+   * Soft total-size guard for the assembled system prompt. If `prompt` is under
+   * SYSTEM_PROMPT_SOFT_CAP, it is returned UNCHANGED (byte-identical). Otherwise
+   * the given trim targets are removed IN ORDER (lowest priority first) until the
+   * prompt is back under the cap or the list is exhausted. Protected sections
+   * (soul, CORE, active-project, security/injection caution) are never in the
+   * list, so they always survive. Best-effort — logs at debug when trimming.
+   */
+  private applyTotalBudgetGuard(
+    prompt: string,
+    trimOrder: Array<{ name: string; block: string }>,
+  ): string {
+    if (prompt.length <= SYSTEM_PROMPT_SOFT_CAP) return prompt;
+
+    const originalLength = prompt.length;
+    const dropped: string[] = [];
+    for (const { name, block } of trimOrder) {
+      if (prompt.length <= SYSTEM_PROMPT_SOFT_CAP) break;
+      if (!block) continue;
+      const idx = prompt.indexOf(block);
+      if (idx < 0) continue;
+      prompt = prompt.slice(0, idx) + prompt.slice(idx + block.length);
+      dropped.push(name);
+    }
+
+    if (dropped.length > 0) {
+      logger.debug(
+        `[system-prompt] total-budget guard trimmed ${originalLength}→${prompt.length} chars ` +
+        `(cap ${SYSTEM_PROMPT_SOFT_CAP}); dropped sections in order: ${dropped.join(', ')}`
+      );
+    }
     return prompt;
   }
 }
