@@ -331,6 +331,9 @@ textarea { resize: vertical; min-height: 60px; }
 .badge-paused { background: var(--warn); }
 .badge-completed { background: var(--success); }
 .badge-failed { background: var(--danger); }
+.badge-danger { background: rgba(239,68,68,0.18); color: var(--danger); border: 1px solid rgba(239,68,68,0.35); }
+.badge-warn { background: rgba(245,158,11,0.18); color: var(--warn); border: 1px solid rgba(245,158,11,0.35); }
+.badge-muted { background: rgba(148,163,184,0.18); color: var(--muted); border: 1px solid rgba(148,163,184,0.35); }
 
 /* ── Active Project Cards (Home — horizontal scroll) ── */
 .project-scroll {
@@ -648,6 +651,10 @@ textarea { resize: vertical; min-height: 60px; }
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
       <span class="nav-label">Library</span>
     </div>
+    <div class="nav-item" data-panel="quality">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+      <span class="nav-label">Quality Lab</span>
+    </div>
     <div class="nav-item" data-panel="settings">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
       <span class="nav-label">Settings</span>
@@ -901,6 +908,88 @@ textarea { resize: vertical; min-height: 60px; }
           <div style="color:var(--muted);text-align:center;padding:20px;">No compiled outputs yet.</div>
         </div>
       </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+         PANEL: QUALITY LAB
+         ═══════════════════════════════ -->
+    <div class="panel" id="panel-quality">
+
+      <!-- Revision Analysis -->
+      <div class="card">
+        <div class="card-title">Revision Analysis</div>
+        <p class="hint" style="margin-bottom:10px;">Runs the coordinated specialist passes (continuity, voice, craft, anti-slop) against pasted chapter text and returns a prioritized findings report. The anti-slop + craft passes work with no API keys configured; continuity + voice passes need a project selected.</p>
+        <div class="form-group">
+          <label>Chapter text</label>
+          <textarea id="qlRevisionText" rows="8" placeholder="Paste chapter text to analyze..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Project (optional — enables continuity + voice passes)</label>
+          <select id="qlRevisionProject"><option value="">None — mechanical passes only</option></select>
+        </div>
+        <button id="qlRevisionBtn">Analyze</button>
+        <div id="qlRevisionResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Contradiction Check -->
+      <div class="card">
+        <div class="card-title">Contradiction Check</div>
+        <p class="hint" style="margin-bottom:10px;">Diffs a chapter against the project's entity database and prior chapter summaries, flagging evidence-chained contradictions (character, timeline, setting, plot).</p>
+        <div class="form-group">
+          <label>Project</label>
+          <select id="qlContraProject"><option value="">Select a project...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Chapter text</label>
+          <textarea id="qlContraText" rows="8" placeholder="Paste chapter text to check for contradictions..."></textarea>
+        </div>
+        <button id="qlContraBtn">Check</button>
+        <div id="qlContraResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Character Critique -->
+      <div class="card">
+        <div class="card-title">Character Critique</div>
+        <p class="hint" style="margin-bottom:10px;">Each major character reviews their own dialogue in a chapter, flagging off-voice, anachronistic-knowledge, or off-motivation lines with in-voice rewrites.</p>
+        <div class="form-group">
+          <label>Project</label>
+          <select id="qlCritiqueProject"><option value="">Select a project...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Chapter text</label>
+          <textarea id="qlCritiqueText" rows="8" placeholder="Paste chapter text to critique..."></textarea>
+        </div>
+        <button id="qlCritiqueBtn">Critique</button>
+        <div id="qlCritiqueResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Reader Panels -->
+      <div class="card">
+        <div class="card-title">Reader Panels</div>
+        <p class="hint" style="margin-bottom:10px;">Runs a tournament of your candidates against a demographically varied synthetic reader panel and ranks them by win rate. Works with any active AI provider, including free tiers (Ollama/Gemini) — confidence may be lower on smaller models.</p>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Kind</label>
+            <select id="qlPanelKind">
+              <option value="blurb">Blurb</option>
+              <option value="title">Title</option>
+              <option value="cover-concept">Cover concept</option>
+              <option value="concept">Concept</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Genre</label>
+            <input type="text" id="qlPanelGenre" placeholder="e.g. cozy fantasy">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Candidates (one per line, at least 2)</label>
+          <textarea id="qlPanelCandidates" rows="6" placeholder="Candidate A&#10;Candidate B&#10;Candidate C"></textarea>
+        </div>
+        <button id="qlPanelBtn">Run Panel</button>
+        <div id="qlPanelResults" style="margin-top:16px;"></div>
+      </div>
+
     </div>
 
     <!-- ═══════════════════════════════
@@ -1254,7 +1343,7 @@ function initials(name) {
 // ================================================================
 // NAVIGATION
 // ================================================================
-var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', settings: 'Settings' };
+var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', settings: 'Settings' };
 var navItems = document.querySelectorAll('.nav-item');
 
 function switchPanel(name) {
@@ -1274,6 +1363,8 @@ function switchPanel(name) {
     loadPersonas();
   } else if (name === 'library') {
     loadDocuments();
+  } else if (name === 'quality') {
+    loadQualityLab();
   } else if (name === 'settings') {
     updateQuickStartBanner();
     loadKeys();
@@ -3892,6 +3983,246 @@ function humanAgo(date) {
   if (s < 3600) return Math.floor(s / 60) + 'm ago';
   if (s < 86400) return Math.floor(s / 3600) + 'h ago';
   return Math.floor(s / 86400) + 'd ago';
+}
+
+// ================================================================
+// QUALITY LAB PANEL
+// ================================================================
+// Surfaces four API-only manuscript-quality endpoints as click-to-run cards:
+// revision analysis, contradiction detection, character critique, and
+// synthetic reader panels. Populates project <select>s on panel open;
+// each card's results render into its own div on button click.
+
+function loadQualityLab() {
+  api('GET', '/api/projects/list').then(function(data) {
+    var projects = data.projects || [];
+    var sels = [
+      { el: document.getElementById('qlRevisionProject'), placeholder: 'None — mechanical passes only' },
+      { el: document.getElementById('qlContraProject'), placeholder: 'Select a project...' },
+      { el: document.getElementById('qlCritiqueProject'), placeholder: 'Select a project...' },
+    ];
+    sels.forEach(function(s) {
+      if (!s.el) return;
+      var current = s.el.value;
+      var html = '<option value="">' + esc(s.placeholder) + '</option>';
+      projects.forEach(function(p) {
+        html += '<option value="' + esc(p.id) + '">' + esc(p.title || p.id) + '</option>';
+      });
+      s.el.innerHTML = html;
+      if (current && projects.some(function(p) { return p.id === current; })) s.el.value = current;
+    });
+  }).catch(function() { /* selects stay at their placeholder options */ });
+}
+
+function qlSetRunning(btn, running, idleLabel, runningLabel) {
+  btn.disabled = running;
+  btn.textContent = running ? runningLabel : idleLabel;
+}
+
+function qlSeverityBadgeClass(sev) {
+  if (sev === 'error') return 'badge-danger';
+  if (sev === 'warning') return 'badge-warn';
+  return 'badge-muted';
+}
+
+// ── Revision Analysis ──
+document.getElementById('qlRevisionBtn').addEventListener('click', function() {
+  var btn = this;
+  var text = document.getElementById('qlRevisionText').value.trim();
+  var projectId = document.getElementById('qlRevisionProject').value;
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  var el = document.getElementById('qlRevisionResults');
+  qlSetRunning(btn, true, 'Analyze', 'Analyzing...');
+  el.innerHTML = '<div style="color:var(--muted);">Running specialist passes...</div>';
+  api('POST', '/api/revision/analyze', { chapterText: text, projectId: projectId || undefined }).then(function(report) {
+    renderRevisionReport(report);
+  }).catch(function(e) {
+    showToast('Revision analysis failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Analysis failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Analyze', 'Analyzing...');
+  });
+});
+
+function renderRevisionReport(report) {
+  var el = document.getElementById('qlRevisionResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--muted);">' +
+    '<span>Passes run: ' + (report.passesRun || []).map(esc).join(', ') + '</span>';
+  if (report.passesSkipped && report.passesSkipped.length) {
+    html += '<span>&middot; Passes skipped: ' + report.passesSkipped.map(esc).join(', ') + '</span>';
+  }
+  html += '</div>';
+
+  if (!report.totalFindings) {
+    html += '<div style="text-align:center;padding:20px;color:var(--success);"><strong>No findings!</strong><br><span style="font-size:12px;color:var(--muted);">This pass came back clean.</span></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  var byPass = {};
+  (report.findings || []).forEach(function(f) {
+    if (!byPass[f.pass]) byPass[f.pass] = [];
+    byPass[f.pass].push(f);
+  });
+
+  Object.keys(byPass).forEach(function(pass) {
+    html += '<div style="margin-bottom:14px;">' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:8px;text-transform:capitalize;">' + esc(pass) + ' (' + byPass[pass].length + ')</div>';
+    byPass[pass].forEach(function(f) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge ' + qlSeverityBadgeClass(f.severity) + '">' + esc(f.severity) + '</span> ' +
+        '<span class="badge badge-type">' + esc(f.category) + '</span></div>' +
+        '<div style="margin-bottom:4px;">' + esc(f.description) + '</div>' +
+        (f.suggestion ? '<div style="color:var(--success);font-size:12px;">Suggestion: ' + esc(f.suggestion) + '</div>' : '') +
+        '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<div class="hint">anti-slop works with no API keys — continuity and voice passes require a selected project.</div>';
+  el.innerHTML = html;
+}
+
+// ── Contradiction Check ──
+document.getElementById('qlContraBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('qlContraProject').value;
+  var text = document.getElementById('qlContraText').value.trim();
+  var el = document.getElementById('qlContraResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  qlSetRunning(btn, true, 'Check', 'Checking...');
+  el.innerHTML = '<div style="color:var(--muted);">Diffing against the entity database...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/contradictions', { chapterText: text }).then(function(report) {
+    renderContradictionReport(report);
+  }).catch(function(e) {
+    showToast('Contradiction check failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Check failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Check', 'Checking...');
+  });
+});
+
+function renderContradictionReport(report) {
+  var el = document.getElementById('qlContraResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  if (!report.total) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--success);"><strong>No contradictions found!</strong></div>';
+    return;
+  }
+
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">' + report.total + ' contradiction(s) found</div>';
+  (report.contradictions || []).forEach(function(c) {
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+      '<div style="margin-bottom:4px;"><span class="badge ' + qlSeverityBadgeClass(c.severity) + '">' + esc(c.severity) + '</span> ' +
+      '<span class="badge badge-type">' + esc(c.category) + (c.subtype ? ' / ' + esc(c.subtype) : '') + '</span>' +
+      (c.entity ? ' <span class="badge badge-persona">' + esc(c.entity) + '</span>' : '') + '</div>' +
+      '<div style="margin-bottom:6px;">' + esc(c.description) + '</div>' +
+      '<div style="font-style:italic;color:var(--muted);margin-bottom:4px;font-size:12px;">This chapter: "' + esc(c.chapterEvidence) + '"</div>' +
+      '<div style="font-style:italic;color:var(--muted);margin-bottom:6px;font-size:12px;">Established: "' + esc(c.priorEvidence) + '"</div>' +
+      (c.suggestion ? '<div style="color:var(--success);font-size:12px;">Suggestion: ' + esc(c.suggestion) + '</div>' : '') +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ── Character Critique ──
+document.getElementById('qlCritiqueBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('qlCritiqueProject').value;
+  var text = document.getElementById('qlCritiqueText').value.trim();
+  var el = document.getElementById('qlCritiqueResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  qlSetRunning(btn, true, 'Critique', 'Critiquing...');
+  el.innerHTML = '<div style="color:var(--muted);">Each character is reviewing their own dialogue...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/character-critique', { chapterText: text }).then(function(report) {
+    renderCritiqueReport(report);
+  }).catch(function(e) {
+    showToast('Character critique failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Critique failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Critique', 'Critiquing...');
+  });
+});
+
+function renderCritiqueReport(report) {
+  var el = document.getElementById('qlCritiqueResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  if (!report.totalFlags) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--success);"><strong>No flags!</strong><br><span style="font-size:12px;color:var(--muted);">Every reviewed character stayed in voice.</span></div>';
+    return;
+  }
+
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">' + report.totalFlags + ' flag(s) across ' + (report.byCharacter || []).length + ' character(s)</div>';
+  (report.byCharacter || []).forEach(function(cc) {
+    html += '<div style="margin-bottom:14px;">' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">' + esc(cc.character) + ' &mdash; ' + cc.linesReviewed + ' line(s) reviewed, ' + cc.flags.length + ' flag(s)</div>';
+    cc.flags.forEach(function(f) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge badge-warn">' + esc(f.issue) + '</span></div>' +
+        '<div style="font-style:italic;margin-bottom:4px;">"' + esc(f.line) + '"</div>' +
+        '<div style="color:var(--muted);margin-bottom:4px;font-size:12px;">' + esc(f.reason) + '</div>' +
+        (f.suggestion ? '<div style="color:var(--success);font-size:12px;">Rewrite: ' + esc(f.suggestion) + '</div>' : '') +
+        '</div>';
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ── Reader Panels ──
+document.getElementById('qlPanelBtn').addEventListener('click', function() {
+  var btn = this;
+  var kind = document.getElementById('qlPanelKind').value;
+  var genre = document.getElementById('qlPanelGenre').value.trim();
+  var candidates = document.getElementById('qlPanelCandidates').value.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+  var el = document.getElementById('qlPanelResults');
+  if (candidates.length < 2) { showToast('Enter at least 2 candidates (one per line)', 'error'); return; }
+  qlSetRunning(btn, true, 'Run Panel', 'Running panel...');
+  el.innerHTML = '<div style="color:var(--muted);">Running the synthetic reader panel tournament...</div>';
+  api('POST', '/api/reader-panel', { candidates: candidates, kind: kind, genre: genre || undefined }).then(function(report) {
+    renderPanelReport(report);
+  }).catch(function(e) {
+    showToast('Reader panel failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Panel failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    qlSetRunning(btn, false, 'Run Panel', 'Running panel...');
+  });
+});
+
+function renderPanelReport(report) {
+  var el = document.getElementById('qlPanelResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '';
+  if (report.warnings && report.warnings.length) {
+    html += '<div style="margin-bottom:12px;">' + report.warnings.map(function(w) {
+      return '<div style="padding:8px 12px;background:rgba(245,158,11,0.12);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;margin-bottom:6px;">' + esc(w) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  html += '<div style="font-size:13px;margin-bottom:12px;">Winner: <strong>' + (report.winner ? esc(report.winner) : 'n/a') + '</strong>' +
+    ' &middot; Confidence: ' + Math.round((report.confidence || 0) * 100) + '%</div>';
+
+  (report.ranking || []).forEach(function(r, i) {
+    var pct = Math.round((r.winRate || 0) * 100);
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;">' +
+      '<span style="font-weight:600;">#' + (i + 1) + ' &mdash; ' + esc(r.candidate) + '</span>' +
+      '<span style="color:var(--muted);">' + pct + '%</span></div>' +
+      '<div class="progress-bar" style="height:14px;margin-bottom:6px;"><div class="progress-fill" style="width:' + pct + '%;"></div></div>' +
+      (r.segmentPreference ? '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">Preferred by: ' + esc(r.segmentPreference) + '</div>' : '') +
+      (r.sampleReasons && r.sampleReasons.length ? '<div style="font-style:italic;color:var(--muted);font-size:12px;">"' + r.sampleReasons.map(esc).join('" &middot; "') + '"</div>' : '') +
+      '</div>';
+  });
+
+  el.innerHTML = html;
 }
 
 // ================================================================
