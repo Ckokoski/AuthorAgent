@@ -659,6 +659,10 @@ textarea { resize: vertical; min-height: 60px; }
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
       <span class="nav-label">Publishing</span>
     </div>
+    <div class="nav-item" data-panel="craft">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+      <span class="nav-label">Craft</span>
+    </div>
     <div class="nav-item" data-panel="settings">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
       <span class="nav-label">Settings</span>
@@ -1176,6 +1180,109 @@ textarea { resize: vertical; min-height: 60px; }
     </div>
 
     <!-- ═══════════════════════════════
+         PANEL: CRAFT
+         ═══════════════════════════════ -->
+    <div class="panel" id="panel-craft">
+
+      <!-- Story Structures -->
+      <div class="card">
+        <div class="card-title">Story Structures</div>
+        <p class="hint" style="margin-bottom:10px;">Browse the built-in beat-sheet library (GET /api/structures), check a pasted outline against a chosen structure's beats (POST /api/structures/check-outline), or get a genre-based recommendation (POST /api/structures/recommend). Advisory only — nothing here forces a structure on your project.</p>
+        <div id="craftStructuresList" style="margin-bottom:14px;"><div style="color:var(--muted);text-align:center;padding:16px;">Loading structures...</div></div>
+
+        <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+          <div class="form-group">
+            <label>Outline (one chapter summary per line)</label>
+            <textarea id="craftOutlineText" rows="6" placeholder="Chapter 1: Sarah discovers the letter...&#10;Chapter 2: She confronts her father...&#10;..."></textarea>
+          </div>
+          <div class="form-group-inline">
+            <div class="form-group">
+              <label>Structure</label>
+              <select id="craftOutlineStructure"><option value="">Loading...</option></select>
+            </div>
+            <div class="form-group">
+              <label>Genre (for recommend)</label>
+              <input type="text" id="craftRecommendGenre" placeholder="e.g. cozy fantasy">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="craftCheckOutlineBtn">Check Outline</button>
+            <button id="craftRecommendBtn" class="secondary">Recommend Structure</button>
+          </div>
+          <div id="craftStructuresResults" style="margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- Plot Promises -->
+      <div class="card">
+        <div class="card-title">Plot Promises</div>
+        <p class="hint" style="margin-bottom:10px;">Tracks Sanderson-style "promises and payoffs": what the opening chapters implicitly promise the reader, and whether later chapters pay them off (GET/POST /api/projects/:id/plot-promises). Extraction and audit are analysis only — nothing is rewritten.</p>
+        <div class="form-group">
+          <label>Project</label>
+          <select id="craftPromisesProject"><option value="">Select a project...</option></select>
+        </div>
+        <div id="craftPromisesList" style="margin-bottom:14px;"><div style="color:var(--muted);text-align:center;padding:16px;">Select a project to view tracked promises.</div></div>
+
+        <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+          <div class="form-group">
+            <label>Opening chapter text (optional — falls back to the project's first 1-3 completed chapters)</label>
+            <textarea id="craftPromisesText" rows="6" placeholder="Paste opening chapter text to extract promises from..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="craftPromisesExtractBtn">Extract Promises</button>
+            <button id="craftPromisesAuditBtn" class="secondary">Audit Unresolved</button>
+          </div>
+          <div id="craftPromisesResults" style="margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- Character Voices -->
+      <div class="card">
+        <div class="card-title">Character Voices</div>
+        <p class="hint" style="margin-bottom:10px;">Builds a per-character style fingerprint from dialogue as chapters are written, then flags "drift" — moments where a character stops sounding like themselves (GET/POST /api/projects/:id/character-voices). Ingest and drift-detection are local analysis, no rewriting.</p>
+        <div class="form-group">
+          <label>Project</label>
+          <select id="craftVoicesProject"><option value="">Select a project...</option></select>
+        </div>
+        <div id="craftVoicesList" style="margin-bottom:14px;"><div style="color:var(--muted);text-align:center;padding:16px;">Select a project to view character voice fingerprints.</div></div>
+
+        <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+          <div class="form-group">
+            <label>Chapter text</label>
+            <textarea id="craftVoicesText" rows="6" placeholder="Paste chapter text containing dialogue..."></textarea>
+          </div>
+          <div class="form-group-inline">
+            <div class="form-group">
+              <label>Chapter number</label>
+              <input type="number" id="craftVoicesChapterNum" value="1" min="1" style="max-width:120px;">
+            </div>
+            <div class="form-group">
+              <label>Character names (comma-separated)</label>
+              <input type="text" id="craftVoicesNames" placeholder="e.g. Sarah, Marcus">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="craftVoicesIngestBtn">Ingest Chapter</button>
+            <button id="craftVoicesDriftBtn" class="secondary">Detect Drift</button>
+          </div>
+          <div id="craftVoicesResults" style="margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- Series Bible -->
+      <div class="card">
+        <div class="card-title">Series Bible</div>
+        <p class="hint" style="margin-bottom:10px;">Cross-book memory for multi-project series: merges entity indexes, timelines, and contradictions across every book in a series (GET /api/series, GET /api/series/:id/report). Read-only — series are created/managed elsewhere in the app.</p>
+        <div class="form-group">
+          <label>Series</label>
+          <select id="craftSeriesSelect"><option value="">Loading series...</option></select>
+        </div>
+        <div id="craftSeriesResults"><div style="color:var(--muted);text-align:center;padding:16px;">Select a series to view its bible.</div></div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════
          PANEL: SETTINGS
          ═══════════════════════════════ -->
     <div class="panel" id="panel-settings">
@@ -1526,7 +1633,7 @@ function initials(name) {
 // ================================================================
 // NAVIGATION
 // ================================================================
-var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', settings: 'Settings' };
+var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', craft: 'Craft', settings: 'Settings' };
 var navItems = document.querySelectorAll('.nav-item');
 
 function switchPanel(name) {
@@ -1550,6 +1657,8 @@ function switchPanel(name) {
     loadQualityLab();
   } else if (name === 'publishing') {
     loadPublishing();
+  } else if (name === 'craft') {
+    loadCraft();
   } else if (name === 'settings') {
     updateQuickStartBanner();
     loadKeys();
@@ -4936,6 +5045,448 @@ function renderAmsReport(report) {
   });
 
   html += '<div class="hint" style="margin-top:10px;">' + esc(report.dryRunSummary || 'Recommendations only — no bids have been changed in AMS.') + '</div>';
+  el.innerHTML = html;
+}
+
+// ================================================================
+// CRAFT PANEL
+// ================================================================
+// Surfaces manuscript-structure REST endpoints that already exist in the
+// gateway but had no dashboard UI: the story-structure beat-sheet library,
+// the plot-promises tracker, per-character voice fingerprinting, and the
+// cross-book series bible. Every card here is either pure display (GET) or
+// an analysis action (extract/audit/ingest/detect-drift/check-outline) —
+// nothing here rewrites prose or mutates project content.
+
+function loadCraft() {
+  api('GET', '/api/projects/list').then(function(data) {
+    var projects = data.projects || [];
+    var sels = [
+      { el: document.getElementById('craftPromisesProject'), placeholder: 'Select a project...' },
+      { el: document.getElementById('craftVoicesProject'), placeholder: 'Select a project...' },
+    ];
+    sels.forEach(function(s) {
+      if (!s.el) return;
+      var current = s.el.value;
+      var html = '<option value="">' + esc(s.placeholder) + '</option>';
+      projects.forEach(function(p) {
+        html += '<option value="' + esc(p.id) + '">' + esc(p.title || p.id) + '</option>';
+      });
+      s.el.innerHTML = html;
+      if (current && projects.some(function(p) { return p.id === current; })) s.el.value = current;
+    });
+  }).catch(function() { /* selects stay at their placeholder options */ });
+
+  loadCraftStructures();
+  loadCraftSeries();
+}
+
+function craftSetRunning(btn, running, idleLabel, runningLabel) {
+  btn.disabled = running;
+  btn.textContent = running ? runningLabel : idleLabel;
+}
+
+// ── Story Structures ──
+function loadCraftStructures() {
+  var listEl = document.getElementById('craftStructuresList');
+  var selEl = document.getElementById('craftOutlineStructure');
+  api('GET', '/api/structures').then(function(data) {
+    var structures = data.structures || [];
+    if (!structures.length) {
+      listEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">No structures available.</div>';
+    } else {
+      var html = '';
+      structures.forEach(function(s) {
+        html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+          '<span style="font-weight:600;">' + esc(s.name) + '</span>' +
+          '<span class="badge badge-type">' + (s.beats || []).length + ' beats</span></div>' +
+          '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">' + esc(s.oneLiner) + '</div>' +
+          '<div style="font-size:12px;">Best for: ' + (s.recommendedFor || []).map(esc).join(', ') + '</div>' +
+          '</div>';
+      });
+      listEl.innerHTML = html;
+    }
+
+    var current = selEl.value;
+    var selHtml = '<option value="">Select a structure...</option>';
+    structures.forEach(function(s) {
+      selHtml += '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>';
+    });
+    selEl.innerHTML = selHtml;
+    if (current && structures.some(function(s) { return s.id === current; })) selEl.value = current;
+  }).catch(function(e) {
+    listEl.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;">Could not load structures: ' + esc(e.message) + '</div>';
+  });
+}
+
+document.getElementById('craftCheckOutlineBtn').addEventListener('click', function() {
+  var btn = this;
+  var outlineRaw = document.getElementById('craftOutlineText').value.trim();
+  var structureId = document.getElementById('craftOutlineStructure').value;
+  var el = document.getElementById('craftStructuresResults');
+  var outline = outlineRaw.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+  if (!outline.length) { showToast('Paste an outline first (one chapter summary per line)', 'error'); return; }
+  if (!structureId) { showToast('Select a structure first', 'error'); return; }
+  craftSetRunning(btn, true, 'Check Outline', 'Checking...');
+  el.innerHTML = '<div style="color:var(--muted);">Checking outline against structure beats...</div>';
+  api('POST', '/api/structures/check-outline', { outline: outline, structureId: structureId }).then(function(report) {
+    renderCraftOutlineCheck(report);
+  }).catch(function(e) {
+    showToast('Outline check failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Check failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Check Outline', 'Checking...');
+  });
+});
+
+function renderCraftOutlineCheck(report) {
+  var el = document.getElementById('craftStructuresResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:12px;">' + esc(report.structureName) + ' &mdash; ' +
+    report.beatsFoundInRange + '/' + report.totalBeats + ' beats found in range' +
+    (report.mustHaveMissing ? ', <span style="color:var(--danger);">' + report.mustHaveMissing + ' must-have missing</span>' : '') + '</div>';
+  html += '<div style="margin-bottom:12px;">' + esc(report.summary) + '</div>';
+
+  (report.results || []).forEach(function(r) {
+    var badgeClass = r.status === 'found_in_range' ? 'badge-muted' : (r.status === 'found_misplaced' ? 'badge-warn' : 'badge-danger');
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(r.beat.name) + (r.beat.mustHave ? ' <span class="badge badge-type">must-have</span>' : '') + '</span>' +
+      '<span class="badge ' + badgeClass + '">' + esc(r.status.replace(/_/g, ' ')) + '</span></div>' +
+      '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">' + esc(r.beat.description) + '</div>' +
+      (r.foundAtPct !== null && r.foundAtPct !== undefined ? '<div style="font-size:12px;color:var(--muted);">Found at ' + r.foundAtPct + '% (expected ~' + r.beat.expectedPct + '%)</div>' : '') +
+      '<div style="font-size:12px;">' + esc(r.suggestion) + '</div>' +
+      '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+document.getElementById('craftRecommendBtn').addEventListener('click', function() {
+  var btn = this;
+  var genre = document.getElementById('craftRecommendGenre').value.trim();
+  var el = document.getElementById('craftStructuresResults');
+  if (!genre) { showToast('Enter a genre first', 'error'); return; }
+  craftSetRunning(btn, true, 'Recommend Structure', 'Recommending...');
+  el.innerHTML = '<div style="color:var(--muted);">Matching genre to structure...</div>';
+  api('POST', '/api/structures/recommend', { genre: genre }).then(function(rec) {
+    renderCraftRecommendation(rec);
+  }).catch(function(e) {
+    showToast('Recommendation failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Recommendation failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Recommend Structure', 'Recommending...');
+  });
+});
+
+function renderCraftRecommendation(rec) {
+  var el = document.getElementById('craftStructuresResults');
+  if (!rec) { el.innerHTML = ''; return; }
+
+  var html = '';
+  (rec.recommended || []).forEach(function(r, i) {
+    var pct = Math.round((r.fitScore || 0) * 100);
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;">' +
+      '<span style="font-weight:600;">#' + (i + 1) + ' &mdash; ' + esc(r.structureName) + '</span>' +
+      '<span style="color:var(--muted);">' + pct + '% fit</span></div>' +
+      '<div class="progress-bar" style="height:14px;margin-bottom:6px;"><div class="progress-fill" style="width:' + pct + '%;"></div></div>' +
+      '<div style="font-size:12px;">' + esc(r.rationale) + '</div>' +
+      '</div>';
+  });
+
+  if (rec.additionalNotes && rec.additionalNotes.length) {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">Additional notes</div>';
+    rec.additionalNotes.forEach(function(n) {
+      html += '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">' + esc(n) + '</div>';
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Plot Promises ──
+document.getElementById('craftPromisesProject').addEventListener('change', function() {
+  loadCraftPromisesList(this.value);
+});
+
+function craftPromiseStatusBadgeClass(status) {
+  if (status === 'paid_off' || status === 'intentionally_unpaid') return 'badge-muted';
+  if (status === 'partial_payoff') return 'badge-type';
+  if (status === 'dropped') return 'badge-danger';
+  return 'badge-warn';
+}
+
+function loadCraftPromisesList(projectId) {
+  var el = document.getElementById('craftPromisesList');
+  if (!projectId) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Select a project to view tracked promises.</div>'; return; }
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Loading promises...</div>';
+  api('GET', '/api/projects/' + encodeURIComponent(projectId) + '/plot-promises').then(function(data) {
+    renderCraftPromisesList(data);
+  }).catch(function(e) {
+    el.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;">Could not load promises: ' + esc(e.message) + '</div>';
+  });
+}
+
+function renderCraftPromisesList(data) {
+  var el = document.getElementById('craftPromisesList');
+  var promises = (data && data.promises) || [];
+  if (!promises.length) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">No promises tracked yet. Extract from the opening chapters below.</div>';
+    return;
+  }
+  var html = '';
+  promises.forEach(function(p) {
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(p.title) + '</span>' +
+      '<span class="badge ' + craftPromiseStatusBadgeClass(p.status) + '">' + esc((p.status || '').replace(/_/g, ' ')) + '</span></div>' +
+      '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;"><span class="badge badge-type">' + esc(p.category) + '</span> introduced ch. ' + p.introducedAtChapter + '</div>' +
+      '<div style="font-size:12px;">' + esc(p.description) + '</div>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+document.getElementById('craftPromisesExtractBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('craftPromisesProject').value;
+  var text = document.getElementById('craftPromisesText').value.trim();
+  var el = document.getElementById('craftPromisesResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  craftSetRunning(btn, true, 'Extract Promises', 'Extracting...');
+  el.innerHTML = '<div style="color:var(--muted);">Extracting implicit promises from the opening...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/plot-promises/extract', text ? { openingText: text } : {}).then(function(data) {
+    renderCraftPromisesList(data);
+    el.innerHTML = '<div class="hint">Extracted ' + ((data && data.promises) || []).length + ' promise(s). See the list above.</div>';
+  }).catch(function(e) {
+    showToast('Extraction failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Extraction failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Extract Promises', 'Extracting...');
+  });
+});
+
+document.getElementById('craftPromisesAuditBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('craftPromisesProject').value;
+  var el = document.getElementById('craftPromisesResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  craftSetRunning(btn, true, 'Audit Unresolved', 'Auditing...');
+  el.innerHTML = '<div style="color:var(--muted);">Auditing promise closure...</div>';
+  api('GET', '/api/projects/' + encodeURIComponent(projectId) + '/plot-promises/audit').then(function(report) {
+    renderCraftPromisesAudit(report);
+  }).catch(function(e) {
+    showToast('Audit failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Audit failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Audit Unresolved', 'Auditing...');
+  });
+});
+
+function renderCraftPromisesAudit(report) {
+  var el = document.getElementById('craftPromisesResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:8px;">' + report.paidOff + '/' + report.totalPromises + ' paid off &middot; ' +
+    report.partialPayoff + ' partial &middot; ' + report.open + ' open &middot; closure rate ' + Math.round((report.closureRate || 0) * 100) + '%</div>';
+  html += '<div style="margin-bottom:12px;">' + esc(report.summary) + '</div>';
+
+  if (!report.atRiskPromises || !report.atRiskPromises.length) {
+    html += '<div style="text-align:center;padding:16px;color:var(--success);"><strong>No at-risk promises.</strong></div>';
+  } else {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">At-risk promises (' + report.atRiskPromises.length + ')</div>';
+    report.atRiskPromises.forEach(function(p) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge ' + craftPromiseStatusBadgeClass(p.status) + '">' + esc((p.status || '').replace(/_/g, ' ')) + '</span> <span style="font-weight:600;">' + esc(p.title) + '</span></div>' +
+        '<div style="font-size:12px;">' + esc(p.description) + '</div>' +
+        '</div>';
+    });
+  }
+  el.innerHTML = html;
+}
+
+// ── Character Voices ──
+document.getElementById('craftVoicesProject').addEventListener('change', function() {
+  loadCraftVoicesList(this.value);
+});
+
+function loadCraftVoicesList(projectId) {
+  var el = document.getElementById('craftVoicesList');
+  if (!projectId) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Select a project to view character voice fingerprints.</div>'; return; }
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Loading voice fingerprints...</div>';
+  api('GET', '/api/projects/' + encodeURIComponent(projectId) + '/character-voices').then(function(data) {
+    renderCraftVoicesList(data);
+  }).catch(function(e) {
+    el.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;">Could not load character voices: ' + esc(e.message) + '</div>';
+  });
+}
+
+function renderCraftVoicesList(data) {
+  var el = document.getElementById('craftVoicesList');
+  var characters = (data && data.characters) || {};
+  var names = Object.keys(characters);
+  if (!names.length) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">No character voices ingested yet. Ingest a chapter below.</div>';
+    return;
+  }
+  var html = '';
+  names.forEach(function(name) {
+    var c = characters[name];
+    var hasFingerprint = !!c.fingerprint;
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(c.characterName || name) + '</span>' +
+      '<span class="badge ' + (hasFingerprint ? 'badge-muted' : 'badge-warn') + '" style="' + (hasFingerprint ? 'background:rgba(39,174,96,0.18);color:var(--success);border-color:rgba(39,174,96,0.35);' : '') + '">' + (hasFingerprint ? 'fingerprint ready' : 'not enough data') + '</span></div>' +
+      '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">' + (c.dialogueWordCount || 0) + ' word(s) of dialogue accumulated</div>' +
+      (hasFingerprint ? '<div style="font-style:italic;font-size:12px;">' + esc(c.fingerprint.signature || '') + '</div>' : '') +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+document.getElementById('craftVoicesIngestBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('craftVoicesProject').value;
+  var text = document.getElementById('craftVoicesText').value.trim();
+  var chapterNumber = parseInt(document.getElementById('craftVoicesChapterNum').value, 10) || 1;
+  var names = document.getElementById('craftVoicesNames').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var el = document.getElementById('craftVoicesResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  if (!names.length) { showToast('Enter at least one character name', 'error'); return; }
+  craftSetRunning(btn, true, 'Ingest Chapter', 'Ingesting...');
+  el.innerHTML = '<div style="color:var(--muted);">Extracting dialogue and updating fingerprints...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/character-voices/ingest', {
+    chapterNumber: chapterNumber, chapterText: text, characterNames: names,
+  }).then(function(result) {
+    el.innerHTML = '<div class="hint">Ingested ' + result.linesIngested + ' line(s) across ' + (result.charactersTouched || []).length + ' character(s): ' + (result.charactersTouched || []).map(esc).join(', ') + '</div>';
+    loadCraftVoicesList(projectId);
+  }).catch(function(e) {
+    showToast('Ingestion failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Ingestion failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Ingest Chapter', 'Ingesting...');
+  });
+});
+
+document.getElementById('craftVoicesDriftBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('craftVoicesProject').value;
+  var text = document.getElementById('craftVoicesText').value.trim();
+  var chapterNumber = parseInt(document.getElementById('craftVoicesChapterNum').value, 10) || 1;
+  var names = document.getElementById('craftVoicesNames').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var el = document.getElementById('craftVoicesResults');
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!text) { showToast('Paste some chapter text first', 'error'); return; }
+  if (!names.length) { showToast('Enter at least one character name', 'error'); return; }
+  craftSetRunning(btn, true, 'Detect Drift', 'Detecting...');
+  el.innerHTML = '<div style="color:var(--muted);">Comparing chapter dialogue against baseline fingerprints...</div>';
+  api('POST', '/api/projects/' + encodeURIComponent(projectId) + '/character-voices/detect-drift', {
+    chapterNumber: chapterNumber, chapterText: text, characterNames: names,
+  }).then(function(report) {
+    renderCraftDriftReport(report);
+  }).catch(function(e) {
+    showToast('Drift detection failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Drift detection failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    craftSetRunning(btn, false, 'Detect Drift', 'Detecting...');
+  });
+});
+
+function renderCraftDriftReport(report) {
+  var el = document.getElementById('craftVoicesResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:12px;">' + esc(report.summary) + '</div>';
+
+  (report.characters || []).forEach(function(c) {
+    html += '<div style="margin-bottom:10px;">' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">' + esc(c.name) + ' &mdash; drift score ' + c.driftScore + '/100 (' + c.flags.length + ' flag(s))</div>';
+    c.flags.forEach(function(f) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge badge-warn">' + esc(f.marker) + '</span></div>' +
+        '<div style="font-style:italic;margin-bottom:4px;">"' + esc(f.excerpt) + '"</div>' +
+        '<div style="color:var(--muted);font-size:12px;">' + esc(f.note) + '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── Series Bible ──
+function loadCraftSeries() {
+  var sel = document.getElementById('craftSeriesSelect');
+  api('GET', '/api/series').then(function(data) {
+    var series = data.series || [];
+    var current = sel.value;
+    var html = '<option value="">Select a series...</option>';
+    series.forEach(function(s) {
+      html += '<option value="' + esc(s.id) + '">' + esc(s.title) + '</option>';
+    });
+    sel.innerHTML = html;
+    if (!series.length) sel.innerHTML = '<option value="">No series created yet</option>';
+    if (current && series.some(function(s) { return s.id === current; })) sel.value = current;
+  }).catch(function() {
+    sel.innerHTML = '<option value="">Could not load series</option>';
+  });
+}
+
+document.getElementById('craftSeriesSelect').addEventListener('change', function() {
+  var seriesId = this.value;
+  var el = document.getElementById('craftSeriesResults');
+  if (!seriesId) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Select a series to view its bible.</div>'; return; }
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Loading series bible...</div>';
+  api('GET', '/api/series/' + encodeURIComponent(seriesId) + '/report').then(function(report) {
+    renderCraftSeriesReport(report);
+  }).catch(function(e) {
+    el.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;">Could not load series bible: ' + esc(e.message) + '</div>';
+  });
+});
+
+function renderCraftSeriesReport(report) {
+  var el = document.getElementById('craftSeriesResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var stats = report.stats || {};
+  var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--muted);">' +
+    '<span>' + (stats.totalBooks || 0) + ' book(s)</span>' +
+    '<span>&middot; ' + (stats.totalWords || 0).toLocaleString() + ' word(s)</span>' +
+    '<span>&middot; ' + (stats.totalChapters || 0) + ' chapter(s)</span>' +
+    '<span>&middot; ' + (stats.characterCount || 0) + ' character(s)</span>' +
+    '<span>&middot; ' + (stats.locationCount || 0) + ' location(s)</span>' +
+    '</div>';
+
+  if (report.contradictions && report.contradictions.length) {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Cross-book contradictions (' + report.contradictions.length + ')</div>';
+    report.contradictions.forEach(function(c) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span class="badge ' + (c.severity === 'error' ? 'badge-danger' : 'badge-warn') + '">' + esc(c.severity) + '</span> ' +
+        '<span class="badge badge-type">' + esc(c.category) + '</span>' +
+        (c.entity ? ' <span class="badge badge-persona">' + esc(c.entity) + '</span>' : '') + '</div>' +
+        '<div style="margin-bottom:4px;">' + esc(c.description) + '</div>' +
+        '<div style="font-size:12px;">' + esc(c.suggestion) + '</div>' +
+        '</div>';
+    });
+  } else {
+    html += '<div style="text-align:center;padding:16px;color:var(--success);margin-bottom:12px;"><strong>No cross-book contradictions found.</strong></div>';
+  }
+
+  if (report.entities && report.entities.length) {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Entities (' + report.entities.length + ')</div>';
+    report.entities.forEach(function(e) {
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div style="margin-bottom:4px;"><span style="font-weight:600;">' + esc(e.name) + '</span> ' +
+        '<span class="badge badge-type">' + esc(e.type) + '</span></div>' +
+        '<div style="color:var(--muted);font-size:12px;">Appears in ' + (e.appearances || []).length + ' book(s)</div>' +
+        '</div>';
+    });
+  }
+
   el.innerHTML = html;
 }
 
