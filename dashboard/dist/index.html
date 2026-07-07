@@ -256,6 +256,14 @@ body {
 }
 .stat-card .stat-value { font-size: 28px; font-weight: 700; color: var(--accent); }
 .stat-card .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.stat-card .stat-subtext { font-size: 11px; color: var(--muted); margin-top: 4px; }
+/* Writing Momentum — subtle celebratory state when there's an active streak. Classy, not confetti:
+   a soft accent-colored glow and border, no animation/motion. */
+.stat-card.momentum-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 16px -6px rgba(245,158,11,0.35);
+}
+.stat-card .stat-note { font-size: 11px; color: var(--success); margin-top: 4px; font-weight: 600; }
 
 /* ── Buttons ── */
 button, .btn {
@@ -726,6 +734,40 @@ textarea { resize: vertical; min-height: 60px; }
         </div>
         <div id="gettingStartedProgress" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;"></div>
         <div id="gettingStartedList"></div>
+      </div>
+
+      <!-- Writing Momentum — friendly streak + word-count delight strip, backed by GET /api/writing/stats.
+           Non-blocking: any failure or brand-new all-zero state degrades to an encouraging empty state,
+           never an error, never breaks Home. -->
+      <div class="card" id="writingMomentumCard" style="margin-bottom:20px;">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Writing Momentum</span>
+          <span id="momentumNote" style="font-size:12px;color:var(--success);font-weight:600;"></span>
+        </div>
+        <div class="stats-bar" id="momentumStatsBar" style="margin-bottom:0;">
+          <div class="stat-card" id="momentumStreakCard">
+            <div class="stat-value" id="momentumStreak">0</div>
+            <div class="stat-label" id="momentumStreakLabel">Day Streak</div>
+            <div class="stat-subtext" id="momentumLongest"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="momentumToday">0</div>
+            <div class="stat-label">Words Today</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="momentumWeek">0</div>
+            <div class="stat-label">Words This Week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="momentumTotal">0</div>
+            <div class="stat-label">Total Words</div>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:14px;margin-bottom:0;">
+          <input type="number" id="momentumLogInput" placeholder="Words written..." min="1" style="max-width:160px;">
+          <button class="small" id="btnMomentumLog" style="white-space:nowrap;">Log words</button>
+          <span class="hint" id="momentumLogHint" style="margin-top:0;">Record a quick writing session to keep your streak alive.</span>
+        </div>
       </div>
 
       <!-- Quick Stats Bar -->
@@ -1691,6 +1733,7 @@ function switchPanel(name) {
   } else if (name === 'home') {
     loadProjects();
     loadHomeStats();
+    loadWritingMomentum();
     loadHub();
     loadGettingStarted();
   } else if (name === 'hq') {
@@ -1762,6 +1805,7 @@ function startPolling() {
   loadPersonas();
   loadActivity();
   loadHomeStats();
+  loadWritingMomentum();
   loadGettingStarted();
   statusPollTimer = setInterval(loadStatus, 10000);
   projectPollTimer = setInterval(function() {
@@ -3961,6 +4005,82 @@ themeToggle.addEventListener('click', function() {
 // Set initial icon
 if (savedTheme === 'light') {
   document.getElementById('themeIcon').innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+}
+
+// ================================================================
+// WRITING MOMENTUM — GET /api/writing/stats, optional POST /api/writing/log-words
+// ================================================================
+// Non-blocking, home-only delight strip. Never surfaces an error to the user: a fetch
+// failure or a brand-new all-zero store both render the same encouraging empty state.
+function loadWritingMomentum() {
+  var card = document.getElementById('writingMomentumCard');
+  if (!card) return;
+  api('GET', '/api/writing/stats').then(function(data) {
+    data = data || {};
+    var wordsToday = data.wordsToday || 0;
+    var wordsWeek = data.wordsThisWeek || 0;
+    var wordsTotal = data.wordsTotal || 0;
+    var streak = data.currentStreakDays || 0;
+    var longest = data.longestStreakDays || 0;
+
+    document.getElementById('momentumToday').textContent = wordsToday.toLocaleString();
+    document.getElementById('momentumWeek').textContent = wordsWeek.toLocaleString();
+    document.getElementById('momentumTotal').textContent = wordsTotal.toLocaleString();
+
+    var streakEl = document.getElementById('momentumStreak');
+    var streakLabelEl = document.getElementById('momentumStreakLabel');
+    var streakCardEl = document.getElementById('momentumStreakCard');
+    var longestEl = document.getElementById('momentumLongest');
+    var noteEl = document.getElementById('momentumNote');
+
+    if (streak > 0) {
+      // Momentum: emphasize the streak with the accent glow rather than a cold number.
+      streakEl.textContent = String(streak);
+      streakLabelEl.textContent = '🔥 ' + streak + '-day streak';
+      streakCardEl.classList.add('momentum-active');
+    } else {
+      // Brand-new / broken streak: encourage, don't shame with a bare "0".
+      streakEl.textContent = '—';
+      streakLabelEl.textContent = 'Start your streak today';
+      streakCardEl.classList.remove('momentum-active');
+    }
+    longestEl.textContent = longest > 0 ? 'Longest: ' + longest + ' day' + (longest === 1 ? '' : 's') : '';
+
+    noteEl.textContent = wordsToday > 0 ? '✍️ writing today' : '';
+  }).catch(function() {
+    // Guarded degrade: never show an error on Home. Present the same encouraging
+    // empty state a fresh install would see.
+    document.getElementById('momentumToday').textContent = '0';
+    document.getElementById('momentumWeek').textContent = '0';
+    document.getElementById('momentumTotal').textContent = '0';
+    document.getElementById('momentumStreak').textContent = '—';
+    document.getElementById('momentumStreakLabel').textContent = 'Start your streak today';
+    document.getElementById('momentumStreakCard').classList.remove('momentum-active');
+    document.getElementById('momentumLongest').textContent = '';
+    document.getElementById('momentumNote').textContent = '';
+  });
+}
+
+var btnMomentumLog = document.getElementById('btnMomentumLog');
+if (btnMomentumLog) {
+  btnMomentumLog.addEventListener('click', function() {
+    var input = document.getElementById('momentumLogInput');
+    var count = parseInt(input.value, 10);
+    if (!count || count <= 0) return showToast('Enter a word count', 'error');
+    btnMomentumLog.disabled = true;
+    api('POST', '/api/writing/log-words', { count: count }).then(function() {
+      input.value = '';
+      showToast('Logged ' + count.toLocaleString() + ' words', 'success');
+      loadWritingMomentum();
+    }).catch(function(e) {
+      showToast('Failed: ' + e.message, 'error');
+    }).then(function() {
+      btnMomentumLog.disabled = false;
+    });
+  });
+  document.getElementById('momentumLogInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') btnMomentumLog.click();
+  });
 }
 
 // ================================================================
