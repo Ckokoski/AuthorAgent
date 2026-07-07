@@ -5,7 +5,7 @@
  */
 import { Request, Response } from 'express';
 import type { ApiContext } from '../context.js';
-import { validateKeyFormat } from '../context.js';
+import { validateKeyFormat, hasProviderKeyName, isVoiceProfileTemplate } from '../context.js';
 
 export function registerSystemRoutes(ctx: ApiContext): void {
   const { app, gateway, services, baseDir } = ctx;
@@ -533,6 +533,209 @@ export function registerSystemRoutes(ctx: ApiContext): void {
       }
     } catch (error) {
       res.status(500).json({ error: 'Failed to test token: ' + String(error) });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Phase 5 — Onboarding / First-Run Readiness (Author HQ)
+  // ═══════════════════════════════════════════════════════════
+  //
+  // Pure-read aggregate over existing services (vault, AI router, soul files,
+  // projects directory, telegram config) — no new state is introduced here.
+  // Every check is independently guarded so one failing signal (e.g. a
+  // missing workspace/soul directory on a very first boot) can't 500 the
+  // whole endpoint; it just reports that item as not-done.
+
+  app.get('/api/onboarding/status', async (_req: Request, res: Response) => {
+    const { readFile } = await import('fs/promises');
+    const { existsSync } = await import('fs');
+    const { readdir } = await import('fs/promises');
+    const { join } = await import('path');
+
+    type ChecklistItem = { id: string; label: string; done: boolean; hint: string };
+    const checklist: ChecklistItem[] = [];
+
+    // ── 1. At least one AI provider key present (vault key OR Ollama reachable) ──
+    let hasProvider = false;
+    try {
+      const active = services.aiRouter.getActiveProviders();
+      hasProvider = Array.isArray(active) && active.length > 0;
+    } catch {
+      // Fall back to a raw vault check below if the router isn't ready yet.
+    }
+    if (!hasProvider) {
+      try {
+        const keys: string[] = await services.vault.list();
+        hasProvider = hasProviderKeyName(keys);
+      } catch {
+        hasProvider = false;
+      }
+    }
+    checklist.push({
+      id: 'ai_provider',
+      label: 'Connect an AI provider',
+      done: hasProvider,
+      hint: hasProvider
+        ? 'At least one AI provider is active.'
+        : 'Add a free Gemini key, run Ollama locally, or add a paid key in Settings → API Keys.',
+    });
+
+    // ── 2. Voice profile analyzed (file exists AND isn't the shipped template) ──
+    let voiceAnalyzed = false;
+    try {
+      const voicePath = join(baseDir, 'workspace', 'soul', 'VOICE-PROFILE.md');
+      if (existsSync(voicePath)) {
+        const content = await readFile(voicePath, 'utf-8');
+        voiceAnalyzed = !isVoiceProfileTemplate(content);
+      }
+    } catch {
+      voiceAnalyzed = false;
+    }
+    checklist.push({
+      id: 'voice_profile',
+      label: 'Analyze your writing voice',
+      done: voiceAnalyzed,
+      hint: voiceAnalyzed
+        ? 'Voice profile is analyzed and active.'
+        : 'Send a 5,000+ word writing sample and say "Learn my style from this."',
+    });
+
+    // ── 3. Soul / identity present (SOUL.md exists and has content) ──
+    let soulPresent = false;
+    try {
+      const soulPath = join(baseDir, 'workspace', 'soul', 'SOUL.md');
+      if (existsSync(soulPath)) {
+        const content = await readFile(soulPath, 'utf-8');
+        soulPresent = content.trim().length > 0;
+      }
+    } catch {
+      soulPresent = false;
+    }
+    checklist.push({
+      id: 'soul',
+      label: 'Set up your agent identity',
+      done: soulPresent,
+      hint: soulPresent
+        ? 'SOUL.md is present.'
+        : 'AuthorClaw ships with a default SOUL.md — customize it in workspace/soul/SOUL.md if you want a different personality.',
+    });
+
+    // ── 4. At least one project created ──
+    let hasProject = false;
+    try {
+      const projectsDir = join(baseDir, 'workspace', 'projects');
+      if (existsSync(projectsDir)) {
+        const entries = await readdir(projectsDir, { withFileTypes: true });
+        hasProject = entries.some(e => e.isDirectory() && e.name !== '.template');
+      }
+    } catch {
+      hasProject = false;
+    }
+    checklist.push({
+      id: 'project',
+      label: 'Create your first project',
+      done: hasProject,
+      hint: hasProject
+        ? 'At least one project exists.'
+        : 'Start a novel, book bible, or blog post from the Projects panel.',
+    });
+
+    // ── 5. (Optional) Telegram connected ──
+    let telegramConnected = false;
+    try {
+      const enabled = services.config.get('bridges.telegram.enabled', false);
+      const hasToken = (await services.vault.list()).includes('telegram_bot_token');
+      telegramConnected = Boolean(enabled) && hasToken;
+    } catch {
+      telegramConnected = false;
+    }
+    checklist.push({
+      id: 'telegram',
+      label: 'Connect Telegram (optional)',
+      done: telegramConnected,
+      hint: telegramConnected
+        ? 'Telegram bridge is connected.'
+        : 'Optional — connect Telegram in Settings to write from your phone.',
+    });
+
+    // firstRun is driven by the CORE items only (provider + project). Voice
+    // profile, soul, and Telegram are valuable but not required to start
+    // using AuthorClaw, so they don't gate the "first run" banner.
+    const coreDone = hasProvider && hasProject;
+
+    res.json({
+      firstRun: !coreDone,
+      checklist,
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Phase 5 — Writing Stats (Author HQ)
+  // ═══════════════════════════════════════════════════════════
+  //
+  // Aggregates the persisted daily-word-tally store (wired into
+  // HeartbeatService — see services/writing-stats.ts and
+  // HeartbeatService.addWords()) with a live project count. Pure read; never
+  // throws — a missing/corrupt stats file just reports zeros.
+
+  app.get('/api/writing/stats', async (_req: Request, res: Response) => {
+    try {
+      const { existsSync } = await import('fs');
+      const { readdir } = await import('fs/promises');
+      const { join } = await import('path');
+
+      let activeProjects = 0;
+      try {
+        const projectsDir = join(baseDir, 'workspace', 'projects');
+        if (existsSync(projectsDir)) {
+          const entries = await readdir(projectsDir, { withFileTypes: true });
+          activeProjects = entries.filter(e => e.isDirectory() && e.name !== '.template').length;
+        }
+      } catch {
+        activeProjects = 0;
+      }
+
+      const store = services.heartbeat?.getWritingStats?.();
+      if (!store) {
+        // HeartbeatService was constructed without a workspace (shouldn't
+        // happen in production, but keep this endpoint 200-always).
+        return res.json({
+          wordsToday: 0, wordsThisWeek: 0, wordsTotal: 0,
+          currentStreakDays: 0, longestStreakDays: 0,
+          activeProjects, lastActiveIso: null,
+        });
+      }
+
+      const snapshot = await store.getSnapshot(activeProjects);
+      res.json(snapshot);
+    } catch (error) {
+      // Never throw — degrade to a safe zeroed shape.
+      res.json({
+        wordsToday: 0, wordsThisWeek: 0, wordsTotal: 0,
+        currentStreakDays: 0, longestStreakDays: 0,
+        activeProjects: 0, lastActiveIso: null,
+        error: 'Failed to load writing stats: ' + String((error as Error)?.message || error),
+      });
+    }
+  });
+
+  // Manual word-logging for the dashboard (e.g. "I wrote 500 words offline").
+  app.post('/api/writing/log-words', async (req: Request, res: Response) => {
+    const count = Number(req.body?.count);
+    if (!Number.isFinite(count) || count <= 0) {
+      return res.status(400).json({ error: 'count must be a positive number' });
+    }
+    if (count > 200000) {
+      return res.status(400).json({ error: 'count is implausibly large (max 200,000 per entry)' });
+    }
+    try {
+      // Reuse the exact same path project steps use, so manual entries show
+      // up in both the persisted stats store AND heartbeat's in-memory
+      // today/streak counters (Morning Briefing stays consistent).
+      services.heartbeat.addWords(Math.round(count));
+      res.json({ success: true, count: Math.round(count) });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to log words: ' + String((error as Error)?.message || error) });
     }
   });
 

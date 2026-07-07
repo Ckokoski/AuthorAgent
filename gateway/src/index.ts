@@ -892,7 +892,7 @@ class AuthorClawGateway {
     logger.warn('  ⚠ Wave 3 actions are gated — review SECURITY.md and confirm every external action.');
 
     // ── Phase 7: Heartbeat ──
-    this.heartbeat = new HeartbeatService(this.config.get('heartbeat'), this.memory);
+    this.heartbeat = new HeartbeatService(this.config.get('heartbeat'), this.memory, join(ROOT_DIR, 'workspace'));
 
     // Wire autonomous mode — heartbeat can now trigger project steps on a schedule
     const commandHandlers = this.buildTelegramCommandHandlers();

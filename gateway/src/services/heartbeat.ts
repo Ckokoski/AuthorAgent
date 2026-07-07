@@ -8,6 +8,7 @@
  */
 
 import { MemoryService } from './memory.js';
+import { WritingStatsStore } from './writing-stats.js';
 
 interface WritingSession {
   startTime: Date;
@@ -79,6 +80,12 @@ export interface AgentJournalEntry {
 export class HeartbeatService {
   private config: HeartbeatConfig;
   private memory: MemoryService;
+  // Additive, persisted daily-word-tally store for the Author HQ dashboard
+  // (today/week/total/streaks). Optional so existing tests that construct
+  // HeartbeatService with just (config, memory) keep working unchanged —
+  // when absent, addWords() simply skips persistence (in-memory counters
+  // below still work exactly as before).
+  private writingStats: WritingStatsStore | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private autonomousTimer: ReturnType<typeof setInterval> | null = null;
   private currentSession: WritingSession | null = null;
@@ -105,7 +112,7 @@ export class HeartbeatService {
   private reminderMilestones: Set<number> = new Set(); // word goal % milestones already sent today
   private lastReminderDate: string | null = null; // for resetting milestones on new day
 
-  constructor(config: Partial<HeartbeatConfig>, memory: MemoryService) {
+  constructor(config: Partial<HeartbeatConfig>, memory: MemoryService, workspaceDir?: string) {
     this.config = {
       intervalMinutes: config.intervalMinutes ?? 15,
       dailyWordGoal: config.dailyWordGoal ?? 1000,
@@ -117,6 +124,17 @@ export class HeartbeatService {
       maxAutonomousStepsPerWake: config.maxAutonomousStepsPerWake ?? 5,
     };
     this.memory = memory;
+    // Only wire up persisted stats when a workspace is provided (production).
+    // Tests that construct HeartbeatService with just (config, memory) get
+    // identical behavior to before this feature existed.
+    if (workspaceDir) {
+      this.writingStats = new WritingStatsStore(workspaceDir);
+    }
+  }
+
+  /** Exposes the persisted writing-stats store (if wired) for the /api/writing/* routes. Null when this HeartbeatService was constructed without a workspaceDir (e.g. in unit tests). */
+  getWritingStats(): WritingStatsStore | null {
+    return this.writingStats;
   }
 
   /**
@@ -700,6 +718,20 @@ export class HeartbeatService {
     if (count > 0) {
       this.todayWords += count;
       this.lastWritingDate = new Date().toISOString().split('T')[0];
+
+      // Additive: also persist to the daily-tally store powering Author HQ's
+      // stats (today/week/total/streaks survive restarts, unlike the
+      // in-memory counters above). Fire-and-forget — recordWords() never
+      // throws, but wrap in try/catch anyway so a future change to that
+      // contract still can't take down the step-completion write path that
+      // calls addWords().
+      if (this.writingStats) {
+        try {
+          void this.writingStats.recordWords(count);
+        } catch {
+          // Never let stats tracking break the writing path.
+        }
+      }
     }
   }
 

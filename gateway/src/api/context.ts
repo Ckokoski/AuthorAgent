@@ -98,6 +98,41 @@ export function validateKeyFormat(keyName: string, value: string): { ok: boolean
 }
 
 /**
+ * Vault key names that indicate an AI provider is configured. Shared between
+ * the onboarding checklist (system.ts) and anywhere else that needs to ask
+ * "does the user have at least one paid/free provider key saved?" without
+ * going through the AI router (e.g. before it has initialized).
+ */
+export const PROVIDER_KEY_NAMES = [
+  'gemini_api_key', 'deepseek_api_key', 'anthropic_api_key',
+  'openai_api_key', 'openrouter_api_key', 'together_api_key',
+] as const;
+
+/** True if any of the given vault key names is a known AI provider key. */
+export function hasProviderKeyName(keys: string[]): boolean {
+  return keys.some(k => (PROVIDER_KEY_NAMES as readonly string[]).includes(k));
+}
+
+/**
+ * The exact status line present in both the shipped VOICE-PROFILE.template.md
+ * and the un-analyzed live VOICE-PROFILE.md (which starts as a copy of the
+ * template). SoulService.updateVoiceProfile() overwrites the file with real
+ * markers once a manuscript has been analyzed, so this line's absence is a
+ * reliable "voice profile is live" signal — see workspace/soul/VOICE-PROFILE.template.md.
+ */
+const VOICE_PROFILE_TEMPLATE_MARKER = 'Status: Not Yet Analyzed';
+
+/**
+ * True if `content` is the un-analyzed template (or a close variant of it) —
+ * i.e. the voice profile has NOT been populated by real analysis yet.
+ * Empty/whitespace-only content also counts as "not yet analyzed".
+ */
+export function isVoiceProfileTemplate(content: string): boolean {
+  if (!content || !content.trim()) return true;
+  return content.includes(VOICE_PROFILE_TEMPLATE_MARKER);
+}
+
+/**
  * Shared multer instance for large (up to 50MB) manuscript-style uploads.
  * Used by both /api/projects/:id/upload (documents.ts) and
  * /api/track-changes/parse (kdp-track-changes.ts) — moved here verbatim so
