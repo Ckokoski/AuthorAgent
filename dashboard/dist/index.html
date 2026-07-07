@@ -717,6 +717,17 @@ textarea { resize: vertical; min-height: 60px; }
          ═══════════════════════════════ -->
     <div class="panel active" id="panel-home">
 
+      <!-- Getting Started — first-run onboarding checklist, backed by GET /api/onboarding/status.
+           Hidden by default; JS shows/populates it (and hides it silently if the endpoint fails). -->
+      <div class="card" id="gettingStartedCard" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.10) 0%,rgba(245,158,11,0.03) 100%);border-left:4px solid var(--accent);">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span id="gettingStartedHeading">Getting Started</span>
+          <button class="small secondary" id="btnDismissGettingStarted" style="font-size:11px;padding:4px 10px;">Dismiss</button>
+        </div>
+        <div id="gettingStartedProgress" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;"></div>
+        <div id="gettingStartedList"></div>
+      </div>
+
       <!-- Quick Stats Bar -->
       <div class="stats-bar">
         <div class="stat-card">
@@ -1661,6 +1672,7 @@ function switchPanel(name) {
     loadCraft();
   } else if (name === 'settings') {
     updateQuickStartBanner();
+    loadGettingStarted();
     loadKeys();
     loadAiModels();
     loadOllamaConfig();
@@ -1680,6 +1692,7 @@ function switchPanel(name) {
     loadProjects();
     loadHomeStats();
     loadHub();
+    loadGettingStarted();
   } else if (name === 'hq') {
     loadHQ();
   }
@@ -1749,6 +1762,7 @@ function startPolling() {
   loadPersonas();
   loadActivity();
   loadHomeStats();
+  loadGettingStarted();
   statusPollTimer = setInterval(loadStatus, 10000);
   projectPollTimer = setInterval(function() {
     if (currentPanel === 'home' || currentPanel === 'projects') {
@@ -3362,7 +3376,10 @@ if (btnSaveOllama) {
   });
 }
 
-// ── Quick-start banner — show only when zero providers are connected ──
+// ── Quick-start banner (Settings panel) — show only when zero providers are connected.
+// Superseded by the richer Getting Started card (see loadGettingStarted below), which
+// reads the same real /api/onboarding/status checklist used on Home. Kept as a thin
+// legacy shim so the existing #quickStartBanner element in Settings still behaves. ──
 function updateQuickStartBanner() {
   var banner = document.getElementById('quickStartBanner');
   if (!banner) return;
@@ -3371,6 +3388,111 @@ function updateQuickStartBanner() {
     banner.style.display = count === 0 ? 'block' : 'none';
   }).catch(function() { banner.style.display = 'none'; });
 }
+
+// ── Getting Started — first-run onboarding checklist (Home panel, top) ──
+// Backed by GET /api/onboarding/status -> { firstRun, checklist: [{id,label,done,hint}] }.
+// Non-blocking: any failure just hides the card, never breaks Home.
+var ONBOARDING_DISMISS_KEY = 'authorclaw_onboarding_dismissed';
+
+// Where the "Go" action for each checklist item should take the user.
+var ONBOARDING_ITEM_TARGETS = {
+  ai_provider: { panel: 'settings', label: 'Go' },
+  voice_profile: { panel: 'settings', label: 'Learn my style' },
+  soul: { panel: 'settings', label: 'Go' },
+  project: { panel: 'projects', label: 'Go' },
+  telegram: { panel: 'settings', label: 'Go' },
+};
+
+function isOnboardingDismissed() {
+  try {
+    return localStorage.getItem(ONBOARDING_DISMISS_KEY) === '1';
+  } catch (e) {
+    return false; // localStorage unavailable (e.g. privacy mode) — never nag-block on that
+  }
+}
+
+function setOnboardingDismissed() {
+  try {
+    localStorage.setItem(ONBOARDING_DISMISS_KEY, '1');
+  } catch (e) { /* ignore — best effort only */ }
+}
+
+function loadGettingStarted() {
+  var card = document.getElementById('gettingStartedCard');
+  if (!card) return;
+  api('GET', '/api/onboarding/status').then(function(data) {
+    var checklist = (data && data.checklist) || [];
+    var firstRun = Boolean(data && data.firstRun);
+    var doneCount = checklist.filter(function(item) { return item.done; }).length;
+    var total = checklist.length;
+    var allDone = total > 0 && doneCount === total;
+
+    // Dismiss always wins UNLESS core setup is still incomplete (firstRun true) —
+    // those users genuinely need the nudge regardless of a stale dismiss flag.
+    if (!firstRun && isOnboardingDismissed()) {
+      card.style.display = 'none';
+      return;
+    }
+
+    // All items done: collapse to a small "setup complete" state instead of the
+    // full checklist. Still visible so the user gets a moment of confirmation,
+    // but low-key — no Dismiss chase, it just won't show again next visit.
+    if (allDone) {
+      document.getElementById('gettingStartedHeading').textContent = 'Setup complete';
+      document.getElementById('gettingStartedProgress').textContent = '';
+      var doneBtn = document.getElementById('btnDismissGettingStarted');
+      if (doneBtn) doneBtn.style.display = 'none';
+      document.getElementById('gettingStartedList').innerHTML =
+        '<div style="color:var(--success);font-weight:600;">All set — AuthorClaw is ready to write with you.</div>';
+      card.style.display = 'block';
+      return;
+    }
+
+    var doneBtn2 = document.getElementById('btnDismissGettingStarted');
+    if (doneBtn2) doneBtn2.style.display = '';
+    document.getElementById('gettingStartedHeading').textContent = 'Getting Started';
+    document.getElementById('gettingStartedProgress').textContent = doneCount + ' of ' + total + ' complete';
+
+    var html = '';
+    checklist.forEach(function(item) {
+      var target = ONBOARDING_ITEM_TARGETS[item.id] || { panel: 'settings', label: 'Go' };
+      var mark = item.done
+        ? '<span style="color:var(--success);font-weight:700;font-size:15px;">✓</span>'
+        : '<span style="color:var(--muted);font-weight:700;font-size:15px;">○</span>';
+      html += '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;' +
+        (item.done ? 'opacity:0.65;' : '') +
+        (checklist.indexOf(item) < checklist.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">' +
+        '<div style="padding-top:1px;">' + mark + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:600;font-size:13px;' + (item.done ? 'text-decoration:line-through;' : '') + '">' + esc(item.label) + '</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + esc(item.hint || '') + '</div>' +
+        '</div>' +
+        (item.done ? '' :
+          '<button class="small btn-onboarding-go" data-panel="' + esc(target.panel) + '" style="font-size:11px;padding:4px 10px;white-space:nowrap;">' + esc(target.label) + '</button>') +
+        '</div>';
+    });
+    document.getElementById('gettingStartedList').innerHTML = html;
+
+    document.querySelectorAll('.btn-onboarding-go').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        switchPanel(btn.getAttribute('data-panel'));
+      });
+    });
+
+    card.style.display = 'block';
+  }).catch(function() {
+    // Endpoint failed/unavailable — hide silently, never break Home.
+    card.style.display = 'none';
+  });
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'btnDismissGettingStarted') {
+    setOnboardingDismissed();
+    var card = document.getElementById('gettingStartedCard');
+    if (card) card.style.display = 'none';
+  }
+});
 
 // ── Global Provider Preference ──
 function loadGlobalProvider() {
