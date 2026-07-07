@@ -655,6 +655,10 @@ textarea { resize: vertical; min-height: 60px; }
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
       <span class="nav-label">Quality Lab</span>
     </div>
+    <div class="nav-item" data-panel="publishing">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
+      <span class="nav-label">Publishing</span>
+    </div>
     <div class="nav-item" data-panel="settings">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
       <span class="nav-label">Settings</span>
@@ -1025,6 +1029,153 @@ textarea { resize: vertical; min-height: 60px; }
     </div>
 
     <!-- ═══════════════════════════════
+         PANEL: PUBLISHING
+         ═══════════════════════════════ -->
+    <div class="panel" id="panel-publishing">
+
+      <!-- Author Sites -->
+      <div class="card">
+        <div class="card-title">Author Sites</div>
+        <p class="hint" style="margin-bottom:10px;">Lists sites registered in the site registry (GET /api/sites) and probes which deploy tools are installed on this machine (GET /api/site-deploy/doctor). Rendering and deploying happen elsewhere in the app — this card is read-only.</p>
+        <div id="pubSitesList" style="margin-bottom:14px;"><div style="color:var(--muted);text-align:center;padding:16px;">Loading sites...</div></div>
+        <button id="pubSitesDoctorBtn">Check deploy tooling</button>
+        <div id="pubSitesDoctorResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Launch Timeline -->
+      <div class="card">
+        <div class="card-title">Launch Timeline</div>
+        <p class="hint" style="margin-bottom:10px;">Builds the 90-day launch plan (pre-order, ARC seeding, launch day, follow-ups) for a project + target release date. Display-only — every external action in the timeline is gated behind the confirmation flow elsewhere in the app; nothing here executes anything.</p>
+        <div class="form-group">
+          <label>Existing launch (optional)</label>
+          <select id="pubLaunchExisting"><option value="">None — create a new one below</option></select>
+        </div>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Project</label>
+            <select id="pubLaunchProject"><option value="">Select a project...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Author name</label>
+            <input type="text" id="pubLaunchAuthor" placeholder="e.g. Jane Doe">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Target release date</label>
+          <input type="text" id="pubLaunchDate" placeholder="YYYY-MM-DD" style="max-width:200px;">
+        </div>
+        <button id="pubLaunchBtn">Show timeline</button>
+        <div id="pubLaunchResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Translation Planner -->
+      <div class="card">
+        <div class="card-title">Translation Planner</div>
+        <p class="hint" style="margin-bottom:10px;">Estimates cost + market ROI for translating a manuscript into one or more foreign-rights languages (POST /api/translation/plan). Display-only — this never calls /propose or /execute, so no translation work is kicked off from this card.</p>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Project</label>
+            <select id="pubXlateProject"><option value="">Select a project...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Book title</label>
+            <input type="text" id="pubXlateTitle" placeholder="e.g. The Last Ember">
+          </div>
+        </div>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Estimated word count</label>
+            <input type="number" id="pubXlateWords" placeholder="e.g. 90000" min="1000">
+          </div>
+          <div class="form-group">
+            <label>Source language</label>
+            <input type="text" id="pubXlateSource" placeholder="en" value="en">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Target languages</label>
+          <div id="pubXlateLangs" style="display:flex;flex-wrap:wrap;gap:10px;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="de" class="pubXlateLangCb"> German</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="es" class="pubXlateLangCb"> Spanish</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="fr" class="pubXlateLangCb"> French</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="it" class="pubXlateLangCb"> Italian</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="pt" class="pubXlateLangCb"> Portuguese</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="nl" class="pubXlateLangCb"> Dutch</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="pl" class="pubXlateLangCb"> Polish</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="ja" class="pubXlateLangCb"> Japanese</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="ko" class="pubXlateLangCb"> Korean</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--text);"><input type="checkbox" value="zh" class="pubXlateLangCb"> Chinese</label>
+          </div>
+        </div>
+        <button id="pubXlateBtn">Build plan</button>
+        <div id="pubXlateResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- BookBub Deal Builder -->
+      <div class="card">
+        <div class="card-title">BookBub Deal Builder</div>
+        <p class="hint" style="margin-bottom:10px;">Assembles a BookBub Featured Deal submission draft (BookBub-style blurb, price point, rationale) from your Amazon listing details (POST /api/bookbub/draft). Produces a draft to review and paste into partners.bookbub.com manually — nothing is submitted from here.</p>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="pubBbTitle" placeholder="Book title">
+          </div>
+          <div class="form-group">
+            <label>Author name</label>
+            <input type="text" id="pubBbAuthor" placeholder="Author name">
+          </div>
+        </div>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>Genre</label>
+            <input type="text" id="pubBbGenre" placeholder="e.g. cozy fantasy">
+          </div>
+          <div class="form-group">
+            <label>Suggested deal price (USD)</label>
+            <select id="pubBbPrice">
+              <option value="0.99">$0.99</option>
+              <option value="1.99">$1.99</option>
+              <option value="2.99">$2.99</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Amazon blurb</label>
+          <textarea id="pubBbBlurb" rows="6" placeholder="Paste your current Amazon description..."></textarea>
+        </div>
+        <button id="pubBbBtn">Build draft</button>
+        <div id="pubBbResults" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- AMS Ads -->
+      <div class="card">
+        <div class="card-title">AMS Ads Optimizer</div>
+        <p class="hint" style="margin-bottom:10px;">Paste exported Amazon Advertising keyword performance data (one row per keyword) and get pause/bid recommendations (POST /api/ams/optimize). Never proposes a bid increase over 2x and never executes anything in AMS — recommendations only.</p>
+        <div class="form-group">
+          <label>Performance data (JSON array — keyword, matchType, impressions, clicks, spendUSD, salesUSD, acos, currentBidUSD)</label>
+          <textarea id="pubAmsPerf" rows="6" placeholder='[{"keyword":"cozy fantasy series","matchType":"broad","impressions":4200,"clicks":38,"spendUSD":22.5,"salesUSD":9.99,"acos":2.25,"currentBidUSD":0.45}]'></textarea>
+        </div>
+        <div class="form-group-inline">
+          <div class="form-group">
+            <label>ACoS target (%)</label>
+            <input type="number" id="pubAmsAcosTarget" value="30" min="1" max="100">
+          </div>
+          <div class="form-group">
+            <label>Daily budget ceiling (USD)</label>
+            <input type="number" id="pubAmsBudgetCeiling" value="20" min="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Current daily spend (USD)</label>
+          <input type="number" id="pubAmsCurrentSpend" value="15" min="0" style="max-width:200px;">
+        </div>
+        <button id="pubAmsBtn">Analyze</button>
+        <div id="pubAmsResults" style="margin-top:16px;"></div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════
          PANEL: SETTINGS
          ═══════════════════════════════ -->
     <div class="panel" id="panel-settings">
@@ -1375,7 +1526,7 @@ function initials(name) {
 // ================================================================
 // NAVIGATION
 // ================================================================
-var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', settings: 'Settings' };
+var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', settings: 'Settings' };
 var navItems = document.querySelectorAll('.nav-item');
 
 function switchPanel(name) {
@@ -1397,6 +1548,8 @@ function switchPanel(name) {
     loadDocuments();
   } else if (name === 'quality') {
     loadQualityLab();
+  } else if (name === 'publishing') {
+    loadPublishing();
   } else if (name === 'settings') {
     updateQuickStartBanner();
     loadKeys();
@@ -4376,6 +4529,413 @@ function renderLearnOutcome(outcome) {
   }
 
   html += '<div class="hint" style="margin-top:10px;">Learned lessons feed forward into future writing via the project\'s lesson store.</div>';
+  el.innerHTML = html;
+}
+
+// ================================================================
+// PUBLISHING PANEL
+// ================================================================
+// Surfaces marketing/publishing REST endpoints that already exist in the
+// gateway but had no dashboard UI: the site registry + deploy doctor, the
+// launch orchestrator's timeline, the translation planner, the BookBub
+// deal-draft builder, and the AMS ads optimizer. Every card here is either
+// pure display (GET) or a planning/analysis POST — nothing on this panel
+// deploys a site, executes a translation, submits to BookBub, or changes
+// a live AMS bid. Those irreversible actions all route through the
+// confirmation-gate flow elsewhere in the app.
+
+function loadPublishing() {
+  api('GET', '/api/projects/list').then(function(data) {
+    var projects = data.projects || [];
+    var sels = [
+      { el: document.getElementById('pubLaunchProject'), placeholder: 'Select a project...' },
+      { el: document.getElementById('pubXlateProject'), placeholder: 'Select a project...' },
+    ];
+    sels.forEach(function(s) {
+      if (!s.el) return;
+      var current = s.el.value;
+      var html = '<option value="">' + esc(s.placeholder) + '</option>';
+      projects.forEach(function(p) {
+        html += '<option value="' + esc(p.id) + '">' + esc(p.title || p.id) + '</option>';
+      });
+      s.el.innerHTML = html;
+      if (current && projects.some(function(p) { return p.id === current; })) s.el.value = current;
+    });
+  }).catch(function() { /* selects stay at their placeholder options */ });
+
+  loadPublishingSites();
+  loadPublishingLaunches();
+}
+
+function pubSetRunning(btn, running, idleLabel, runningLabel) {
+  btn.disabled = running;
+  btn.textContent = running ? runningLabel : idleLabel;
+}
+
+// ── Author Sites ──
+function loadPublishingSites() {
+  var el = document.getElementById('pubSitesList');
+  api('GET', '/api/sites').then(function(data) {
+    var sites = data.sites || [];
+    if (!sites.length) {
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">No sites registered yet.</div>';
+      return;
+    }
+    var html = '';
+    sites.forEach(function(s) {
+      var target = (s.deploy && s.deploy.target) || 'none';
+      var lastDeployed = s.lastDeployedAt ? new Date(s.lastDeployedAt).toLocaleDateString() : 'never';
+      var lastRendered = s.lastRenderedAt ? new Date(s.lastRenderedAt).toLocaleDateString() : 'never';
+      html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+        '<span style="font-weight:600;">' + esc((s.config && s.config.siteName) || s.id) + '</span>' +
+        '<span class="badge badge-type">' + esc(target) + '</span></div>' +
+        '<div style="color:var(--muted);font-size:12px;">' + esc((s.config && s.config.baseUrl) || '') + '</div>' +
+        '<div style="color:var(--muted);font-size:12px;margin-top:4px;">' + (s.books || []).length + ' book(s) &middot; ' + (s.blogPosts || []).length + ' blog post(s) &middot; rendered ' + lastRendered + ' &middot; deployed ' + lastDeployed + '</div>' +
+        '</div>';
+    });
+    el.innerHTML = html;
+  }).catch(function(e) {
+    el.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;">Could not load sites: ' + esc(e.message) + '</div>';
+  });
+}
+
+document.getElementById('pubSitesDoctorBtn').addEventListener('click', function() {
+  var btn = this;
+  var el = document.getElementById('pubSitesDoctorResults');
+  pubSetRunning(btn, true, 'Check deploy tooling', 'Checking...');
+  el.innerHTML = '<div style="color:var(--muted);">Probing this machine for deploy CLIs...</div>';
+  api('GET', '/api/site-deploy/doctor').then(function(report) {
+    renderSitesDoctorReport(report);
+  }).catch(function(e) {
+    showToast('Deploy doctor failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Check failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    pubSetRunning(btn, false, 'Check deploy tooling', 'Checking...');
+  });
+});
+
+function renderSitesDoctorReport(report) {
+  var el = document.getElementById('pubSitesDoctorResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+  Object.keys(report.ready || {}).forEach(function(target) {
+    var ok = report.ready[target];
+    html += '<div style="padding:8px 10px;background:var(--bg);border-radius:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">' +
+      '<span>' + esc(target) + '</span>' +
+      '<span class="badge ' + (ok ? 'badge-muted' : 'badge-warn') + '" style="' + (ok ? 'background:rgba(39,174,96,0.18);color:var(--success);border-color:rgba(39,174,96,0.35);' : '') + '">' + (ok ? 'ready' : 'not found') + '</span>' +
+      '</div>';
+  });
+  html += '</div>';
+
+  if (report.installHints && report.installHints.length) {
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">Install hints</div>';
+    report.installHints.forEach(function(h) {
+      html += '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">' + esc(h) + '</div>';
+    });
+  }
+  el.innerHTML = html;
+}
+
+// ── Launch Timeline ──
+function loadPublishingLaunches() {
+  var sel = document.getElementById('pubLaunchExisting');
+  api('GET', '/api/launches').then(function(data) {
+    var launches = data.launches || [];
+    var current = sel.value;
+    var html = '<option value="">None — create a new one below</option>';
+    launches.forEach(function(l) {
+      html += '<option value="' + esc(l.id) + '">' + esc(l.bookTitle) + ' &mdash; ' + esc(l.currentPhase) + '</option>';
+    });
+    sel.innerHTML = html;
+    if (current && launches.some(function(l) { return l.id === current; })) sel.value = current;
+  }).catch(function() { /* select stays at placeholder */ });
+}
+
+document.getElementById('pubLaunchExisting').addEventListener('change', function() {
+  var id = this.value;
+  if (!id) return;
+  var el = document.getElementById('pubLaunchResults');
+  el.innerHTML = '<div style="color:var(--muted);">Loading launch plan...</div>';
+  api('GET', '/api/launches/' + encodeURIComponent(id)).then(function(data) {
+    renderLaunchPlan(data.plan, data.launch);
+  }).catch(function(e) {
+    showToast('Could not load launch: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Load failed: ' + esc(e.message) + '</div>';
+  });
+});
+
+document.getElementById('pubLaunchBtn').addEventListener('click', function() {
+  var btn = this;
+  var existingId = document.getElementById('pubLaunchExisting').value;
+  var el = document.getElementById('pubLaunchResults');
+
+  if (existingId) {
+    pubSetRunning(btn, true, 'Show timeline', 'Loading...');
+    el.innerHTML = '<div style="color:var(--muted);">Loading launch plan...</div>';
+    api('GET', '/api/launches/' + encodeURIComponent(existingId)).then(function(data) {
+      renderLaunchPlan(data.plan, data.launch);
+    }).catch(function(e) {
+      showToast('Could not load launch: ' + e.message, 'error');
+      el.innerHTML = '<div style="color:var(--danger);">Load failed: ' + esc(e.message) + '</div>';
+    }).then(function() {
+      pubSetRunning(btn, false, 'Show timeline', 'Loading...');
+    });
+    return;
+  }
+
+  var projectId = document.getElementById('pubLaunchProject').value;
+  var projectSelect = document.getElementById('pubLaunchProject');
+  var bookTitle = projectSelect.options[projectSelect.selectedIndex] ? projectSelect.options[projectSelect.selectedIndex].textContent : '';
+  var authorName = document.getElementById('pubLaunchAuthor').value.trim();
+  var releaseDate = document.getElementById('pubLaunchDate').value.trim();
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!authorName) { showToast('Enter an author name', 'error'); return; }
+  if (!releaseDate) { showToast('Enter a target release date (YYYY-MM-DD)', 'error'); return; }
+  if (isNaN(new Date(releaseDate).getTime())) { showToast('Release date is not a valid date', 'error'); return; }
+
+  pubSetRunning(btn, true, 'Show timeline', 'Building...');
+  el.innerHTML = '<div style="color:var(--muted);">Building the 90-day launch plan...</div>';
+  api('POST', '/api/launches', {
+    projectId: projectId,
+    bookTitle: bookTitle || projectId,
+    authorName: authorName,
+    targetReleaseDate: new Date(releaseDate).toISOString(),
+  }).then(function(data) {
+    return api('GET', '/api/launches/' + encodeURIComponent(data.launch.id));
+  }).then(function(data) {
+    renderLaunchPlan(data.plan, data.launch);
+    loadPublishingLaunches();
+  }).catch(function(e) {
+    showToast('Launch plan failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Build failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    pubSetRunning(btn, false, 'Show timeline', 'Building...');
+  });
+});
+
+function pubRiskBadgeClass(risk) {
+  if (risk === 'critical' || risk === 'high') return 'badge-danger';
+  if (risk === 'medium') return 'badge-warn';
+  return 'badge-muted';
+}
+
+function renderLaunchPlan(plan, launch) {
+  var el = document.getElementById('pubLaunchResults');
+  if (!plan) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:12px;">' +
+    '<strong>' + esc((launch && launch.bookTitle) || '') + '</strong>' +
+    ' &middot; current phase: <span class="badge badge-type">' + esc((launch && launch.currentPhase) || 'n/a') + '</span>' +
+    ' &middot; ' + plan.totalSteps + ' step(s)</div>';
+
+  if (plan.warnings && plan.warnings.length) {
+    html += '<div style="margin-bottom:12px;">' + plan.warnings.map(function(w) {
+      return '<div style="padding:8px 12px;background:rgba(245,158,11,0.12);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;margin-bottom:6px;">' + esc(w) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  (plan.timeline || []).forEach(function(step) {
+    var dayLabel = step.dayOffset === 0 ? 'Launch day' : (step.dayOffset < 0 ? (Math.abs(step.dayOffset) + ' day(s) before') : (step.dayOffset + ' day(s) after'));
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(dayLabel) + '</span>' +
+      '<span class="badge ' + pubRiskBadgeClass(step.riskLevel) + '">' + esc(step.riskLevel) + '</span></div>' +
+      '<div style="margin-bottom:4px;">' + esc(step.action) + '</div>' +
+      '<div style="color:var(--muted);font-size:12px;">' + esc(step.platform) + (step.requiresConfirmation ? ' &middot; requires confirmation before executing' : '') + '</div>' +
+      '</div>';
+  });
+
+  html += '<div class="hint" style="margin-top:10px;">This is a read-only preview of the plan. Every step marked "requires confirmation" is gated behind the confirmation flow — nothing here has been executed.</div>';
+  el.innerHTML = html;
+}
+
+// ── Translation Planner ──
+document.getElementById('pubXlateBtn').addEventListener('click', function() {
+  var btn = this;
+  var projectId = document.getElementById('pubXlateProject').value;
+  var projectSelect = document.getElementById('pubXlateProject');
+  var bookTitle = document.getElementById('pubXlateTitle').value.trim() ||
+    (projectSelect.options[projectSelect.selectedIndex] ? projectSelect.options[projectSelect.selectedIndex].textContent : '');
+  var wordsRaw = parseInt(document.getElementById('pubXlateWords').value, 10);
+  var sourceLang = document.getElementById('pubXlateSource').value.trim() || 'en';
+  var targetLangs = Array.prototype.slice.call(document.querySelectorAll('.pubXlateLangCb:checked')).map(function(cb) { return cb.value; });
+  var el = document.getElementById('pubXlateResults');
+
+  if (!projectId) { showToast('Select a project first', 'error'); return; }
+  if (!bookTitle) { showToast('Enter a book title', 'error'); return; }
+  if (isNaN(wordsRaw) || wordsRaw <= 0) { showToast('Enter a valid estimated word count', 'error'); return; }
+  if (!targetLangs.length) { showToast('Check at least one target language', 'error'); return; }
+
+  pubSetRunning(btn, true, 'Build plan', 'Building...');
+  el.innerHTML = '<div style="color:var(--muted);">Estimating cost + market ROI...</div>';
+  api('POST', '/api/translation/plan', {
+    projectId: projectId,
+    bookTitle: bookTitle,
+    sourceLang: sourceLang,
+    targetLangs: targetLangs,
+    estimatedWordCount: wordsRaw,
+  }).then(function(plan) {
+    renderTranslationPlan(plan);
+  }).catch(function(e) {
+    showToast('Translation plan failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Build failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    pubSetRunning(btn, false, 'Build plan', 'Building...');
+  });
+});
+
+function renderTranslationPlan(plan) {
+  var el = document.getElementById('pubXlateResults');
+  if (!plan) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:12px;">Recommended order: ' +
+    (plan.recommendedOrder || []).map(function(l) { return '<span class="badge badge-type" style="margin-right:4px;">' + esc(l) + '</span>'; }).join('') + '</div>';
+
+  (plan.roiRankings || []).forEach(function(r) {
+    var cost = plan.estimatedCostByLang && plan.estimatedCostByLang[r.lang];
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(r.lang.toUpperCase()) + ' &mdash; ' + esc(r.market) + '</span>' +
+      '<span style="color:var(--muted);">' + (cost ? '$' + cost.usd.toFixed(2) : 'n/a') + '</span></div>' +
+      '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">Reader multiplier: ' + r.estimatedReaderMultiplier + 'x &middot; Revenue multiplier: ' + r.estimatedRevenueMultiplier + 'x</div>' +
+      '<div style="font-size:12px;">' + esc(r.rationale) + '</div>' +
+      (cost ? '<div style="color:var(--muted);font-size:12px;margin-top:4px;">' + esc(cost.notes) + '</div>' : '') +
+      '</div>';
+  });
+
+  if (plan.disclaimerLines && plan.disclaimerLines.length) {
+    html += '<div style="margin-top:10px;">' + plan.disclaimerLines.map(function(d) {
+      return '<div class="hint" style="margin-bottom:4px;">' + esc(d) + '</div>';
+    }).join('') + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+// ── BookBub Deal Builder ──
+document.getElementById('pubBbBtn').addEventListener('click', function() {
+  var btn = this;
+  var title = document.getElementById('pubBbTitle').value.trim();
+  var authorName = document.getElementById('pubBbAuthor').value.trim();
+  var genre = document.getElementById('pubBbGenre').value.trim();
+  var suggestedPriceUSD = parseFloat(document.getElementById('pubBbPrice').value);
+  var amazonBlurb = document.getElementById('pubBbBlurb').value.trim();
+  var el = document.getElementById('pubBbResults');
+
+  if (!title || !authorName || !genre || !amazonBlurb) { showToast('Title, author, genre, and Amazon blurb are all required', 'error'); return; }
+
+  pubSetRunning(btn, true, 'Build draft', 'Building...');
+  el.innerHTML = '<div style="color:var(--muted);">Assembling the BookBub-style submission draft...</div>';
+  api('POST', '/api/bookbub/draft', {
+    title: title, authorName: authorName, genre: genre, amazonBlurb: amazonBlurb, suggestedPriceUSD: suggestedPriceUSD,
+  }).then(function(data) {
+    renderBookBubDraft(data.draft);
+  }).catch(function(e) {
+    showToast('BookBub draft failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Build failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    pubSetRunning(btn, false, 'Build draft', 'Building...');
+  });
+});
+
+function renderBookBubDraft(draft) {
+  var el = document.getElementById('pubBbResults');
+  if (!draft) { el.innerHTML = ''; return; }
+
+  var html = '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:10px;font-size:13px;">' +
+    '<div style="font-weight:700;margin-bottom:6px;">BookBub blurb &middot; $' + draft.suggestedDealPriceUSD.toFixed(2) + '</div>' +
+    '<div style="white-space:pre-wrap;">' + esc(draft.blurb) + '</div>' +
+    '</div>';
+
+  html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:10px;font-size:13px;">' +
+    '<div style="font-weight:700;margin-bottom:6px;">Why this time</div>' +
+    '<div>' + esc(draft.whyThisTime) + '</div>' +
+    '<div style="color:var(--muted);font-size:12px;margin-top:6px;">' + esc(draft.priorDealHistoryNote) + '</div>' +
+    '</div>';
+
+  if (draft.pitchingNeeded && draft.pitchingNeeded.length) {
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Still need review quotes from: ' + draft.pitchingNeeded.map(esc).join(', ') + '</div>';
+  }
+
+  if (draft.warnings && draft.warnings.length) {
+    html += draft.warnings.map(function(w) {
+      return '<div style="padding:8px 12px;background:rgba(245,158,11,0.12);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;margin-bottom:6px;">' + esc(w) + '</div>';
+    }).join('');
+  }
+
+  html += '<div class="hint" style="margin-top:6px;">This is a draft to review and paste into partners.bookbub.com yourself. AuthorClaw never fabricates review quotes and never submits on your behalf.</div>';
+  el.innerHTML = html;
+}
+
+// ── AMS Ads Optimizer ──
+document.getElementById('pubAmsBtn').addEventListener('click', function() {
+  var btn = this;
+  var el = document.getElementById('pubAmsResults');
+  var raw = document.getElementById('pubAmsPerf').value.trim();
+  var acosTargetPct = parseFloat(document.getElementById('pubAmsAcosTarget').value);
+  var dailyBudgetCeilingUSD = parseFloat(document.getElementById('pubAmsBudgetCeiling').value);
+  var currentDailySpendUSD = parseFloat(document.getElementById('pubAmsCurrentSpend').value);
+
+  if (!raw) { showToast('Paste performance data as a JSON array first', 'error'); return; }
+  var performance;
+  try {
+    performance = JSON.parse(raw);
+    if (!Array.isArray(performance)) throw new Error('Not an array');
+  } catch (parseErr) {
+    showToast('Performance data must be a valid JSON array', 'error');
+    return;
+  }
+  if (isNaN(acosTargetPct) || isNaN(dailyBudgetCeilingUSD) || isNaN(currentDailySpendUSD)) {
+    showToast('ACoS target, budget ceiling, and current spend must all be numbers', 'error');
+    return;
+  }
+
+  pubSetRunning(btn, true, 'Analyze', 'Analyzing...');
+  el.innerHTML = '<div style="color:var(--muted);">Analyzing keyword performance...</div>';
+  api('POST', '/api/ams/optimize', {
+    performance: performance, acosTargetPct: acosTargetPct, dailyBudgetCeilingUSD: dailyBudgetCeilingUSD, currentDailySpendUSD: currentDailySpendUSD,
+  }).then(function(report) {
+    renderAmsReport(report);
+  }).catch(function(e) {
+    showToast('AMS analysis failed: ' + e.message, 'error');
+    el.innerHTML = '<div style="color:var(--danger);">Analysis failed: ' + esc(e.message) + '</div>';
+  }).then(function() {
+    pubSetRunning(btn, false, 'Analyze', 'Analyzing...');
+  });
+});
+
+function pubAmsActionBadgeClass(action) {
+  if (action === 'pause' || action === 'add_negative' || action === 'decrease_bid') return 'badge-warn';
+  if (action === 'increase_bid' || action === 'promote_to_exact') return 'badge-muted';
+  return 'badge-type';
+}
+
+function renderAmsReport(report) {
+  var el = document.getElementById('pubAmsResults');
+  if (!report) { el.innerHTML = ''; return; }
+
+  var html = '<div style="font-size:13px;margin-bottom:12px;">Overall ACoS: <strong>' + report.overallACoS.toFixed(1) + '%</strong>' +
+    ' &middot; Spend: $' + report.totalSpendUSD.toFixed(2) + ' &middot; Sales: $' + report.totalSalesUSD.toFixed(2) +
+    ' &middot; Daily spend delta: ' + (report.wouldIncreaseDailySpendBy >= 0 ? '+' : '') + report.wouldIncreaseDailySpendBy.toFixed(2) + '</div>';
+
+  if (report.warnings && report.warnings.length) {
+    html += '<div style="margin-bottom:12px;">' + report.warnings.map(function(w) {
+      return '<div style="padding:8px 12px;background:rgba(245,158,11,0.12);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;margin-bottom:6px;">' + esc(w) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  (report.recommendations || []).forEach(function(r) {
+    html += '<div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + esc(r.keyword) + '</span>' +
+      '<span class="badge ' + pubAmsActionBadgeClass(r.action) + '">' + esc(r.action) + '</span></div>' +
+      '<div style="color:var(--muted);font-size:12px;margin-bottom:4px;">$' + r.currentBidUSD.toFixed(2) + ' &rarr; $' + r.proposedBidUSD.toFixed(2) + ' &middot; risk: ' + esc(r.riskLevel) + '</div>' +
+      '<div style="font-size:12px;">' + esc(r.rationale) + '</div>' +
+      '</div>';
+  });
+
+  html += '<div class="hint" style="margin-top:10px;">' + esc(report.dryRunSummary || 'Recommendations only — no bids have been changed in AMS.') + '</div>';
   el.innerHTML = html;
 }
 
