@@ -655,17 +655,9 @@ textarea { resize: vertical; min-height: 60px; }
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
       <span class="nav-label">Library</span>
     </div>
-    <div class="nav-item" data-panel="quality">
-      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-      <span class="nav-label">Quality Lab</span>
-    </div>
-    <div class="nav-item" data-panel="publishing">
-      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
-      <span class="nav-label">Publishing</span>
-    </div>
-    <div class="nav-item" data-panel="craft">
-      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
-      <span class="nav-label">Craft</span>
+    <div class="nav-item" data-panel="tools">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+      <span class="nav-label">Tools</span>
     </div>
     <div class="nav-item" data-panel="settings">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
@@ -942,9 +934,21 @@ textarea { resize: vertical; min-height: 60px; }
     </div>
 
     <!-- ═══════════════════════════════
-         PANEL: QUALITY LAB
+         PANEL: TOOLS (Wave 3 — Quality Lab + Craft + Publishing consolidated)
          ═══════════════════════════════ -->
-    <div class="panel" id="panel-quality">
+    <div class="panel" id="panel-tools">
+
+      <p class="hint" style="margin-bottom:14px;">One-off tools — these also run inside each book's workflow.</p>
+
+      <!-- Tools tab bar — reuses the .pd-tab pattern from Settings (Wave 2) -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <button class="pd-tab tools-tab active" data-tools-tab="quality" style="padding:10px 20px;background:none;border:none;color:var(--text);font-weight:700;cursor:pointer;border-bottom:2px solid var(--accent);margin-bottom:-2px;font-size:13px;">Revise &amp; Critique</button>
+        <button class="pd-tab tools-tab" data-tools-tab="craft" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Craft</button>
+        <button class="pd-tab tools-tab" data-tools-tab="publishing" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Publishing &amp; Marketing</button>
+      </div>
+
+      <!-- ============ TAB: Revise & Critique (default, former Quality Lab) ============ -->
+      <div class="tools-tab-content" id="toolsTabQuality">
 
       <!-- Revision Analysis -->
       <div class="card">
@@ -1053,12 +1057,11 @@ textarea { resize: vertical; min-height: 60px; }
         <div id="qlLearnResults" style="margin-top:16px;"></div>
       </div>
 
-    </div>
+      </div>
+      <!-- ============ /TAB: Revise & Critique ============ -->
 
-    <!-- ═══════════════════════════════
-         PANEL: PUBLISHING
-         ═══════════════════════════════ -->
-    <div class="panel" id="panel-publishing">
+      <!-- ============ TAB: Publishing & Marketing (former Publishing panel) ============ -->
+      <div class="tools-tab-content" id="toolsTabPublishing" style="display:none;">
 
       <!-- Author Sites -->
       <div class="card">
@@ -1200,12 +1203,11 @@ textarea { resize: vertical; min-height: 60px; }
         <div id="pubAmsResults" style="margin-top:16px;"></div>
       </div>
 
-    </div>
+      </div>
+      <!-- ============ /TAB: Publishing & Marketing ============ -->
 
-    <!-- ═══════════════════════════════
-         PANEL: CRAFT
-         ═══════════════════════════════ -->
-    <div class="panel" id="panel-craft">
+      <!-- ============ TAB: Craft (former Craft panel) ============ -->
+      <div class="tools-tab-content" id="toolsTabCraft" style="display:none;">
 
       <!-- Story Structures -->
       <div class="card">
@@ -1302,6 +1304,9 @@ textarea { resize: vertical; min-height: 60px; }
         </div>
         <div id="craftSeriesResults"><div style="color:var(--muted);text-align:center;padding:16px;">Select a series to view its bible.</div></div>
       </div>
+
+      </div>
+      <!-- ============ /TAB: Craft ============ -->
 
     </div>
 
@@ -1699,7 +1704,7 @@ function initials(name) {
 // ================================================================
 // NAVIGATION
 // ================================================================
-var panelTitles = { home: 'Home', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', craft: 'Craft', settings: 'Settings' };
+var panelTitles = { home: 'Home', projects: 'Projects', personas: 'Personas', library: 'Library', tools: 'Tools', settings: 'Settings' };
 var navItems = document.querySelectorAll('.nav-item');
 
 function switchPanel(name) {
@@ -1720,12 +1725,8 @@ function switchPanel(name) {
     loadPersonaBreakdown();
   } else if (name === 'library') {
     loadDocuments();
-  } else if (name === 'quality') {
-    loadQualityLab();
-  } else if (name === 'publishing') {
-    loadPublishing();
-  } else if (name === 'craft') {
-    loadCraft();
+  } else if (name === 'tools') {
+    resetToolsTabs();
   } else if (name === 'settings') {
     resetSettingsTabs();
   } else if (name === 'home') {
@@ -1816,6 +1817,51 @@ function resetSettingsTabs() {
 document.querySelectorAll('.settings-tab').forEach(function(tab) {
   tab.addEventListener('click', function() {
     activateSettingsTab(tab.getAttribute('data-settings-tab'));
+  });
+});
+
+// ================================================================
+// TOOLS TABS (lazy-loaded — Wave 3 consolidation of Quality Lab, Craft, Publishing)
+// ================================================================
+var toolsTabsLoaded = { quality: false, craft: false, publishing: false };
+
+var toolsTabLoaders = {
+  quality: loadQualityLab,
+  craft: loadCraft,
+  publishing: loadPublishing
+};
+
+function activateToolsTab(tabName) {
+  document.querySelectorAll('.tools-tab').forEach(function(t) {
+    var active = t.getAttribute('data-tools-tab') === tabName;
+    t.classList.toggle('active', active);
+    t.style.color = active ? 'var(--text)' : 'var(--muted)';
+    t.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+    t.style.fontWeight = active ? '700' : '600';
+  });
+  document.querySelectorAll('.tools-tab-content').forEach(function(c) { c.style.display = 'none'; });
+  var target = document.getElementById('toolsTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (target) target.style.display = 'block';
+
+  if (!toolsTabsLoaded[tabName]) {
+    toolsTabsLoaded[tabName] = true;
+    var loader = toolsTabLoaders[tabName];
+    if (loader) loader();
+  }
+}
+
+function resetToolsTabs() {
+  activateToolsTab('quality');
+}
+
+function openToolsTab(tabName) {
+  switchPanel('tools');
+  activateToolsTab(tabName);
+}
+
+document.querySelectorAll('.tools-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    activateToolsTab(tab.getAttribute('data-tools-tab'));
   });
 });
 
