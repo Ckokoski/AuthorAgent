@@ -2478,32 +2478,145 @@ function openProjectDetail(id) {
     personaName = typeof project.persona === 'string' ? project.persona : (project.persona.penName || project.persona.name || '');
   }
 
+  // ── Book-View helpers: phase/task classification ──
+  var steps = project.steps || [];
+  function stepPhase(s) {
+    var ph = (s.phase || '').toLowerCase();
+    var tt = (s.taskType || '').toLowerCase();
+    var sk = (s.skill || '').toLowerCase();
+    var lbl = (s.label || s.name || '').toLowerCase();
+    // Order matters: taskType/skill/label signals are checked before the
+    // coarse `phase` bucket, because self-review steps carry phase='writing'
+    // yet are revision work (taskType='revision').
+    if (tt === 'research' || tt === 'outline' || tt === 'book_bible' || tt === 'style_analysis' ||
+        sk === 'research' || sk === 'premise' || sk === 'book-bible' || sk === 'outline' || sk === 'style-clone' ||
+        ph === 'planning' || /outline|premise|research|bible|character profile|synopsis|world/.test(lbl)) return 'plan';
+    if (tt === 'marketing' || sk === 'blurb-writer' || sk === 'ad-copy' || sk === 'book-launch' || /launch|blurb|ad copy|keyword|amazon/.test(lbl)) return 'publish';
+    if (tt === 'final_edit' || sk === 'format' || ph === 'assembly' || ph === 'polish' || /format|compile|export|final edit|assemble|polish/.test(lbl)) return 'polish';
+    if (tt === 'revision' || tt === 'consistency' || sk === 'revise' || sk === 'beta-reader' || ph === 'revision' || ph === 'revision_apply' ||
+        /revis|self-review|beta|continuity|consisten|critique/.test(lbl)) return 'revise';
+    if (tt === 'creative_writing' || sk === 'write' || sk === 'dialogue' || ph === 'writing' || /write chapter|draft/.test(lbl)) return 'write';
+    return 'write';
+  }
+  function isWritingStep(s) { return stepPhase(s) === 'write'; }
+  function stepWords(s) {
+    var t = s.result || s.output || '';
+    if (!t) return 0;
+    return t.trim().split(/\s+/).filter(Boolean).length;
+  }
+  var taskEmoji = { research: '🔍', outline: '🗺', book_bible: '📘', style_analysis: '🎨',
+    creative_writing: '✍️', revision: '🧐', consistency: '🧐', final_edit: '📦', marketing: '📣', general: '⚙️' };
+  function stepEmoji(s) { return taskEmoji[(s.taskType || '').toLowerCase()] || '⚙️'; }
+
+  // Chapter accounting (completed writing steps)
+  var writingSteps = steps.filter(isWritingStep);
+  var completedWriting = writingSteps.filter(function(s) { return s.status === 'completed'; });
+  var totalWords = steps.reduce(function(a, s) { return a + stepWords(s); }, 0);
+  var targetChapters = (project.context && project.context.targetChapters) || 0;
+  var chaptersDrafted = completedWriting.length;
+  var chaptersTotal = targetChapters || writingSteps.length || chaptersDrafted;
+
+  // ── Journey-bar fill heuristics ──
+  var planSteps = steps.filter(function(s) { return stepPhase(s) === 'plan'; });
+  var planDone = planSteps.filter(function(s) { return s.status === 'completed'; }).length;
+  var planFill = planSteps.length ? Math.round(planDone / planSteps.length * 100) : (chaptersDrafted > 0 ? 100 : 15);
+  planFill = Math.max(15, planFill); // goal gradient: never 0 once project exists
+  var writeFill = writingSteps.length ? Math.round(completedWriting.length / writingSteps.length * 100) : 0;
+  var reviseSteps = steps.filter(function(s) { return stepPhase(s) === 'revise'; });
+  var reviseDone = reviseSteps.filter(function(s) { return s.status === 'completed'; }).length;
+  var reviseFill = reviseSteps.length === 0 ? 0 : (reviseDone === 0 ? 0 : (reviseDone >= reviseSteps.length ? 100 : 50));
+  var polishSteps = steps.filter(function(s) { return stepPhase(s) === 'polish'; });
+  var polishFill = polishSteps.length && polishSteps.every(function(s) { return s.status === 'completed'; }) ? 100 : 0;
+  var publishSteps = steps.filter(function(s) { return stepPhase(s) === 'publish'; });
+  var publishFill = publishSteps.length && publishSteps.some(function(s) { return s.status === 'completed'; }) ? 100 : 0;
+  var journeySegs = [
+    { key: 'plan', label: 'Plan', fill: planFill },
+    { key: 'write', label: 'Write', fill: writeFill },
+    { key: 'revise', label: 'Revise', fill: reviseFill },
+    { key: 'polish', label: 'Polish', fill: polishFill },
+    { key: 'publish', label: 'Publish', fill: publishFill },
+  ];
+  var journeyHtml = '<div style="display:flex;gap:6px;margin-bottom:14px;">' + journeySegs.map(function(sg) {
+    return '<div style="flex:1;text-align:center;">' +
+      '<div style="height:8px;border-radius:5px;background:var(--border);overflow:hidden;margin-bottom:5px;">' +
+        '<div style="height:100%;width:' + sg.fill + '%;background:linear-gradient(90deg,var(--accent),#27ae60);transition:width .4s;"></div>' +
+      '</div>' +
+      '<div style="font-size:11px;font-weight:600;color:' + (sg.fill > 0 ? 'var(--text)' : 'var(--muted)') + ';">' + sg.label + ' <span style="color:var(--muted);font-weight:400;">' + sg.fill + '%</span></div>' +
+    '</div>';
+  }).join('') + '</div>';
+
+  // Hero + next-step line
+  var firstPending = steps.find(function(s) { return s.status === 'pending' || s.status === 'active'; });
+  var nextLine = firstPending ? ('Next: ' + esc(firstPending.label || firstPending.name || 'Continue')) :
+    (project.status === 'completed' ? 'All steps complete — ready to polish & publish.' : 'Ready to begin.');
+  var heroLine = esc(project.title) + ' — ' +
+    (chaptersTotal ? 'Chapter ' + chaptersDrafted + ' of ' + chaptersTotal + ' drafted' : chaptersDrafted + ' chapters drafted') +
+    ' · ' + totalWords.toLocaleString() + ' words';
+
+  // ── Write-stage step rows (with per-chapter Check menu on completed writing steps) ──
   var stepsHtml = '';
   var hasFailed = false;
-  if (project.steps && project.steps.length > 0) {
-    project.steps.forEach(function(s, i) {
+  var activeStep = null;
+  if (steps.length > 0) {
+    steps.forEach(function(s, i) {
       if (s.status === 'failed') hasFailed = true;
-      // Per-step retry button: visible for failed/active/completed steps so users
-      // can re-run without restarting the whole project.
+      if (s.status === 'active') activeStep = s;
       var retryBtn = '';
       if (s.status === 'failed' || s.status === 'active' || s.status === 'completed') {
         retryBtn = '<button class="small pd-retry-step" data-step-id="' + esc(s.id) + '" data-step-label="' + esc(s.label || '') + '" ' +
           'style="font-size:10px;padding:3px 8px;margin-left:4px;" ' +
           'title="Reset this step to pending so it can be re-run">' + (s.status === 'failed' ? 'Retry' : 'Re-run') + '</button>';
       }
+      // Per-chapter zero-paste "Check" menu on completed writing steps
+      var checkMenu = '';
+      if (s.status === 'completed' && isWritingStep(s)) {
+        checkMenu = '<span style="display:inline-block;position:relative;margin-left:4px;">' +
+          '<button class="small pd-check-btn" data-step-id="' + esc(s.id) + '" style="font-size:10px;padding:3px 8px;" title="Run a zero-paste quality check on this chapter">Check ▾</button>' +
+          '<div class="pd-check-menu" data-step-id="' + esc(s.id) + '" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 0;min-width:170px;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.4);">' +
+            '<div class="pd-check-opt" data-tool="contradictions" style="padding:8px 14px;cursor:pointer;font-size:12px;">Contradictions</div>' +
+            '<div class="pd-check-opt" data-tool="critique" style="padding:8px 14px;cursor:pointer;font-size:12px;">Character Critique</div>' +
+            '<div class="pd-check-opt" data-tool="revision" style="padding:8px 14px;cursor:pointer;font-size:12px;">Revision Analysis</div>' +
+          '</div>' +
+        '</span>';
+      }
       stepsHtml +=
         '<div class="step-item" data-step-idx="' + i + '">' +
           '<span class="step-dot ' + esc(s.status) + '"></span>' +
           '<div style="flex:1;">' +
             '<div>' + esc(s.label || s.name || 'Step ' + (i+1)) + '</div>' +
-            '<div style="font-size:11px;color:var(--muted);">' + esc(s.status) + (s.error ? ' - ' + esc(s.error.slice(0, 120)) : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--muted);">' + esc(s.status) + (s.status === 'completed' && isWritingStep(s) ? ' · ' + stepWords(s).toLocaleString() + ' words' : '') + (s.error ? ' - ' + esc(s.error.slice(0, 120)) : '') + '</div>' +
           '</div>' +
           '<span class="badge badge-' + esc(s.status) + '" style="font-size:10px;">' + esc(s.status) + '</span>' +
+          checkMenu +
           retryBtn +
         '</div>' +
         '<div class="step-output" id="stepOutput' + i + '">' + esc(s.output || s.result || 'No output available.') + '</div>';
     });
   }
+
+  // ── Orchestra "conductor" strip (shown when auto-execute is running) ──
+  var orchestraHtml = '';
+  if (project.status === 'active') {
+    var cur = activeStep || firstPending;
+    var curLabel = cur ? esc(cur.label || cur.name || 'Working') : 'Preparing next step';
+    var curEmoji = cur ? stepEmoji(cur) : '⚙️';
+    orchestraHtml =
+      '<div id="pdOrchestra" style="margin-bottom:16px;padding:16px;border-radius:12px;background:linear-gradient(135deg,rgba(52,152,219,.12),rgba(39,174,96,.10));border:1px solid var(--accent);">' +
+        '<div style="display:flex;align-items:center;gap:14px;">' +
+          '<div class="pd-conductor-emoji" style="font-size:34px;">' + curEmoji + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-weight:700;font-size:15px;">' + curLabel + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:2px;">The conductor is orchestrating your book — leave this open or come back later.</div>' +
+          '</div>' +
+          '<div class="pd-pulse-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);"></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Chapter <select> options for Revise-stage runners
+  var chapterOptions = '<option value="">Select a chapter…</option>' + completedWriting.map(function(s) {
+    return '<option value="' + esc(s.id) + '">' + esc(s.label || s.id) + ' (' + stepWords(s).toLocaleString() + ' words)</option>';
+  }).join('');
 
   var actionsHtml = '';
   if (project.status === 'pending') {
@@ -2516,8 +2629,6 @@ function openProjectDetail(id) {
   if (project.status === 'paused') {
     actionsHtml += '<button class="success" id="pdResume">Resume</button> ';
   }
-  actionsHtml += '<button id="pdCompile">Compile Files</button> ';
-
   // Restart options — visible whenever the project has any non-pending state.
   // Two flavors:
   //   "Restart Failed Steps" — only resets failed/active steps, keeps completed work
@@ -2571,34 +2682,79 @@ function openProjectDetail(id) {
             '<span class="badge badge-status badge-' + esc(project.status) + '">' + esc(project.status) + '</span>' +
           '</div>' +
         '</div>' +
-        '<div class="progress-bar" style="margin-bottom:12px;"><div class="progress-fill" style="width:' + (project.progress || 0) + '%">' + (project.progress || 0) + '%</div></div>' +
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' + actionsHtml + '</div>' +
+        journeyHtml +
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:4px;">' + heroLine + '</div>' +
+        '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px;">' + nextLine + '</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:2px;">' + actionsHtml + '</div>' +
       '</div>' +
-      '<div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--border);">' +
-        '<button class="pd-tab active" data-tab="steps" style="padding:10px 20px;background:none;border:none;color:var(--text);font-weight:700;cursor:pointer;border-bottom:2px solid var(--accent);margin-bottom:-2px;font-size:13px;">Steps</button>' +
-        '<button class="pd-tab" data-tab="context" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Context</button>' +
-        '<button class="pd-tab" data-tab="continuity" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Continuity</button>' +
+      '<div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--border);flex-wrap:wrap;">' +
+        pdStageTab('plan', 'Plan', false) +
+        pdStageTab('write', 'Write', true) +
+        pdStageTab('revise', 'Revise', false) +
+        pdStageTab('polish', 'Polish', false) +
+        pdStageTab('publish', 'Publish', false) +
       '</div>' +
-      '<div class="card pd-tab-content" id="pdTabSteps">' +
-        '<div class="card-title">Steps</div>' +
-        '<div class="step-list">' + stepsHtml + '</div>' +
-      '</div>' +
-      '<div class="card pd-tab-content" id="pdTabContext" style="display:none;">' +
+      // ── PLAN ──
+      '<div class="card pd-tab-content" id="pdTabPlan" style="display:none;">' +
         '<div class="card-title">Story Context</div>' +
         '<div id="pdContextContent" style="color:var(--muted);font-size:13px;">Loading...</div>' +
+        '<div class="card-title" style="margin-top:20px;">Story Structure</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Check this book\'s outline against a known dramatic structure.</div>' +
+        '<button class="secondary" id="pdStructureRun" style="font-size:12px;padding:6px 14px;">Analyze Structure</button>' +
+        '<div id="pdStructureResults" style="margin-top:12px;"></div>' +
       '</div>' +
-      '<div class="card pd-tab-content" id="pdTabContinuity" style="display:none;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
-          '<div class="card-title" style="margin-bottom:0;">Continuity Report</div>' +
-          '<button class="success" id="pdRunContinuity" style="font-size:12px;padding:6px 14px;">Run Check</button>' +
+      // ── WRITE (default) ──
+      '<div class="card pd-tab-content" id="pdTabWrite">' +
+        orchestraHtml +
+        (project.status !== 'active' ? '<div id="pdPrimaryCTASlot" style="margin-bottom:16px;"></div>' : '') +
+        '<div class="card-title">Chapters &amp; Steps</div>' +
+        '<div class="step-list">' + stepsHtml + '</div>' +
+      '</div>' +
+      // ── REVISE ──
+      '<div class="card pd-tab-content" id="pdTabRevise" style="display:none;">' +
+        '<div class="card-title">Zero-Paste Quality Checks</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Pick a completed chapter — its text loads automatically, no pasting.</div>' +
+        '<select id="pdReviseChapter" style="width:100%;max-width:420px;margin-bottom:12px;">' + chapterOptions + '</select>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
+          '<button class="secondary pd-revise-run" data-tool="revision" style="font-size:12px;">Revision Analysis</button>' +
+          '<button class="secondary pd-revise-run" data-tool="contradictions" style="font-size:12px;">Contradictions</button>' +
+          '<button class="secondary pd-revise-run" data-tool="critique" style="font-size:12px;">Character Critique</button>' +
+          '<button class="secondary pd-revise-run" data-tool="voices" style="font-size:12px;">Character Voices</button>' +
+          '<button class="secondary pd-revise-run" data-tool="promises" style="font-size:12px;">Plot Promises</button>' +
+          '<button class="secondary pd-revise-run" data-tool="learn" style="font-size:12px;">Learn from Chapter</button>' +
         '</div>' +
-        '<div id="pdContinuityContent" style="color:var(--muted);font-size:13px;">No report yet. Click "Run Check" to scan for inconsistencies.</div>' +
+        '<div id="pdReviseResults" style="min-height:20px;"></div>' +
       '</div>' +
-      '<div class="card" id="pdFilePanel">' +
-        '<div class="card-title">Project Files</div>' +
+      // ── POLISH ──
+      '<div class="card pd-tab-content" id="pdTabPolish" style="display:none;">' +
+        '<div class="card-title">Compile &amp; Export</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' +
+          '<button id="pdCompile">Compile Files</button>' +
+        '</div>' +
+        '<div class="card-title" style="margin-top:8px;">Project Files</div>' +
         '<div id="pdFiles" style="color:var(--muted);">Loading files...</div>' +
+        '<div class="card-title" style="margin-top:20px;">Series Bible</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Generate a cross-book series bible from this project.</div>' +
+        '<button class="secondary" id="pdSeriesRun" style="font-size:12px;padding:6px 14px;">Build Series Bible</button>' +
+        '<div id="pdSeriesResults" style="margin-top:12px;"></div>' +
+      '</div>' +
+      // ── PUBLISH ──
+      '<div class="card pd-tab-content" id="pdTabPublish" style="display:none;">' +
+        '<div class="card-title">Launch &amp; Marketing</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
+          '<button class="secondary pd-pub-run" data-tool="launch" style="font-size:12px;">Launch Timeline</button>' +
+          '<button class="secondary pd-pub-run" data-tool="translation" style="font-size:12px;">Translation Plan</button>' +
+          '<button class="secondary pd-pub-run" data-tool="bookbub" style="font-size:12px;">BookBub Draft</button>' +
+          '<button class="secondary pd-pub-run" data-tool="ams" style="font-size:12px;">AMS Optimize</button>' +
+          '<button class="secondary pd-pub-run" data-tool="sites" style="font-size:12px;">Sites</button>' +
+        '</div>' +
+        '<div id="pdPublishResults" style="min-height:20px;color:var(--muted);font-size:13px;">Pick a tool above to plan your launch.</div>' +
       '</div>' +
     '</div>';
+
+  function pdStageTab(key, label, active) {
+    return '<button class="pd-tab' + (active ? ' active' : '') + '" data-tab="' + key + '" style="padding:10px 20px;background:none;border:none;color:' + (active ? 'var(--text)' : 'var(--muted)') + ';font-weight:' + (active ? '700' : '600') + ';cursor:pointer;border-bottom:2px solid ' + (active ? 'var(--accent)' : 'transparent') + ';margin-bottom:-2px;font-size:13px;">' + label + '</button>';
+  }
 
   // Wire back button
   detail.querySelector('#pdBack').addEventListener('click', showProjectList);
@@ -2709,72 +2865,180 @@ function openProjectDetail(id) {
     });
   });
 
-  // Wire tabs
+  // Wire compile (in Polish stage)
+  var pdCompile = detail.querySelector('#pdCompile');
+  if (pdCompile) pdCompile.addEventListener('click', function() { compileProject(id); });
+
+  // ── Stage tabs ──
+  var loaded = { plan: false, polish: false };
+  function activateStage(tabName) {
+    detail.querySelectorAll('.pd-tab').forEach(function(t) {
+      var on = t.getAttribute('data-tab') === tabName;
+      t.style.color = on ? 'var(--text)' : 'var(--muted)';
+      t.style.borderBottomColor = on ? 'var(--accent)' : 'transparent';
+      t.style.fontWeight = on ? '700' : '600';
+    });
+    detail.querySelectorAll('.pd-tab-content').forEach(function(c) { c.style.display = 'none'; });
+    var target = detail.querySelector('#pdTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+    if (target) target.style.display = 'block';
+    if (tabName === 'plan' && !loaded.plan) { loaded.plan = true; loadProjectContext(id); }
+    if (tabName === 'polish' && !loaded.polish) { loaded.polish = true; loadProjectFiles(id); }
+  }
   detail.querySelectorAll('.pd-tab').forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      detail.querySelectorAll('.pd-tab').forEach(function(t) {
-        t.style.color = 'var(--muted)';
-        t.style.borderBottomColor = 'transparent';
-        t.style.fontWeight = '600';
+    tab.addEventListener('click', function() { activateStage(tab.getAttribute('data-tab')); });
+  });
+  detail._activateStage = activateStage;
+
+  // ── Write-stage primary CTA (idle only) ──
+  var ctaSlot = detail.querySelector('#pdPrimaryCTASlot');
+  if (ctaSlot) {
+    var ctaLabel = project.status === 'pending' ? 'Start Writing →' :
+                   project.status === 'paused' ? 'Resume Writing →' :
+                   project.status === 'completed' ? null : 'Continue Writing →';
+    if (ctaLabel) {
+      ctaSlot.innerHTML = '<button class="success" id="pdPrimaryCTA" style="font-size:16px;padding:12px 28px;font-weight:700;">' + ctaLabel + '</button>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:6px;">' + esc(nextLine) + '</div>';
+      ctaSlot.querySelector('#pdPrimaryCTA').addEventListener('click', function() {
+        if (project.status === 'paused') projectAction('resume', id);
+        else projectAction('auto-execute', id);
       });
-      tab.style.color = 'var(--text)';
-      tab.style.borderBottomColor = 'var(--accent)';
-      tab.style.fontWeight = '700';
+    } else {
+      ctaSlot.innerHTML = '<div style="padding:12px;border-radius:8px;background:rgba(39,174,96,.1);color:var(--success);font-weight:600;">All steps complete. Head to Polish to compile &amp; export.</div>';
+    }
+  }
 
-      var tabName = tab.getAttribute('data-tab');
-      detail.querySelectorAll('.pd-tab-content').forEach(function(c) { c.style.display = 'none'; });
-      var target = detail.querySelector('#pdTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-      if (target) target.style.display = 'block';
+  // ── getChapterText helper: result → output file → null ──
+  function getChapterText(step) {
+    if (!step) return Promise.resolve(null);
+    if (step.result && step.result.trim()) return Promise.resolve(step.result);
+    if (step.output && step.output.trim()) return Promise.resolve(step.output);
+    return api('GET', '/api/projects/' + id + '/files').then(function(data) {
+      var files = (data.files || []).filter(function(f) { return f.name && f.name.endsWith('.md'); });
+      var match = files.find(function(f) { return f.name.indexOf(step.id + '-') === 0; });
+      if (!match) return null;
+      return fetch('/api/projects/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(match.name))
+        .then(function(r) { return r.ok ? r.text() : null; });
+    }).catch(function() { return null; });
+  }
+  function stepById(sid) { return steps.find(function(s) { return s.id === sid; }); }
 
-      // Lazy load data
-      if (tabName === 'context' && !detail._contextLoaded) {
-        detail._contextLoaded = true;
-        loadProjectContext(id);
+  // ── Revise-stage runner (shared by chapter-select buttons + per-chapter Check menu) ──
+  function runReviseTool(tool, stepId) {
+    var resEl = detail.querySelector('#pdReviseResults');
+    var sel = detail.querySelector('#pdReviseChapter');
+    var sid = stepId || (sel && sel.value);
+    if (!sid) { showToast('Pick a chapter first', 'error'); return; }
+    if (sel && stepId) sel.value = stepId;
+    resEl.innerHTML = '<div style="color:var(--muted);">Loading chapter text…</div>';
+    getChapterText(stepById(sid)).then(function(text) {
+      if (!text) {
+        resEl.innerHTML = '<div style="color:var(--danger);">Could not auto-load this chapter. <textarea id="pdRevisePaste" rows="6" style="width:100%;margin-top:8px;" placeholder="Paste chapter text as a fallback…"></textarea><button class="secondary" id="pdRevisePasteRun" style="margin-top:6px;font-size:12px;">Run with pasted text</button></div>';
+        var pr = resEl.querySelector('#pdRevisePasteRun');
+        if (pr) pr.addEventListener('click', function() { runReviseWithText(tool, detail.querySelector('#pdRevisePaste').value.trim(), resEl); });
+        return;
       }
-      if (tabName === 'continuity' && !detail._continuityLoaded) {
-        detail._continuityLoaded = true;
-        loadContinuityReport(id);
-      }
+      runReviseWithText(tool, text, resEl);
+    });
+  }
+  function runReviseWithText(tool, text, resEl) {
+    if (!text) { showToast('No chapter text', 'error'); return; }
+    resEl.innerHTML = '<div style="color:var(--muted);">Running ' + esc(tool) + '…</div>';
+    if (tool === 'revision') {
+      api('POST', '/api/revision/analyze', { chapterText: text, projectId: id }).then(function(r) { renderRevisionReport(r, resEl); })
+        .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    } else if (tool === 'contradictions') {
+      api('POST', '/api/projects/' + id + '/contradictions', { chapterText: text }).then(function(r) { renderContradictionReport(r, resEl); })
+        .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    } else if (tool === 'critique') {
+      api('POST', '/api/projects/' + id + '/character-critique', { chapterText: text }).then(function(r) { renderCritiqueReport(r, resEl); })
+        .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    } else if (tool === 'learn') {
+      api('POST', '/api/projects/' + id + '/learn', { chapterText: text }).then(function(r) {
+        resEl.innerHTML = '<div style="font-size:13px;">Learned ' + ((r.lessonsAdded || []).length) + ' lesson(s). ' + esc(r.summary || '') + '</div>';
+      }).catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    } else if (tool === 'voices') {
+      api('POST', '/api/projects/' + id + '/character-voices/detect-drift', { chapterText: text }).then(function(r) {
+        resEl.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+      }).catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    } else if (tool === 'promises') {
+      api('GET', '/api/projects/' + id + '/plot-promises/audit').then(function(r) {
+        resEl.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+      }).catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    }
+  }
+  detail.querySelectorAll('.pd-revise-run').forEach(function(btn) {
+    btn.addEventListener('click', function() { runReviseTool(btn.getAttribute('data-tool')); });
+  });
+
+  // ── Per-chapter "Check ▾" menu on Write-stage completed rows ──
+  detail.querySelectorAll('.pd-check-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var menu = btn.parentNode.querySelector('.pd-check-menu');
+      var open = menu.style.display !== 'none';
+      detail.querySelectorAll('.pd-check-menu').forEach(function(m) { m.style.display = 'none'; });
+      menu.style.display = open ? 'none' : 'block';
+    });
+  });
+  detail.querySelectorAll('.pd-check-opt').forEach(function(opt) {
+    opt.addEventListener('mouseenter', function() { opt.style.background = 'var(--hover)'; });
+    opt.addEventListener('mouseleave', function() { opt.style.background = 'none'; });
+    opt.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var menu = opt.closest('.pd-check-menu');
+      var stepId = menu.getAttribute('data-step-id');
+      var tool = opt.getAttribute('data-tool');
+      menu.style.display = 'none';
+      activateStage('revise');
+      runReviseTool(tool, stepId);
+      var rc = detail.querySelector('#pdTabRevise');
+      if (rc && rc.scrollIntoView) rc.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
 
-  // Wire continuity run button
-  var pdRunCont = detail.querySelector('#pdRunContinuity');
-  if (pdRunCont) {
-    pdRunCont.addEventListener('click', function() {
-      pdRunCont.disabled = true;
-      pdRunCont.textContent = 'Running...';
-      showToast('Continuity check started...', 'info');
-      api('POST', '/api/projects/' + id + '/continuity-check').then(function() {
-        // Poll for completion
-        var pollCount = 0;
-        var pollId = setInterval(function() {
-          pollCount++;
-          api('GET', '/api/projects/' + id + '/continuity-report').then(function(data) {
-            if (data.report) {
-              clearInterval(pollId);
-              pdRunCont.disabled = false;
-              pdRunCont.textContent = 'Run Check';
-              renderContinuityReport(data.report);
-              showToast('Continuity check complete! Found ' + data.report.totalIssues + ' issue(s).', 'success');
-            }
-          });
-          if (pollCount > 60) { // 5 minutes max
-            clearInterval(pollId);
-            pdRunCont.disabled = false;
-            pdRunCont.textContent = 'Run Check';
-            showToast('Continuity check timed out. Check again later.', 'error');
-          }
-        }, 5000);
-      }).catch(function(e) {
-        pdRunCont.disabled = false;
-        pdRunCont.textContent = 'Run Check';
-        showToast('Failed: ' + e.message, 'error');
-      });
+  // ── Plan-stage structure analyzer ──
+  var pdStructure = detail.querySelector('#pdStructureRun');
+  if (pdStructure) {
+    pdStructure.addEventListener('click', function() {
+      var el = detail.querySelector('#pdStructureResults');
+      el.innerHTML = '<div style="color:var(--muted);">Analyzing…</div>';
+      api('GET', '/api/structures/recommend?projectId=' + encodeURIComponent(id)).then(function(r) {
+        el.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+      }).catch(function(e) { el.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
     });
   }
 
-  // Load files
+  // ── Polish-stage series bible ──
+  var pdSeries = detail.querySelector('#pdSeriesRun');
+  if (pdSeries) {
+    pdSeries.addEventListener('click', function() {
+      var el = detail.querySelector('#pdSeriesResults');
+      el.innerHTML = '<div style="color:var(--muted);">Building…</div>';
+      api('POST', '/api/series/bible', { projectId: id }).then(function(r) {
+        el.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+      }).catch(function(e) { el.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    });
+  }
+
+  // ── Publish-stage runners ──
+  detail.querySelectorAll('.pd-pub-run').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var tool = btn.getAttribute('data-tool');
+      var el = detail.querySelector('#pdPublishResults');
+      el.innerHTML = '<div style="color:var(--muted);">Running ' + esc(tool) + '…</div>';
+      var call;
+      if (tool === 'launch') call = api('GET', '/api/launches?projectId=' + encodeURIComponent(id));
+      else if (tool === 'translation') call = api('POST', '/api/translation/plan', { projectId: id });
+      else if (tool === 'bookbub') call = api('POST', '/api/bookbub/draft', { projectId: id });
+      else if (tool === 'ams') call = api('POST', '/api/ams/optimize', { projectId: id });
+      else call = api('GET', '/api/sites');
+      call.then(function(r) {
+        el.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+      }).catch(function(e) { el.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
+    });
+  });
+
+  // Load files eagerly if project is completed (Polish likely visited)
   loadProjectFiles(id);
 }
 
@@ -2922,63 +3186,6 @@ function loadProjectContext(projectId) {
   }).catch(function(err) {
     el.innerHTML = '<span style="color:var(--danger);">Failed to load context: ' + esc(err.message) + '</span>';
   });
-}
-
-function loadContinuityReport(projectId) {
-  api('GET', '/api/projects/' + projectId + '/continuity-report').then(function(data) {
-    if (data.report) renderContinuityReport(data.report);
-  });
-}
-
-function renderContinuityReport(report) {
-  var el = document.getElementById('pdContinuityContent');
-  if (!el || !report) return;
-
-  if (report.totalIssues === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--success);"><div style="font-size:32px;margin-bottom:8px;">\u2705</div><strong>No issues found!</strong><br><span style="font-size:12px;color:var(--muted);">Your manuscript looks consistent.</span></div>';
-    return;
-  }
-
-  var html = '';
-  // Summary bar
-  var errors = report.issues.filter(function(i) { return i.severity === 'error'; }).length;
-  var warnings = report.issues.filter(function(i) { return i.severity === 'warning'; }).length;
-  var infos = report.issues.filter(function(i) { return i.severity === 'info'; }).length;
-
-  html += '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">';
-  if (errors) html += '<div style="padding:8px 14px;background:rgba(231,76,60,0.15);border-radius:6px;font-size:13px;font-weight:600;">\ud83d\udd34 ' + errors + ' Error' + (errors > 1 ? 's' : '') + '</div>';
-  if (warnings) html += '<div style="padding:8px 14px;background:rgba(241,196,15,0.15);border-radius:6px;font-size:13px;font-weight:600;">\ud83d\udfe1 ' + warnings + ' Warning' + (warnings > 1 ? 's' : '') + '</div>';
-  if (infos) html += '<div style="padding:8px 14px;background:rgba(52,152,219,0.15);border-radius:6px;font-size:13px;font-weight:600;">\u2139\ufe0f ' + infos + ' Info</div>';
-  html += '</div>';
-
-  // Issues grouped by category
-  var categories = {};
-  report.issues.forEach(function(issue) {
-    if (!categories[issue.category]) categories[issue.category] = [];
-    categories[issue.category].push(issue);
-  });
-
-  var catLabels = { character: '\ud83d\udc64 Character', timeline: '\ud83d\udd50 Timeline', setting: '\ud83d\udccd Setting', naming: '\ud83d\udcdd Naming', plot_thread: '\ud83e\uddf5 Plot Thread' };
-
-  Object.keys(categories).forEach(function(cat) {
-    html += '<div style="margin-bottom:16px;">' +
-      '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">' + (catLabels[cat] || esc(cat)) + ' (' + categories[cat].length + ')</div>';
-
-    categories[cat].forEach(function(issue) {
-      var severityColor = issue.severity === 'error' ? 'var(--danger)' : issue.severity === 'warning' ? '#f1c40f' : 'var(--muted)';
-      html += '<div style="padding:10px;background:var(--bg);border-left:3px solid ' + severityColor + ';border-radius:4px;margin-bottom:6px;font-size:12px;">' +
-        '<div style="font-weight:600;margin-bottom:4px;">' + esc(issue.description) + '</div>' +
-        (issue.chapters && issue.chapters.length ? '<div style="color:var(--muted);margin-bottom:4px;">Chapters: ' + issue.chapters.map(esc).join(', ') + '</div>' : '') +
-        (issue.evidence && issue.evidence.length ? '<div style="font-style:italic;color:var(--muted);margin-bottom:4px;">"' + issue.evidence.map(esc).join('" vs "') + '"</div>' : '') +
-        (issue.suggestion ? '<div style="color:var(--success);">\ud83d\udca1 ' + esc(issue.suggestion) + '</div>' : '') +
-      '</div>';
-    });
-    html += '</div>';
-  });
-
-  html += '<div style="font-size:11px;color:var(--muted);margin-top:12px;">Generated: ' + esc(report.generatedAt || '') + '</div>';
-
-  el.innerHTML = html;
 }
 
 // ================================================================
@@ -4646,8 +4853,8 @@ document.getElementById('qlRevisionBtn').addEventListener('click', function() {
   });
 });
 
-function renderRevisionReport(report) {
-  var el = document.getElementById('qlRevisionResults');
+function renderRevisionReport(report, targetEl) {
+  var el = targetEl || document.getElementById('qlRevisionResults');
   if (!report) { el.innerHTML = ''; return; }
 
   var html = '';
@@ -4708,8 +4915,8 @@ document.getElementById('qlContraBtn').addEventListener('click', function() {
   });
 });
 
-function renderContradictionReport(report) {
-  var el = document.getElementById('qlContraResults');
+function renderContradictionReport(report, targetEl) {
+  var el = targetEl || document.getElementById('qlContraResults');
   if (!report) { el.innerHTML = ''; return; }
 
   if (!report.total) {
@@ -4752,8 +4959,8 @@ document.getElementById('qlCritiqueBtn').addEventListener('click', function() {
   });
 });
 
-function renderCritiqueReport(report) {
-  var el = document.getElementById('qlCritiqueResults');
+function renderCritiqueReport(report, targetEl) {
+  var el = targetEl || document.getElementById('qlCritiqueResults');
   if (!report) { el.innerHTML = ''; return; }
 
   if (!report.totalFlags) {
@@ -4847,8 +5054,8 @@ document.getElementById('qlEvolveBtn').addEventListener('click', function() {
   });
 });
 
-function renderEvolveResult(result) {
-  var el = document.getElementById('qlEvolveResults');
+function renderEvolveResult(result, targetEl) {
+  var el = targetEl || document.getElementById('qlEvolveResults');
   if (!result) { el.innerHTML = ''; return; }
 
   var delta = (result.best.score || 0) - (result.original.score || 0);
