@@ -643,10 +643,6 @@ textarea { resize: vertical; min-height: 60px; }
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
       <span class="nav-label">Home</span>
     </div>
-    <div class="nav-item" data-panel="hq">
-      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-      <span class="nav-label">Author HQ</span>
-    </div>
     <div class="nav-item" data-panel="projects">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
       <span class="nav-label">Projects</span>
@@ -790,10 +786,13 @@ textarea { resize: vertical; min-height: 60px; }
         </div>
       </div>
 
-      <!-- Active Project Cards -->
+      <!-- Active Projects — rich per-project rows (steps done/total, running step) with Continue deep-link -->
       <div class="card">
-        <div class="card-title">Active Projects</div>
-        <div class="project-scroll" id="homeProjectScroll">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Active Projects</span>
+          <span id="homeActiveCount" style="font-size:12px;color:var(--muted);font-weight:normal;"></span>
+        </div>
+        <div id="homeProjectScroll">
           <div style="color:var(--muted);padding:20px;text-align:center;width:100%;">No active projects. Go to Projects to create one.</div>
         </div>
       </div>
@@ -848,7 +847,8 @@ textarea { resize: vertical; min-height: 60px; }
         </div>
       </div>
 
-      <!-- Manuscript Hub card — aggregate view of all projects -->
+      <!-- Manuscript Hub card — aggregate totals/goal/upcoming only; per-project rows live in the
+           "Active Projects" card above (avoids showing every project twice). -->
       <div class="card" style="margin-top:18px;">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
           <span>Manuscript Hub</span>
@@ -858,51 +858,13 @@ textarea { resize: vertical; min-height: 60px; }
           <div style="color:var(--muted);">Loading…</div>
         </div>
       </div>
-    </div>
 
-    <!-- ═══════════════════════════════
-         PANEL: AUTHOR HQ — single-page aggregate of everything in flight
-         ═══════════════════════════════ -->
-    <div class="panel" id="panel-hq">
-      <div class="card">
-        <div class="card-title">Today at a glance</div>
-        <div id="hqGlance" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
-          <div style="color:var(--muted);">Loading…</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Active projects</span>
-          <span id="hqActiveCount" style="font-size:12px;color:var(--muted);font-weight:normal;"></span>
-        </div>
-        <div id="hqActiveProjects">
-          <div style="color:var(--muted);">Loading…</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Per-persona breakdown</div>
-        <div id="hqPersonas">
-          <div style="color:var(--muted);">Loading…</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Recent activity</span>
-          <span style="font-size:11px;color:var(--muted);font-weight:normal;">last 12 events</span>
-        </div>
-        <div id="hqRecentActivity">
-          <div style="color:var(--muted);">Loading…</div>
-        </div>
-      </div>
-
-      <div class="card" id="hqUserModelCard" style="display:none;">
-        <div class="card-title">What AuthorClaw knows about you</div>
-        <p class="hint" style="margin-bottom:8px;font-size:12px;">From the user-model service. Builds up over time.</p>
-        <div id="hqUserModel" style="font-size:13px;line-height:1.6;"></div>
-      </div>
+      <!-- Your writing profile — collapsed by default; from the user-model service (moved from Author HQ). -->
+      <details class="card" id="homeUserModelCard" style="display:none;margin-top:18px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;">Your writing profile</summary>
+        <p class="hint" style="margin:8px 0;font-size:12px;">From the user-model service. Builds up over time.</p>
+        <div id="homeUserModel" style="font-size:13px;line-height:1.6;"></div>
+      </details>
     </div>
 
     <!-- ═══════════════════════════════
@@ -944,6 +906,14 @@ textarea { resize: vertical; min-height: 60px; }
         <div class="card-title">Author Personas</div>
         <div class="persona-grid" id="personaGrid">
           <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Persona Activity — per-pen-name project/word breakdown (moved from Author HQ) -->
+      <div class="card">
+        <div class="card-title">Persona Activity</div>
+        <div id="personaActivity">
+          <div style="color:var(--muted);">Loading…</div>
         </div>
       </div>
     </div>
@@ -1584,6 +1554,15 @@ textarea { resize: vertical; min-height: 60px; }
           <div style="color:var(--muted);">Loading...</div>
         </div>
       </div>
+
+      <!-- System Status — provider/memory stat boxes (moved from Author HQ; temporary home until
+           the Data & Memory tab lands in a later wave). -->
+      <div class="card">
+        <div class="card-title">System Status</div>
+        <div id="systemStatusBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+          <div style="color:var(--muted);">Loading…</div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /main-body -->
@@ -1686,7 +1665,7 @@ function initials(name) {
 // ================================================================
 // NAVIGATION
 // ================================================================
-var panelTitles = { home: 'Home', hq: 'Author HQ', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', craft: 'Craft', settings: 'Settings' };
+var panelTitles = { home: 'Home', projects: 'Projects', personas: 'Personas', library: 'Library', quality: 'Quality Lab', publishing: 'Publishing', craft: 'Craft', settings: 'Settings' };
 var navItems = document.querySelectorAll('.nav-item');
 
 function switchPanel(name) {
@@ -1704,6 +1683,7 @@ function switchPanel(name) {
     showProjectList();
   } else if (name === 'personas') {
     loadPersonas();
+    loadPersonaBreakdown();
   } else if (name === 'library') {
     loadDocuments();
   } else if (name === 'quality') {
@@ -1730,14 +1710,14 @@ function switchPanel(name) {
     loadLessons();
     loadPreferences();
     loadOrchestrator();
+    loadSystemStatus();
   } else if (name === 'home') {
     loadProjects();
     loadHomeStats();
     loadWritingMomentum();
     loadHub();
     loadGettingStarted();
-  } else if (name === 'hq') {
-    loadHQ();
+    loadUserModelCard();
   }
 }
 
@@ -1824,11 +1804,14 @@ function startPolling() {
 // ================================================================
 function renderHomeProjects() {
   var container = document.getElementById('homeProjectScroll');
+  var countEl = document.getElementById('homeActiveCount');
   var active = allProjects.filter(function(p) { return p.status === 'active' || p.status === 'paused'; });
+  if (countEl) countEl.textContent = active.length === 0 ? '' : (active.length === 1 ? '1 in flight' : active.length + ' in flight');
   if (active.length === 0) {
     container.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;width:100%;">No active projects. Go to Projects to create one.</div>';
     return;
   }
+  container.className = 'project-scroll';
   container.innerHTML = '';
   active.forEach(function(p) {
     var card = document.createElement('div');
@@ -1838,6 +1821,8 @@ function renderHomeProjects() {
       var act = p.steps.find(function(s) { return s.status === 'active'; });
       if (act) currentStep = act.label || act.name || '';
     }
+    var stepsTotal = (p.steps || []).length;
+    var stepsDone = (p.steps || []).filter(function(s) { return s.status === 'completed'; }).length;
     var personaText = p.persona ? p.persona.penName || p.persona : '';
     card.innerHTML =
       '<div class="psc-title">' + esc(p.title) + '</div>' +
@@ -1846,12 +1831,15 @@ function renderHomeProjects() {
         '<span class="badge badge-status badge-' + esc(p.status) + '">' + esc(p.status) + '</span>' +
       '</div>' +
       '<div class="progress-bar"><div class="progress-fill" style="width:' + (p.progress || 0) + '%">' + (p.progress || 0) + '%</div></div>' +
-      (currentStep ? '<div class="psc-step">Current: ' + esc(currentStep) + '</div>' : '') +
-      (personaText ? '<div class="psc-step" style="color:var(--info);">Persona: ' + esc(typeof personaText === 'string' ? personaText : '') + '</div>' : '');
-    card.addEventListener('click', function() {
+      (stepsTotal ? '<div class="psc-step" style="color:var(--muted);">' + stepsDone + '/' + stepsTotal + ' steps' + (currentStep ? ' · running: ' + esc(currentStep) : '') + '</div>' : (currentStep ? '<div class="psc-step">Current: ' + esc(currentStep) + '</div>' : '')) +
+      (personaText ? '<div class="psc-step" style="color:var(--info);">Persona: ' + esc(typeof personaText === 'string' ? personaText : '') + '</div>' : '') +
+      '<button class="small" style="margin-top:8px;width:100%;">Continue writing &rarr;</button>';
+    var goToDetail = function() {
       switchPanel('projects');
       setTimeout(function() { openProjectDetail(p.id); }, 100);
-    });
+    };
+    card.querySelector('button').addEventListener('click', function(ev) { ev.stopPropagation(); goToDetail(); });
+    card.addEventListener('click', goToDetail);
     container.appendChild(card);
   });
 }
@@ -4315,18 +4303,6 @@ function loadHub() {
     var goalBar = '<div style="background:var(--bg-secondary);border-radius:4px;height:8px;overflow:hidden;margin-top:4px;">' +
       '<div style="background:var(--success);height:100%;width:' + Math.min(100, goalPct) + '%;"></div></div>';
 
-    var projectRows = (data.projects || []).slice(0, 8).map(function(p) {
-      var statusColor = p.status === 'active' ? 'var(--success)' :
-                        p.status === 'completed' ? 'var(--muted)' :
-                        p.status === 'paused' ? 'var(--warning, orange)' :
-                        'var(--text-secondary)';
-      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-secondary);">' +
-        '<div style="flex:1;"><strong>' + (p.title || '').substring(0, 40) + '</strong>' +
-        '<span style="color:' + statusColor + ';font-size:11px;margin-left:8px;">' + p.status + '</span></div>' +
-        '<div style="color:var(--muted);font-size:11px;">' + p.totalWords.toLocaleString() + ' words · ' + p.progress + '%</div>' +
-        '</div>';
-    }).join('') || '<div style="color:var(--muted);padding:6px 0;">No projects yet.</div>';
-
     var upcoming = (data.upcoming || []).slice(0, 5).map(function(u) {
       return '<li>' + u.projectTitle + ' — <em>' + u.stepLabel + '</em></li>';
     }).join('') || '<li style="color:var(--muted);">Nothing queued.</li>';
@@ -4343,10 +4319,7 @@ function loadHub() {
         '<span>' + data.goal.todayWords.toLocaleString() + ' / ' + data.goal.daily.toLocaleString() + ' (' + goalPct + '%)</span></div>' +
         goalBar +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">' +
-        '<div><div style="font-weight:600;margin-bottom:6px;">Projects</div>' + projectRows + '</div>' +
-        '<div><div style="font-weight:600;margin-bottom:6px;">Up next</div><ul style="padding-left:18px;margin:0;font-size:12px;">' + upcoming + '</ul></div>' +
-      '</div>';
+      '<div><div style="font-weight:600;margin-bottom:6px;">Up next</div><ul style="padding-left:18px;margin:0;font-size:12px;">' + upcoming + '</ul></div>';
   }).catch(function() {
     el.innerHTML = '<div style="color:var(--muted);">Could not load hub</div>';
   });
@@ -4356,32 +4329,62 @@ var _btnRefreshHub = document.getElementById('btnRefreshHub');
 if (_btnRefreshHub) _btnRefreshHub.addEventListener('click', loadHub);
 
 // ================================================================
-// AUTHOR HQ — single-page aggregate of everything in flight
+// PERSONA ACTIVITY — per-pen-name project/word breakdown
+// (extracted from the former Author HQ panel; now lives in Personas)
 // ================================================================
-// Pulls existing endpoints (no backend changes) and renders 4 cards:
-// today-at-a-glance, active projects, per-persona breakdown, recent activity.
-// Plus optional "what AuthorClaw knows about you" from the user-model service.
-function loadHQ() {
+function loadPersonaBreakdown() {
+  var personaEl = document.getElementById('personaActivity');
+  if (!personaEl) return;
   Promise.all([
     api('GET', '/api/projects').catch(function() { return { projects: [] }; }),
     api('GET', '/api/personas').catch(function() { return { personas: [] }; }),
-    api('GET', '/api/activity?limit=12').catch(function() { return { events: [] }; }),
+  ]).then(function(results) {
+    var projects = results[0].projects || [];
+    var personas = results[1].personas || [];
+    if (personas.length === 0) {
+      personaEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No personas yet. Add one above for per-pen-name memory + voice.</div>';
+      return;
+    }
+    personaEl.innerHTML = personas.map(function(p) {
+      var pen = p.penName || p.name || p.id;
+      var theirProjects = projects.filter(function(pr) { return pr.personaId === p.id; });
+      var words = 0;
+      theirProjects.forEach(function(pr) {
+        (pr.steps || []).forEach(function(s) {
+          if (s.status === 'completed' && s.result) words += String(s.result).split(/\s+/).filter(Boolean).length;
+        });
+      });
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
+        '<div><strong>' + esc(pen) + '</strong>' +
+          (p.genre ? ' <span style="color:var(--muted);">· ' + esc(p.genre) + '</span>' : '') +
+        '</div>' +
+        '<div style="color:var(--muted);font-size:12px;">' + theirProjects.length + ' project' + (theirProjects.length === 1 ? '' : 's') + ' · ' + words.toLocaleString() + ' words</div>' +
+        '</div>';
+    }).join('');
+  }).catch(function() {
+    personaEl.innerHTML = '<div style="color:var(--danger);">Could not load persona activity.</div>';
+  });
+}
+
+// ================================================================
+// SYSTEM STATUS — provider/memory stat boxes
+// (extracted from the former Author HQ panel; temporary home in Settings
+// until the Data & Memory tab lands)
+// ================================================================
+function loadSystemStatus() {
+  var box = document.getElementById('systemStatusBoxes');
+  if (!box) return;
+  Promise.all([
+    api('GET', '/api/projects').catch(function() { return { projects: [] }; }),
+    api('GET', '/api/personas').catch(function() { return { personas: [] }; }),
     api('GET', '/api/status').catch(function() { return {}; }),
-    api('GET', '/api/user-model').catch(function() { return { snapshot: null }; }),
     api('GET', '/api/memory/stats').catch(function() { return {}; }),
   ]).then(function(results) {
-    var projData = results[0];
-    var personaData = results[1];
-    var activityData = results[2];
-    var statusData = results[3];
-    var userModelData = results[4];
-    var memStats = results[5];
+    var projects = results[0].projects || [];
+    var personas = results[1].personas || [];
+    var statusData = results[2];
+    var memStats = results[3];
 
-    var projects = projData.projects || [];
-    var personas = personaData.personas || [];
-    var events = activityData.events || activityData || [];
-
-    // ── At a glance (5 stats) ──
     var active = projects.filter(function(p) { return p.status === 'active'; });
     var completed = projects.filter(function(p) { return p.status === 'completed'; });
     var failed = projects.filter(function(p) { return p.status === 'failed' || p.steps?.some(function(s){return s.status==='failed';}); });
@@ -4395,124 +4398,48 @@ function loadHQ() {
     });
     var providers = (statusData.providers || []).map(function(p) { return p.id; });
 
-    var glance = document.getElementById('hqGlance');
-    if (glance) {
-      var statBox = function(label, value, sub) {
-        return '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;">' +
-          '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">' + esc(label) + '</div>' +
-          '<div style="font-size:22px;font-weight:700;margin-top:4px;">' + esc(String(value)) + '</div>' +
-          (sub ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + esc(sub) + '</div>' : '') +
-          '</div>';
-      };
-      glance.innerHTML =
-        statBox('Active projects', active.length, completed.length + ' done · ' + failed.length + ' have failures') +
-        statBox('Words on disk', totalWords.toLocaleString(), 'across ' + projects.length + ' project' + (projects.length === 1 ? '' : 's')) +
-        statBox('Personas', personas.length, personas.length > 0 ? personas.slice(0, 2).map(function(p){return p.penName||p.name;}).join(', ') + (personas.length > 2 ? ', …' : '') : 'none yet') +
-        statBox('AI providers', providers.length, providers.join(', ') || 'configure in Settings') +
-        statBox('Memory index', (memStats.totalEntries || 0).toLocaleString(), memStats.available ? 'searchable' : 'unavailable');
-    }
-
-    // ── Active projects ──
-    var activeEl = document.getElementById('hqActiveProjects');
-    var countEl = document.getElementById('hqActiveCount');
-    if (countEl) countEl.textContent = active.length === 1 ? '1 in flight' : active.length + ' in flight';
-    if (activeEl) {
-      if (active.length === 0) {
-        activeEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No active projects. Start one from the <a href="#" onclick="navItems[2].click();return false;">Projects</a> panel.</div>';
-      } else {
-        activeEl.innerHTML = active.slice(0, 8).map(function(p) {
-          var pct = p.progress || 0;
-          var stepsTotal = (p.steps || []).length;
-          var stepsDone = (p.steps || []).filter(function(s){return s.status==='completed';}).length;
-          var activeStep = (p.steps || []).find(function(s){return s.status==='active';});
-          return '<div style="padding:10px 12px;background:var(--bg-secondary);border-radius:8px;margin-bottom:8px;cursor:pointer;" ' +
-            'onclick="document.querySelector(\'[data-panel=projects]\').click(); setTimeout(function(){openProjectDetail(\'' + esc(p.id) + '\');}, 100);">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-              '<div style="font-weight:600;">' + esc(p.title) + '</div>' +
-              '<div style="font-size:11px;color:var(--muted);">' + esc(p.type || 'general') + '</div>' +
-            '</div>' +
-            '<div style="margin-top:6px;background:var(--card-hover);height:6px;border-radius:3px;overflow:hidden;">' +
-              '<div style="background:var(--success);height:100%;width:' + pct + '%;"></div>' +
-            '</div>' +
-            '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' +
-              stepsDone + '/' + stepsTotal + ' steps · ' + pct + '%' +
-              (activeStep ? ' · running: ' + esc(activeStep.label || '') : '') +
-            '</div>' +
-            '</div>';
-        }).join('');
-      }
-    }
-
-    // ── Per-persona breakdown ──
-    var personaEl = document.getElementById('hqPersonas');
-    if (personaEl) {
-      if (personas.length === 0) {
-        personaEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No personas yet. Add one in the Personas panel for per-pen-name memory + voice.</div>';
-      } else {
-        personaEl.innerHTML = personas.map(function(p) {
-          var pen = p.penName || p.name || p.id;
-          var theirProjects = projects.filter(function(pr) { return pr.personaId === p.id; });
-          var words = 0;
-          theirProjects.forEach(function(pr) {
-            (pr.steps || []).forEach(function(s) {
-              if (s.status === 'completed' && s.result) words += String(s.result).split(/\s+/).filter(Boolean).length;
-            });
-          });
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg-secondary);border-radius:6px;margin-bottom:6px;font-size:13px;">' +
-            '<div><strong>' + esc(pen) + '</strong>' +
-              (p.genre ? ' <span style="color:var(--muted);">· ' + esc(p.genre) + '</span>' : '') +
-            '</div>' +
-            '<div style="color:var(--muted);font-size:12px;">' + theirProjects.length + ' project' + (theirProjects.length === 1 ? '' : 's') + ' · ' + words.toLocaleString() + ' words</div>' +
-            '</div>';
-        }).join('');
-      }
-    }
-
-    // ── Recent activity ──
-    var activityEl = document.getElementById('hqRecentActivity');
-    if (activityEl) {
-      if (events.length === 0) {
-        activityEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No activity yet. Start writing!</div>';
-      } else {
-        activityEl.innerHTML = events.slice(0, 12).map(function(e) {
-          var when = e.timestamp ? new Date(e.timestamp) : null;
-          var ago = when ? humanAgo(when) : '';
-          var icon = e.type === 'step_completed' ? '✓' :
-                     e.type === 'step_failed' || e.type === 'error' ? '✗' :
-                     e.type === 'project_created' ? '+' :
-                     e.type === 'file_saved' ? '📄' :
-                     e.type === 'preference_detected' ? '💡' : '·';
-          return '<div style="display:flex;gap:10px;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border);">' +
-            '<div style="width:18px;color:var(--muted);">' + icon + '</div>' +
-            '<div style="flex:1;">' + esc(e.message || e.type || 'event') + '</div>' +
-            '<div style="color:var(--muted);font-size:11px;white-space:nowrap;">' + ago + '</div>' +
-            '</div>';
-        }).join('');
-      }
-    }
-
-    // ── User model narrative ──
-    var umCard = document.getElementById('hqUserModelCard');
-    var umEl = document.getElementById('hqUserModel');
-    if (umCard && umEl) {
-      var snap = userModelData.snapshot;
-      if (snap && snap.narrative && snap.narrative.text && !snap.narrative.text.startsWith('(narrative not yet')) {
-        umCard.style.display = '';
-        umEl.innerHTML = '<div>' + esc(snap.narrative.text).replace(/\n/g, '<br>') + '</div>' +
-          '<div style="margin-top:10px;font-size:11px;color:var(--muted);">' +
-            'Confidence: ' + Math.round((snap.narrative.confidence || 0) * 100) + '% · ' +
-            'observations: ' + (snap.observationCount || 0) +
-          '</div>';
-      } else {
-        umCard.style.display = 'none';
-      }
-    }
+    var statBox = function(label, value, sub) {
+      return '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">' + esc(label) + '</div>' +
+        '<div style="font-size:22px;font-weight:700;margin-top:4px;">' + esc(String(value)) + '</div>' +
+        (sub ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + esc(sub) + '</div>' : '') +
+        '</div>';
+    };
+    box.innerHTML =
+      statBox('Active projects', active.length, completed.length + ' done · ' + failed.length + ' have failures') +
+      statBox('Words on disk', totalWords.toLocaleString(), 'across ' + projects.length + ' project' + (projects.length === 1 ? '' : 's')) +
+      statBox('Personas', personas.length, personas.length > 0 ? personas.slice(0, 2).map(function(p){return p.penName||p.name;}).join(', ') + (personas.length > 2 ? ', …' : '') : 'none yet') +
+      statBox('AI providers', providers.length, providers.join(', ') || 'configure above') +
+      statBox('Memory index', (memStats.totalEntries || 0).toLocaleString(), memStats.available ? 'searchable' : 'unavailable');
   }).catch(function() {
-    document.getElementById('hqGlance').innerHTML = '<div style="color:var(--danger);">Could not load HQ data — check the server log.</div>';
+    box.innerHTML = '<div style="color:var(--danger);">Could not load system status.</div>';
   });
 }
 
-// Compact relative time formatter for HQ activity feed.
+// ================================================================
+// YOUR WRITING PROFILE — user-model narrative card on Home
+// (extracted from the former Author HQ panel)
+// ================================================================
+function loadUserModelCard() {
+  var umCard = document.getElementById('homeUserModelCard');
+  var umEl = document.getElementById('homeUserModel');
+  if (!umCard || !umEl) return;
+  api('GET', '/api/user-model').catch(function() { return { snapshot: null }; }).then(function(userModelData) {
+    var snap = userModelData.snapshot;
+    if (snap && snap.narrative && snap.narrative.text && !snap.narrative.text.startsWith('(narrative not yet')) {
+      umCard.style.display = '';
+      umEl.innerHTML = '<div>' + esc(snap.narrative.text).replace(/\n/g, '<br>') + '</div>' +
+        '<div style="margin-top:10px;font-size:11px;color:var(--muted);">' +
+          'Confidence: ' + Math.round((snap.narrative.confidence || 0) * 100) + '% · ' +
+          'observations: ' + (snap.observationCount || 0) +
+        '</div>';
+    } else {
+      umCard.style.display = 'none';
+    }
+  });
+}
+
+// Compact relative time formatter for the activity feed.
 function humanAgo(date) {
   var s = Math.floor((Date.now() - date.getTime()) / 1000);
   if (s < 60) return s + 's ago';
