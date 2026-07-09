@@ -1310,6 +1310,18 @@ textarea { resize: vertical; min-height: 60px; }
          ═══════════════════════════════ -->
     <div class="panel" id="panel-settings">
 
+      <!-- Settings tab bar — reuses the .pd-tab pattern from openProjectDetail for consistency -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <button class="pd-tab settings-tab active" data-settings-tab="connections" style="padding:10px 20px;background:none;border:none;color:var(--text);font-weight:700;cursor:pointer;border-bottom:2px solid var(--accent);margin-bottom:-2px;font-size:13px;">Connections</button>
+        <button class="pd-tab settings-tab" data-settings-tab="integrations" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Integrations</button>
+        <button class="pd-tab settings-tab" data-settings-tab="automation" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Automation</button>
+        <button class="pd-tab settings-tab" data-settings-tab="datamemory" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Data & Memory</button>
+        <button class="pd-tab settings-tab" data-settings-tab="preferences" style="padding:10px 20px;background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;">Preferences</button>
+      </div>
+
+      <!-- ============ TAB: Connections (default) ============ -->
+      <div class="settings-tab-content" id="settingsTabConnections">
+
       <!-- Quick-start banner — only shown when no providers are active -->
       <div class="card" id="quickStartBanner" style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-left:4px solid var(--accent);display:none;">
         <div class="card-title" style="color:#78350f;">Welcome — connect at least one AI provider to get started</div>
@@ -1402,6 +1414,11 @@ textarea { resize: vertical; min-height: 60px; }
         <button class="success" id="btnSaveGlobalImageProvider">Save Image Provider</button>
       </div>
 
+      </div><!-- /settingsTabConnections -->
+
+      <!-- ============ TAB: Integrations ============ -->
+      <div class="settings-tab-content" id="settingsTabIntegrations" style="display:none;">
+
       <!-- Telegram -->
       <div class="card">
         <div class="card-title">Telegram Integration</div>
@@ -1444,67 +1461,10 @@ textarea { resize: vertical; min-height: 60px; }
         <button id="btnSaveDomains">Save Domains</button>
       </div>
 
-      <!-- Backups -->
-      <div class="card">
-        <div class="card-title">Backups</div>
-        <p class="hint" style="margin-bottom:8px;">Create and restore workspace backups. Includes projects, personas, memory, and settings.</p>
-        <button id="btnCreateBackup" class="success" style="margin-bottom:12px;">Create Backup</button>
-        <div id="backupList" style="margin-top:8px;"></div>
-      </div>
+      </div><!-- /settingsTabIntegrations -->
 
-      <!-- Lessons Learned -->
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Lessons Learned</span>
-          <button class="small danger" id="btnResetLessons" style="font-size:11px;padding:4px 10px;">Reset All</button>
-        </div>
-        <p class="hint" style="margin-bottom:8px;">AuthorClaw learns from experience. High-confidence lessons are injected into every prompt.</p>
-        <div id="lessonsList" style="max-height:300px;overflow-y:auto;">
-          <div style="color:var(--muted);">Loading...</div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <input type="text" id="newLessonText" placeholder="Add a lesson manually..." style="flex:1;">
-          <select id="newLessonCategory" style="max-width:160px;">
-            <option value="writing_quality">Writing Quality</option>
-            <option value="style_voice">Style & Voice</option>
-            <option value="project_planning">Project Planning</option>
-            <option value="user_communication">Communication</option>
-            <option value="general">General</option>
-          </select>
-          <button class="success" id="btnAddLesson">Add</button>
-        </div>
-      </div>
-
-      <!-- User Preferences -->
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>User Preferences</span>
-          <button class="small danger" id="btnResetPreferences" style="font-size:11px;padding:4px 10px;">Reset All</button>
-        </div>
-        <p class="hint" style="margin-bottom:8px;">Auto-detected from your messages (e.g. "I prefer first person POV"). You can also add or remove them here.</p>
-        <div id="preferencesList" style="max-height:300px;overflow-y:auto;">
-          <div style="color:var(--muted);">Loading...</div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <input type="text" id="newPrefKey" placeholder="Key (e.g. writing.pov)" style="width:180px;">
-          <input type="text" id="newPrefValue" placeholder="Value (e.g. first person)" style="flex:1;">
-          <button class="success" id="btnAddPreference">Add</button>
-        </div>
-      </div>
-
-      <!-- Orchestrator (Script Manager) -->
-      <div class="card">
-        <div class="card-title">Script Manager</div>
-        <p class="hint" style="margin-bottom:8px;">Manage background scripts and processes. Auto-restart on crash, health monitoring, and log viewing.</p>
-        <div id="orchestratorScripts" style="margin-bottom:12px;">
-          <div style="color:var(--muted);">Loading...</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="newScriptName" placeholder="Script name" style="width:140px;">
-          <input type="text" id="newScriptCommand" placeholder="Command (e.g. node server.js)" style="flex:1;">
-          <button class="success" id="btnAddScript">Add Script</button>
-        </div>
-      </div>
+      <!-- ============ TAB: Automation ============ -->
+      <div class="settings-tab-content" id="settingsTabAutomation" style="display:none;">
 
       <!-- Autonomous Mode -->
       <div class="card">
@@ -1555,14 +1515,88 @@ textarea { resize: vertical; min-height: 60px; }
         </div>
       </div>
 
-      <!-- System Status — provider/memory stat boxes (moved from Author HQ; temporary home until
-           the Data & Memory tab lands in a later wave). -->
+      <!-- Orchestrator (Script Manager) -->
+      <div class="card">
+        <div class="card-title">Script Manager</div>
+        <p class="hint" style="margin-bottom:8px;">Manage background scripts and processes. Auto-restart on crash, health monitoring, and log viewing.</p>
+        <div id="orchestratorScripts" style="margin-bottom:12px;">
+          <div style="color:var(--muted);">Loading...</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="newScriptName" placeholder="Script name" style="width:140px;">
+          <input type="text" id="newScriptCommand" placeholder="Command (e.g. node server.js)" style="flex:1;">
+          <button class="success" id="btnAddScript">Add Script</button>
+        </div>
+      </div>
+
+      </div><!-- /settingsTabAutomation -->
+
+      <!-- ============ TAB: Data & Memory ============ -->
+      <div class="settings-tab-content" id="settingsTabDatamemory" style="display:none;">
+
+      <!-- Backups -->
+      <div class="card">
+        <div class="card-title">Backups</div>
+        <p class="hint" style="margin-bottom:8px;">Create and restore workspace backups. Includes projects, personas, memory, and settings.</p>
+        <button id="btnCreateBackup" class="success" style="margin-bottom:12px;">Create Backup</button>
+        <div id="backupList" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- Lessons Learned -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Lessons Learned</span>
+          <button class="small danger" id="btnResetLessons" style="font-size:11px;padding:4px 10px;">Reset All</button>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">AuthorClaw learns from experience. High-confidence lessons are injected into every prompt.</p>
+        <div id="lessonsList" style="max-height:300px;overflow-y:auto;">
+          <div style="color:var(--muted);">Loading...</div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <input type="text" id="newLessonText" placeholder="Add a lesson manually..." style="flex:1;">
+          <select id="newLessonCategory" style="max-width:160px;">
+            <option value="writing_quality">Writing Quality</option>
+            <option value="style_voice">Style & Voice</option>
+            <option value="project_planning">Project Planning</option>
+            <option value="user_communication">Communication</option>
+            <option value="general">General</option>
+          </select>
+          <button class="success" id="btnAddLesson">Add</button>
+        </div>
+      </div>
+
+      <!-- System Status — provider/memory stat boxes (moved from Author HQ; now lives in Data & Memory). -->
       <div class="card">
         <div class="card-title">System Status</div>
         <div id="systemStatusBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
           <div style="color:var(--muted);">Loading…</div>
         </div>
       </div>
+
+      </div><!-- /settingsTabDatamemory -->
+
+      <!-- ============ TAB: Preferences ============ -->
+      <div class="settings-tab-content" id="settingsTabPreferences" style="display:none;">
+
+      <!-- User Preferences -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>User Preferences</span>
+          <button class="small danger" id="btnResetPreferences" style="font-size:11px;padding:4px 10px;">Reset All</button>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Auto-detected from your messages (e.g. "I prefer first person POV"). You can also add or remove them here.</p>
+        <div id="preferencesList" style="max-height:300px;overflow-y:auto;">
+          <div style="color:var(--muted);">Loading...</div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <input type="text" id="newPrefKey" placeholder="Key (e.g. writing.pov)" style="width:180px;">
+          <input type="text" id="newPrefValue" placeholder="Value (e.g. first person)" style="flex:1;">
+          <button class="success" id="btnAddPreference">Add</button>
+        </div>
+      </div>
+
+      </div><!-- /settingsTabPreferences -->
+
     </div>
 
   </div><!-- /main-body -->
@@ -1693,24 +1727,7 @@ function switchPanel(name) {
   } else if (name === 'craft') {
     loadCraft();
   } else if (name === 'settings') {
-    updateQuickStartBanner();
-    loadGettingStarted();
-    loadKeys();
-    loadAiModels();
-    loadOllamaConfig();
-    loadOpenrouterConfig();
-    loadGlobalProvider();
-    loadGlobalImageProvider();
-    loadResearchDomains();
-    loadAutonomousStatus();
-    loadTelegramStatus();
-    loadVoices();
-    loadIdleTasks();
-    loadBackups();
-    loadLessons();
-    loadPreferences();
-    loadOrchestrator();
-    loadSystemStatus();
+    resetSettingsTabs();
   } else if (name === 'home') {
     loadProjects();
     loadHomeStats();
@@ -1724,6 +1741,81 @@ function switchPanel(name) {
 navItems.forEach(function(n) {
   n.addEventListener('click', function() {
     switchPanel(n.getAttribute('data-panel'));
+  });
+});
+
+// ================================================================
+// SETTINGS TABS (lazy-loaded — Wave 2 split of the overloaded panel)
+// ================================================================
+var settingsTabsLoaded = { connections: false, integrations: false, automation: false, datamemory: false, preferences: false };
+
+function loadSettingsConnections() {
+  updateQuickStartBanner();
+  loadGettingStarted();
+  loadKeys();
+  loadAiModels();
+  loadOllamaConfig();
+  loadOpenrouterConfig();
+  loadGlobalProvider();
+  loadGlobalImageProvider();
+}
+
+function loadSettingsIntegrations() {
+  loadTelegramStatus();
+  loadVoices();
+  loadResearchDomains();
+}
+
+function loadSettingsAutomation() {
+  loadAutonomousStatus();
+  loadIdleTasks();
+  loadOrchestrator();
+}
+
+function loadSettingsDataMemory() {
+  loadBackups();
+  loadLessons();
+  loadSystemStatus();
+}
+
+function loadSettingsPreferences() {
+  loadPreferences();
+}
+
+var settingsTabLoaders = {
+  connections: loadSettingsConnections,
+  integrations: loadSettingsIntegrations,
+  automation: loadSettingsAutomation,
+  datamemory: loadSettingsDataMemory,
+  preferences: loadSettingsPreferences
+};
+
+function activateSettingsTab(tabName) {
+  document.querySelectorAll('.settings-tab').forEach(function(t) {
+    var active = t.getAttribute('data-settings-tab') === tabName;
+    t.classList.toggle('active', active);
+    t.style.color = active ? 'var(--text)' : 'var(--muted)';
+    t.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+    t.style.fontWeight = active ? '700' : '600';
+  });
+  document.querySelectorAll('.settings-tab-content').forEach(function(c) { c.style.display = 'none'; });
+  var target = document.getElementById('settingsTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (target) target.style.display = 'block';
+
+  if (!settingsTabsLoaded[tabName]) {
+    settingsTabsLoaded[tabName] = true;
+    var loader = settingsTabLoaders[tabName];
+    if (loader) loader();
+  }
+}
+
+function resetSettingsTabs() {
+  activateSettingsTab('connections');
+}
+
+document.querySelectorAll('.settings-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    activateSettingsTab(tab.getAttribute('data-settings-tab'));
   });
 });
 
