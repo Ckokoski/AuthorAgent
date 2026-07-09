@@ -713,6 +713,13 @@ textarea { resize: vertical; min-height: 60px; }
          ═══════════════════════════════ -->
     <div class="panel active" id="panel-home">
 
+      <!-- Start a Book hero — Wave 5 primary entry point. One dominant action, above everything else. -->
+      <div class="card" id="startBookHeroCard" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(230,126,34,0.14) 0%,rgba(230,126,34,0.03) 100%);border-left:4px solid var(--accent);text-align:center;padding:28px 20px;">
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px;">✨ Start a Book</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:18px;max-width:480px;margin-left:auto;margin-right:auto;">Answer a few quick questions — we'll set up the whole project for you.</div>
+        <button class="success" id="btnStartBookHero" style="font-size:16px;padding:14px 32px;font-weight:700;">Start a Book</button>
+      </div>
+
       <!-- Getting Started — first-run onboarding checklist, backed by GET /api/onboarding/status.
            Hidden by default; JS shows/populates it (and hides it silently if the endpoint fails). -->
       <div class="card" id="gettingStartedCard" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.10) 0%,rgba(245,158,11,0.03) 100%);border-left:4px solid var(--accent);">
@@ -866,7 +873,10 @@ textarea { resize: vertical; min-height: 60px; }
 
       <!-- Template Tiles -->
       <div class="card" id="projectTemplatesCard">
-        <div class="card-title">Project Templates</div>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Custom projects (advanced)</span>
+          <button class="success" id="btnStartBookBooksPanel">✨ Start a Book</button>
+        </div>
         <div class="template-grid" id="templateGrid">
           <!-- Populated by JS -->
         </div>
@@ -2225,6 +2235,372 @@ function openCreateProjectModal(template, serverTemplate) {
     });
   });
 }
+
+// ══════════════════════════════════════════════════════════════
+// WAVE 5 — "Start a Book" WIZARD (primary entry point)
+// Reuses the exact POST /api/projects/create body shape from
+// openCreateProjectModal above; openCreateProjectModal itself is untouched.
+// ══════════════════════════════════════════════════════════════
+var wizardState = null;
+
+var wizardGenres = [
+  { id: 'fantasy', label: 'Fantasy', emoji: '🐉' },
+  { id: 'romance', label: 'Romance', emoji: '💞' },
+  { id: 'thriller', label: 'Thriller', emoji: '🔪' },
+  { id: 'mystery', label: 'Mystery', emoji: '🔎' },
+  { id: 'sci-fi', label: 'Sci-Fi', emoji: '🚀' },
+  { id: 'nonfiction', label: 'Nonfiction', emoji: '📚' },
+  { id: 'other', label: 'Other', emoji: '✍️' }
+];
+
+var wizardLengths = [
+  { id: 'novella', label: 'Novella', sub: '~20,000 words', chapters: 10, wordsPerChapter: 2000 },
+  { id: 'novel', label: 'Novel', sub: '~50,000 words', chapters: 15, wordsPerChapter: 3300 },
+  { id: 'epic', label: 'Epic', sub: '~80,000 words', chapters: 24, wordsPerChapter: 3300 }
+];
+
+var wizardModes = [
+  { id: 'full', label: 'Full Book', emoji: '🎼', badge: 'Most Popular',
+    desc: 'Plan, write, revise, format, and launch — the whole journey.' },
+  { id: 'outline', label: 'Just Outline', emoji: '🗺', desc: 'Get a structured outline and premise, nothing more (yet).' },
+  { id: 'write', label: 'Just Write', emoji: '✍️', desc: 'Skip straight to drafting chapters from your idea.' },
+  { id: 'polish', label: 'Just Polish', emoji: '🧐', desc: 'Deep revision passes on an existing manuscript.' },
+  { id: 'format', label: 'Just Format', emoji: '📦', desc: 'Format and export a finished manuscript.' }
+];
+
+function openStartBookWizard() {
+  wizardState = { step: 1, seedType: null, ideaText: '', libraryDocId: '', title: '', genre: null, personaId: '', length: 'novel', mode: 'full' };
+
+  // Default persona: most recently used (allPersonas is assumed loaded elsewhere; fall back to first).
+  if (allPersonas && allPersonas.length) {
+    var mostRecent = allPersonas.slice().sort(function(a, b) {
+      return new Date(b.lastUsedAt || b.updatedAt || 0) - new Date(a.lastUsedAt || a.updatedAt || 0);
+    })[0];
+    wizardState.personaId = mostRecent ? mostRecent.id : '';
+  }
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'startBookWizardModal';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  renderWizardStep(overlay);
+}
+
+function wizardStepIndicator(step) {
+  // Goal-gradient: step 1 already shows as "underway" (filled), not empty.
+  var labels = ['Seed', 'Shape', 'Mode'];
+  var html = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:20px;">';
+  for (var i = 1; i <= 3; i++) {
+    var state = i < step ? 'done' : (i === step ? 'current' : 'todo');
+    var bg = state === 'todo' ? 'var(--border)' : 'var(--accent)';
+    var fg = state === 'todo' ? 'var(--muted)' : '#fff';
+    html += '<div style="display:flex;align-items:center;gap:6px;">' +
+      '<div style="width:26px;height:26px;border-radius:50%;background:' + bg + ';color:' + fg + ';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">' + i + '</div>' +
+      '<span style="font-size:12px;color:' + (state === 'todo' ? 'var(--muted)' : 'var(--text)') + ';font-weight:' + (state === 'current' ? '700' : '500') + ';">' + labels[i - 1] + '</span>' +
+      '</div>';
+    if (i < 3) html += '<div style="width:24px;height:2px;background:' + (i < step ? 'var(--accent)' : 'var(--border)') + ';"></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderWizardStep(overlay) {
+  var s = wizardState;
+  var body = '';
+  if (s.step === 1) body = wizardStep1Html();
+  else if (s.step === 2) body = wizardStep2Html();
+  else body = wizardStep3Html();
+
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:560px;">' +
+      '<div class="modal-title" style="text-align:center;">Start a Book</div>' +
+      wizardStepIndicator(s.step) +
+      '<div id="wizardBody">' + body + '</div>' +
+      '<div class="modal-actions" style="justify-content:space-between;">' +
+        '<button class="secondary" id="wizardBack">' + (s.step === 1 ? 'Cancel' : 'Back') + '</button>' +
+        '<button class="success" id="wizardNext">' + (s.step === 3 ? 'Finish' : 'Next') + '</button>' +
+      '</div>' +
+    '</div>';
+
+  wireWizardStep(overlay);
+}
+
+function wizardStep1Html() {
+  var s = wizardState;
+  var ideaSel = s.seedType === 'idea' ? ' selected' : '';
+  var msSel = s.seedType === 'manuscript' ? ' selected' : '';
+  return (
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">' +
+      '<div class="template-tile wizard-seed-card' + (ideaSel ? ' highlighted' : '') + '" data-seed="idea" style="cursor:pointer;">' +
+        '<div class="tile-icon">💡</div>' +
+        '<div class="tile-name">I have an idea</div>' +
+        '<div class="tile-desc">Just a spark — we\'ll help you shape it.</div>' +
+      '</div>' +
+      '<div class="template-tile wizard-seed-card' + (msSel ? ' highlighted' : '') + '" data-seed="manuscript" style="cursor:pointer;">' +
+        '<div class="tile-icon">📄</div>' +
+        '<div class="tile-name">I have a manuscript/outline</div>' +
+        '<div class="tile-desc">Pick something already in your Library.</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="wizardSeedDetail">' +
+      (s.seedType === 'idea'
+        ? '<div class="form-group"><label>Your idea</label><textarea id="wizardIdeaText" rows="4" placeholder="A lighthouse keeper discovers the storms she\'s been logging are messages...">' + esc(s.ideaText) + '</textarea></div>'
+        : (s.seedType === 'manuscript'
+          ? '<div class="form-group"><label>Choose from Library</label><select id="wizardLibrarySelect"><option value="">Loading documents...</option></select><div class="hint" style="margin-top:6px;">Don\'t see it? Upload via Library first, then come back and pick it here.</div></div>'
+          : '')) +
+    '</div>'
+  );
+}
+
+function wizardStep2Html() {
+  var s = wizardState;
+  var personaOpts = '<option value="">None</option>';
+  (allPersonas || []).forEach(function(p) {
+    personaOpts += '<option value="' + esc(p.id) + '"' + (p.id === s.personaId ? ' selected' : '') + '>' + esc(p.penName || p.name) + '</option>';
+  });
+
+  var genreCards = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">';
+  wizardGenres.forEach(function(g) {
+    genreCards += '<div class="template-tile wizard-genre-card' + (s.genre === g.id ? ' highlighted' : '') + '" data-genre="' + g.id + '" style="cursor:pointer;padding:12px 6px;">' +
+      '<div class="tile-icon" style="font-size:20px;margin-bottom:4px;">' + g.emoji + '</div>' +
+      '<div class="tile-name" style="font-size:12px;">' + g.label + '</div>' +
+    '</div>';
+  });
+  genreCards += '</div>';
+
+  var lengthCards = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;">';
+  wizardLengths.forEach(function(l) {
+    lengthCards += '<div class="template-tile wizard-length-card' + (s.length === l.id ? ' highlighted' : '') + '" data-length="' + l.id + '" style="cursor:pointer;">' +
+      '<div class="tile-name">' + l.label + '</div>' +
+      '<div class="tile-desc">' + l.sub + '</div>' +
+    '</div>';
+  });
+  lengthCards += '</div>';
+
+  return (
+    '<div class="form-group"><label>Title</label><input type="text" id="wizardTitle" placeholder="Working title..." value="' + esc(s.title) + '"></div>' +
+    '<div class="form-group"><label>Genre</label>' + genreCards + '</div>' +
+    '<div class="form-group"><label>Persona</label><select id="wizardPersona">' + personaOpts + '</select>' +
+      '<div style="margin-top:4px;"><a href="#" id="wizardCreatePersonaLink" style="font-size:12px;color:var(--accent);">+ create one</a></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Length</label>' + lengthCards + '</div>'
+  );
+}
+
+function wizardStep3Html() {
+  var s = wizardState;
+  var isNonfiction = s.genre === 'nonfiction';
+  var html = '<div style="display:flex;flex-direction:column;gap:10px;">';
+  wizardModes.forEach(function(m) {
+    var selected = s.mode === m.id;
+    html += '<div class="template-tile wizard-mode-card' + (selected ? ' highlighted' : '') + '" data-mode="' + m.id + '" style="cursor:pointer;display:flex;align-items:center;gap:12px;text-align:left;padding:14px 16px;">' +
+      '<div class="tile-icon" style="margin-bottom:0;font-size:24px;">' + m.emoji + '</div>' +
+      '<div style="flex:1;">' +
+        '<div class="tile-name" style="display:flex;align-items:center;gap:8px;">' + m.label +
+          (m.badge ? '<span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;">' + m.badge + '</span>' : '') +
+        '</div>' +
+        '<div class="tile-desc" style="margin-bottom:0;">' + m.desc + '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function wizardModeToTemplateType(mode, genre) {
+  switch (mode) {
+    case 'full': return genre === 'nonfiction' ? 'book-production' : 'novel-pipeline';
+    case 'outline': return 'book-planning';
+    case 'write': return 'novel-pipeline';
+    case 'polish': return 'deep-revision';
+    case 'format': return 'format-export';
+    default: return 'novel-pipeline';
+  }
+}
+
+function loadWizardLibraryOptions(overlay) {
+  var sel = overlay.querySelector('#wizardLibrarySelect');
+  if (!sel) return;
+  api('GET', '/api/documents').then(function(data) {
+    var docs = data.documents || data || [];
+    if (!docs.length) {
+      sel.innerHTML = '<option value="">No documents in Library yet</option>';
+      return;
+    }
+    var opts = '<option value="">Select a document...</option>';
+    docs.forEach(function(d) {
+      opts += '<option value="' + esc(d.id || d.name) + '"' + (wizardState.libraryDocId === (d.id || d.name) ? ' selected' : '') + '>' + esc(d.name || d.filename) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }).catch(function() {
+    sel.innerHTML = '<option value="">Could not load documents</option>';
+  });
+}
+
+function wireWizardStep(overlay) {
+  var s = wizardState;
+
+  overlay.querySelectorAll('.wizard-seed-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      s.seedType = card.getAttribute('data-seed');
+      renderWizardStep(overlay);
+      if (s.seedType === 'manuscript') loadWizardLibraryOptions(overlay);
+    });
+  });
+  var ideaTa = overlay.querySelector('#wizardIdeaText');
+  if (ideaTa) ideaTa.addEventListener('input', function() { s.ideaText = ideaTa.value; });
+  var libSel = overlay.querySelector('#wizardLibrarySelect');
+  if (libSel) libSel.addEventListener('change', function() { s.libraryDocId = libSel.value; });
+  if (s.seedType === 'manuscript') loadWizardLibraryOptions(overlay);
+
+  var titleInput = overlay.querySelector('#wizardTitle');
+  if (titleInput) titleInput.addEventListener('input', function() { s.title = titleInput.value; });
+  overlay.querySelectorAll('.wizard-genre-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      s.genre = card.getAttribute('data-genre');
+      overlay.querySelectorAll('.wizard-genre-card').forEach(function(c) { c.classList.remove('highlighted'); });
+      card.classList.add('highlighted');
+    });
+  });
+  var personaSel = overlay.querySelector('#wizardPersona');
+  if (personaSel) personaSel.addEventListener('change', function() { s.personaId = personaSel.value; });
+  var createPersonaLink = overlay.querySelector('#wizardCreatePersonaLink');
+  if (createPersonaLink) createPersonaLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    overlay.remove();
+    switchPanel('personas');
+  });
+  overlay.querySelectorAll('.wizard-length-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      s.length = card.getAttribute('data-length');
+      overlay.querySelectorAll('.wizard-length-card').forEach(function(c) { c.classList.remove('highlighted'); });
+      card.classList.add('highlighted');
+    });
+  });
+
+  overlay.querySelectorAll('.wizard-mode-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      s.mode = card.getAttribute('data-mode');
+      overlay.querySelectorAll('.wizard-mode-card').forEach(function(c) { c.classList.remove('highlighted'); });
+      card.classList.add('highlighted');
+    });
+  });
+
+  overlay.querySelector('#wizardBack').addEventListener('click', function() {
+    if (s.step === 1) { overlay.remove(); return; }
+    s.step -= 1;
+    renderWizardStep(overlay);
+  });
+
+  overlay.querySelector('#wizardNext').addEventListener('click', function() {
+    if (s.step === 1) {
+      if (!s.seedType) { showToast('Pick "I have an idea" or "I have a manuscript/outline"', 'error'); return; }
+      if (s.seedType === 'idea' && !s.ideaText.trim()) { showToast('Tell us your idea first', 'error'); return; }
+      if (s.seedType === 'manuscript' && !s.libraryDocId) { showToast('Pick a document from your Library', 'error'); return; }
+      s.step = 2;
+      renderWizardStep(overlay);
+    } else if (s.step === 2) {
+      if (!s.title.trim()) { showToast('Please enter a title', 'error'); return; }
+      s.step = 3;
+      renderWizardStep(overlay);
+    } else {
+      finishWizard(overlay);
+    }
+  });
+}
+
+function finishWizard(overlay) {
+  var s = wizardState;
+  var lengthPreset = wizardLengths.find(function(l) { return l.id === s.length; }) || wizardLengths[1];
+  var templateType = wizardModeToTemplateType(s.mode, s.genre);
+  var isPipeline = templateType === 'novel-pipeline';
+  var isProduction = templateType === 'book-production';
+
+  var descParts = [];
+  if (s.seedType === 'idea') descParts.push(s.ideaText.trim());
+  else if (s.seedType === 'manuscript') descParts.push('Based on existing Library document: ' + s.libraryDocId);
+  if (s.genre) descParts.push('Genre: ' + s.genre);
+  var desc = descParts.join('\n\n');
+
+  // Same payload shape as openCreateProjectModal's submit path.
+  var body = {
+    title: s.title,
+    description: desc || s.title,
+    type: templateType,
+    personaId: s.personaId || undefined,
+    preferredProvider: undefined
+  };
+  if (isProduction || isPipeline) {
+    body.chapters = lengthPreset.chapters;
+    body.wordsPerChapter = lengthPreset.wordsPerChapter;
+  }
+
+  var endpoint = isPipeline ? '/api/pipeline/create' : '/api/projects/create';
+
+  overlay.querySelector('#wizardNext').disabled = true;
+  overlay.querySelector('#wizardNext').textContent = 'Creating...';
+
+  api('POST', endpoint, body).then(function(data) {
+    var projectId = null;
+    if (data.project && data.project.id) projectId = data.project.id;
+    else if (data.phases && data.phases.length > 0) projectId = data.phases[0].id;
+
+    loadProjects();
+    renderWizardSuccess(overlay, projectId);
+  }).catch(function(e) {
+    showToast('Failed: ' + e.message, 'error');
+    overlay.querySelector('#wizardNext').disabled = false;
+    overlay.querySelector('#wizardNext').textContent = 'Finish';
+  });
+}
+
+function renderWizardSuccess(overlay, projectId) {
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;text-align:center;">' +
+      '<div style="font-size:40px;margin-bottom:8px;">🎉</div>' +
+      '<div class="modal-title">Your book is set up!</div>' +
+      '<div class="hint" style="margin-bottom:20px;">Ready when you are — start the AI running now, or just look around first.</div>' +
+      '<div class="modal-actions" style="justify-content:center;">' +
+        '<button class="secondary" id="wizardOpenBook">Open my book</button>' +
+        '<button class="success" id="wizardStartNow">🎼 Start now</button>' +
+      '</div>' +
+    '</div>';
+
+  overlay.querySelector('#wizardOpenBook').addEventListener('click', function() {
+    overlay.remove();
+    if (!projectId) { showToast('Project created!', 'success'); return; }
+    switchPanel('projects');
+    setTimeout(function() { openProjectDetail(projectId); }, 100);
+  });
+
+  overlay.querySelector('#wizardStartNow').addEventListener('click', function() {
+    overlay.remove();
+    if (!projectId) { showToast('Project created!', 'success'); return; }
+    switchPanel('projects');
+    setTimeout(function() {
+      openProjectDetail(projectId);
+      showToast('Starting execution...', 'info');
+      api('POST', '/api/projects/' + projectId + '/auto-execute').then(function(result) {
+        var completed = (result.results || []).filter(function(r) { return r.success; }).length;
+        showToast('Project finished! ' + completed + ' steps completed.', 'success');
+        loadProjects();
+        if (currentDetailProject === projectId) openProjectDetail(projectId);
+      }).catch(function(err) {
+        showToast('Execution error: ' + err.message, 'error');
+        loadProjects();
+      });
+      var pollId = setInterval(function() {
+        loadProjects();
+        if (currentDetailProject === projectId) openProjectDetail(projectId);
+      }, 8000);
+      setTimeout(function() { clearInterval(pollId); }, 600000);
+    }, 100);
+  });
+}
+
+document.getElementById('btnStartBookHero').addEventListener('click', function() { openStartBookWizard(); });
+document.getElementById('btnStartBookBooksPanel').addEventListener('click', function() { openStartBookWizard(); });
 
 // ── Load Projects ──
 function loadProjects() {
