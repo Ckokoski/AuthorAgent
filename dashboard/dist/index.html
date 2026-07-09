@@ -387,6 +387,59 @@ textarea { resize: vertical; min-height: 60px; }
 .chat-input-row input[type="text"] { flex: 1; }
 .chat-input-row button { flex-shrink: 0; }
 
+/* Global chat drawer — Wave 6. Fixed right panel, slides in/out via .open class. */
+.chat-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  max-width: 92vw;
+  height: 100vh;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px -8px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 500;
+}
+.chat-drawer.open { transform: translateX(0); }
+.chat-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.chat-drawer-header .card-title { margin: 0; }
+.chat-drawer-body { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 12px; gap: 8px; }
+.chat-drawer-body .chat-container { flex: 1; height: auto; }
+.chat-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: 499;
+  display: none;
+}
+.chat-drawer-overlay.open { display: block; }
+#btnChatDrawerToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#btnChatDrawerToggle:hover { background: rgba(255,255,255,0.05); border-color: var(--accent); }
+#btnChatDrawerToggle.active { border-color: var(--accent); color: var(--accent); }
+
 /* ── Template Tiles ── */
 .template-grid {
   display: grid;
@@ -704,6 +757,7 @@ textarea { resize: vertical; min-height: 60px; }
     <h2 id="panelTitle">Home</h2>
     <div class="header-right">
       <span id="headerStatus"></span>
+      <button id="btnChatDrawerToggle" title="Chat with AuthorClaw">💬 <span>Chat</span></button>
     </div>
   </div>
   <div class="main-body">
@@ -823,26 +877,6 @@ textarea { resize: vertical; min-height: 60px; }
         <div class="card-title">Recent Activity</div>
         <div class="activity-feed" id="activityFeed" style="max-height:220px;overflow-y:auto;">
           <div style="color:var(--muted);text-align:center;padding:16px;">Loading activity...</div>
-        </div>
-      </div>
-
-      <!-- Chat Interface -->
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Chat with AuthorClaw</span>
-          <button id="btnChatClear" class="small secondary" title="Clear chat history" style="font-size:11px;padding:4px 10px;">Clear</button>
-        </div>
-        <div class="chat-container">
-          <div class="chat-messages" id="chatMessages">
-            <div class="chat-msg bot">Hello! I'm AuthorClaw, your AI writing partner. How can I help you today?</div>
-          </div>
-          <div class="chat-input-row">
-            <input type="text" id="chatInput" placeholder="Type a message or /command... (Enter to send)">
-            <button id="btnChatSend">Send</button>
-          </div>
-        </div>
-        <div class="hint" style="margin-top:8px;">
-          Commands: /novel, /project, /write, /files, /read, /export, /speak, /voice, /status, /stop, /clean, /help
         </div>
       </div>
 
@@ -1618,6 +1652,35 @@ textarea { resize: vertical; min-height: 60px; }
 </div><!-- /main -->
 
 <!-- ═══════════════════════════════════════════════
+     GLOBAL CHAT DRAWER — Wave 6. Available on every panel via header toggle.
+     Same element IDs as the old Home chat card so existing handler JS keeps working.
+     ═══════════════════════════════════════════════ -->
+<div class="chat-drawer-overlay" id="chatDrawerOverlay"></div>
+<div class="chat-drawer" id="chatDrawer">
+  <div class="chat-drawer-header">
+    <span class="card-title">Chat with AuthorClaw</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="btnChatClear" class="small secondary" title="Clear chat history" style="font-size:11px;padding:4px 10px;">Clear</button>
+      <button id="btnChatDrawerClose" class="small secondary" title="Close" style="font-size:11px;padding:4px 10px;">✕</button>
+    </div>
+  </div>
+  <div class="chat-drawer-body">
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg bot">Hello! I'm AuthorClaw, your AI writing partner. How can I help you today?</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Type a message or /command... (Enter to send)">
+        <button id="btnChatSend">Send</button>
+      </div>
+    </div>
+    <div class="hint">
+      Commands: /novel, /project, /write, /files, /read, /export, /speak, /voice, /status, /stop, /clean, /help
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
      JAVASCRIPT
      ═══════════════════════════════════════════════ -->
 <script>
@@ -2051,6 +2114,46 @@ document.getElementById('btnChatClear').addEventListener('click', function() {
   el.innerHTML = '<div class="chat-msg bot">Hello! I\'m AuthorClaw, your AI writing partner. How can I help you today?</div>';
   chatWaiting = false;
 });
+
+// ── Global Chat Drawer — Wave 6 ──
+// State persists in localStorage; default CLOSED. Esc closes. Toggle lives in main-header.
+var CHAT_DRAWER_KEY = 'authorclaw_chat_drawer_open';
+function isChatDrawerOpen() {
+  try { return localStorage.getItem(CHAT_DRAWER_KEY) === '1'; } catch (e) { return false; }
+}
+function setChatDrawerOpen(open) {
+  try { localStorage.setItem(CHAT_DRAWER_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
+}
+function applyChatDrawerState(open) {
+  var drawer = document.getElementById('chatDrawer');
+  var overlay = document.getElementById('chatDrawerOverlay');
+  var toggle = document.getElementById('btnChatDrawerToggle');
+  if (!drawer) return;
+  drawer.classList.toggle('open', open);
+  if (overlay) overlay.classList.toggle('open', open);
+  if (toggle) toggle.classList.toggle('active', open);
+  if (open) {
+    var input = document.getElementById('chatInput');
+    if (input) setTimeout(function() { input.focus(); }, 50);
+  }
+}
+function openChatDrawer() { setChatDrawerOpen(true); applyChatDrawerState(true); }
+function closeChatDrawer() { setChatDrawerOpen(false); applyChatDrawerState(false); }
+function toggleChatDrawer() {
+  var willOpen = !document.getElementById('chatDrawer').classList.contains('open');
+  setChatDrawerOpen(willOpen);
+  applyChatDrawerState(willOpen);
+}
+document.getElementById('btnChatDrawerToggle').addEventListener('click', toggleChatDrawer);
+document.getElementById('btnChatDrawerClose').addEventListener('click', closeChatDrawer);
+document.getElementById('chatDrawerOverlay').addEventListener('click', closeChatDrawer);
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('chatDrawer').classList.contains('open')) {
+    closeChatDrawer();
+  }
+});
+// Restore persisted state on load (default closed if never set).
+applyChatDrawerState(isChatDrawerOpen());
 
 // ================================================================
 // PROJECTS PANEL
@@ -3116,6 +3219,7 @@ function openProjectDetail(id) {
       '</div>' +
       // ── PUBLISH ──
       '<div class="card pd-tab-content" id="pdTabPublish" style="display:none;">' +
+        (project.status === 'completed' ? whatsNextCardHtml(project) : '') +
         '<div class="card-title">Launch &amp; Marketing</div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
           '<button class="secondary pd-pub-run" data-tool="launch" style="font-size:12px;">Launch Timeline</button>' +
@@ -3320,13 +3424,13 @@ function openProjectDetail(id) {
     if (!text) { showToast('No chapter text', 'error'); return; }
     resEl.innerHTML = '<div style="color:var(--muted);">Running ' + esc(tool) + '…</div>';
     if (tool === 'revision') {
-      api('POST', '/api/revision/analyze', { chapterText: text, projectId: id }).then(function(r) { renderRevisionReport(r, resEl); })
+      api('POST', '/api/revision/analyze', { chapterText: text, projectId: id }).then(function(r) { renderRevisionReport(r, resEl); resEl.insertAdjacentHTML('beforeend', trendsHeuristicsLine()); })
         .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
     } else if (tool === 'contradictions') {
-      api('POST', '/api/projects/' + id + '/contradictions', { chapterText: text }).then(function(r) { renderContradictionReport(r, resEl); })
+      api('POST', '/api/projects/' + id + '/contradictions', { chapterText: text }).then(function(r) { renderContradictionReport(r, resEl); resEl.insertAdjacentHTML('beforeend', trendsHeuristicsLine()); })
         .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
     } else if (tool === 'critique') {
-      api('POST', '/api/projects/' + id + '/character-critique', { chapterText: text }).then(function(r) { renderCritiqueReport(r, resEl); })
+      api('POST', '/api/projects/' + id + '/character-critique', { chapterText: text }).then(function(r) { renderCritiqueReport(r, resEl); resEl.insertAdjacentHTML('beforeend', trendsHeuristicsLine()); })
         .catch(function(e) { resEl.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
     } else if (tool === 'learn') {
       api('POST', '/api/projects/' + id + '/learn', { chapterText: text }).then(function(r) {
@@ -3409,7 +3513,7 @@ function openProjectDetail(id) {
       else if (tool === 'ams') call = api('POST', '/api/ams/optimize', { projectId: id });
       else call = api('GET', '/api/sites');
       call.then(function(r) {
-        el.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>';
+        el.innerHTML = '<pre style="white-space:pre-wrap;font-size:12px;background:var(--bg);padding:12px;border-radius:6px;">' + esc(JSON.stringify(r, null, 2).slice(0, 4000)) + '</pre>' + trendsHeuristicsLine();
       }).catch(function(e) { el.innerHTML = '<div style="color:var(--danger);">Failed: ' + esc(e.message) + '</div>'; });
     });
   });
@@ -4224,6 +4328,19 @@ function loadGettingStarted() {
           '<button class="small btn-onboarding-go" data-panel="' + esc(target.panel) + '" style="font-size:11px;padding:4px 10px;white-space:nowrap;">' + esc(target.label) + '</button>') +
         '</div>';
     });
+
+    // Non-blocking "go deeper" item — deliberately NOT part of the checklist array, so it
+    // never counts toward doneCount/total (setup can still hit 100% without it). Muted,
+    // no Go button: Guide & Course isn't available yet, so no dead link/action.
+    html += '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;opacity:0.6;">' +
+      '<div style="padding-top:1px;"><span style="color:var(--muted);font-weight:700;font-size:15px;">○</span></div>' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:600;font-size:13px;">Go deeper: Guide &amp; Course</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">A structured path beyond the basics</div>' +
+      '</div>' +
+      '<div><span class="badge badge-muted">Coming soon</span></div>' +
+    '</div>';
+
     document.getElementById('gettingStartedList').innerHTML = html;
 
     document.querySelectorAll('.btn-onboarding-go').forEach(function(btn) {
@@ -5407,7 +5524,40 @@ function renderPanelReport(report) {
       '</div>';
   });
 
+  html += trendsHeuristicsLine();
+
   el.innerHTML = html;
+}
+
+// Honest-measurement note shown under any comp/market-fit results (Reader Panels, Book View
+// Revise/Publish runners). Nothing here implies Bestseller Trends is purchasable yet.
+function trendsHeuristicsLine() {
+  return '<div style="margin-top:10px;font-size:11px;color:var(--muted);">Using built-in heuristics &middot; Bestseller Trends real market data — <span class="badge badge-muted">Coming soon</span></div>';
+}
+
+// "What's next" card — shown on the Publish stage (and prominently) for completed projects.
+// Honest-measurement: Author OS is a real live link; the other two rows are muted, no hrefs.
+function whatsNextCardHtml(project) {
+  var title = (project && project.title) || 'this book';
+  function row(icon, name, desc, action) {
+    return '<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="font-size:18px;line-height:1;">' + icon + '</div>' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:600;font-size:13px;">' + esc(name) + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + esc(desc) + '</div>' +
+      '</div>' +
+      '<div style="flex-shrink:0;">' + action + '</div>' +
+    '</div>';
+  }
+  return '<div class="card" style="background:linear-gradient(135deg,rgba(245,158,11,0.10) 0%,rgba(245,158,11,0.03) 100%);border-left:4px solid var(--accent);margin-bottom:16px;">' +
+    '<div class="card-title">📚 What\'s next for ' + esc(title) + '?</div>' +
+    row('✍️', 'Author OS', 'Plan your next book with the complete author system',
+      '<a href="https://ko-fi.com/ckokoski/shop" target="_blank" rel="noopener" class="small secondary" style="display:inline-block;font-size:11px;padding:4px 10px;text-decoration:none;">Explore</a>') +
+    row('🧠', 'AI Author Lab', 'Ongoing craft development with Chris',
+      '<span class="badge badge-muted">Coming soon</span>') +
+    row('📈', 'Bestseller Trends', 'Real market data for your next launch',
+      '<span class="badge badge-muted">Coming soon</span>') +
+  '</div>';
 }
 
 // ── Prose Evolve ──
