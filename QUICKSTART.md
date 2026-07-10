@@ -11,8 +11,8 @@ Get AuthorAgent running and writing in under 5 minutes.
 ## Install
 
 ```bash
-git clone https://github.com/Ckokoski/authorclaw.git
-cd authorclaw
+git clone https://github.com/Ckokoski/authoragent.git
+cd authoragent
 npm install
 ```
 

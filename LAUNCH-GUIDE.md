@@ -33,8 +33,8 @@ Open browser to: **http://localhost:3847**
 ### First-time setup
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Ckokoski/authorclaw.git
-cd authorclaw
+git clone https://github.com/Ckokoski/authoragent.git
+cd authoragent
 
 # 2. Install Node 22+ (if running without Docker)
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -

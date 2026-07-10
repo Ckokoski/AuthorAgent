@@ -858,7 +858,7 @@ export class AIRouter {
     // headers for ranking on their leaderboard. Since AuthorAgent is local-only,
     // we send a stable referrer string. Harmless for other providers.
     if (provider.id === 'openrouter') {
-      headers['HTTP-Referer'] = 'https://github.com/Ckokoski/authorclaw';
+      headers['HTTP-Referer'] = 'https://github.com/Ckokoski/authoragent';
       headers['X-Title'] = 'AuthorAgent';
     }
 
