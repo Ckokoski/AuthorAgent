@@ -1,7 +1,7 @@
 ---
 name: beta-reader
 description: Simulate beta reader feedback from different reader perspectives
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "beta read"

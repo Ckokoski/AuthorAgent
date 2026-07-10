@@ -151,7 +151,7 @@ describe('WritingStatsStore', () => {
   let store: WritingStatsStore;
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(join(tmpdir(), 'authorclaw-writing-stats-'));
+    workspaceDir = mkdtempSync(join(tmpdir(), 'authoragent-writing-stats-'));
     store = new WritingStatsStore(workspaceDir);
   });
 

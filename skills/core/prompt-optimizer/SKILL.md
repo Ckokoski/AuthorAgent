@@ -1,7 +1,7 @@
 ---
 name: prompt-optimizer
 description: Automatically improves prompts based on output quality, user feedback, and A/B testing results
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "optimize prompt"
@@ -18,7 +18,7 @@ permissions:
 
 # Prompt Optimizer — Core Skill
 
-AuthorClaw's prompts are its most important tool. This skill continuously optimizes them based on what actually produces good results — not guesswork, but measured outcomes.
+AuthorAgent's prompts are its most important tool. This skill continuously optimizes them based on what actually produces good results — not guesswork, but measured outcomes.
 
 ## The Problem
 

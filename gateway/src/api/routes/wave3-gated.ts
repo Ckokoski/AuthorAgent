@@ -12,7 +12,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
 
   // ─── Browser Doctor ───
   // Read-only probe inspired by OpenClaw's `browser doctor` command. Reports
-  // whether AuthorClaw can plan browser actions for each major author platform.
+  // whether AuthorAgent can plan browser actions for each major author platform.
   // Does NOT navigate or click anything — purely descriptive.
   app.get('/api/browser/doctor', (_req: Request, res: Response) => {
     const planners = {
@@ -20,7 +20,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
         planner: !!services.launchOrchestrator,
         description: 'Amazon KDP — pre-order setup, launch-day publish, price pulse',
         confirmationGated: true,
-        notes: 'KDP automation requires a Claude-in-Chrome MCP session in the user\'s authenticated browser. AuthorClaw produces the plan; the MCP executes after explicit approval.',
+        notes: 'KDP automation requires a Claude-in-Chrome MCP session in the user\'s authenticated browser. AuthorAgent produces the plan; the MCP executes after explicit approval.',
       },
       amsAds: {
         planner: !!services.amsAds,
@@ -32,7 +32,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
         planner: !!services.bookbub,
         description: 'BookBub Featured Deal — submission draft + rationale',
         confirmationGated: true,
-        notes: 'AuthorClaw never fabricates editorial review quotes. Review snippets must be flagged as verified before submission.',
+        notes: 'AuthorAgent never fabricates editorial review quotes. Review snippets must be flagged as verified before submission.',
       },
       website: {
         planner: !!services.websiteBuilder,
@@ -51,7 +51,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
     const ready = all.filter(p => p.planner).length;
     res.json({
       version: 'browser-doctor/v1',
-      summary: `${ready} of ${all.length} planners ready. AuthorClaw is planner-first; an external browser MCP (e.g., Claude in Chrome) executes approved actions.`,
+      summary: `${ready} of ${all.length} planners ready. AuthorAgent is planner-first; an external browser MCP (e.g., Claude in Chrome) executes approved actions.`,
       planners,
       gateStatus: services.confirmationGate
         ? `Confirmation gate active. ${services.confirmationGate.list({ status: 'pending' }).length} pending request(s).`
@@ -59,7 +59,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
       executor: {
         kind: 'external-mcp',
         recommended: 'Claude in Chrome',
-        details: 'AuthorClaw does not bundle a browser driver. Connect Claude-in-Chrome MCP (or your preferred browser-automation MCP) and it will pick up approved confirmations.',
+        details: 'AuthorAgent does not bundle a browser driver. Connect Claude-in-Chrome MCP (or your preferred browser-automation MCP) and it will pick up approved confirmations.',
       },
       safetyRails: [
         'Every irreversible action passes through ConfirmationGateService',
@@ -327,7 +327,7 @@ export function registerWave3GatedRoutes(ctx: ApiContext): void {
       to: req.query.to as any,
     });
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="authorclaw-calendar.ics"');
+    res.setHeader('Content-Disposition', 'attachment; filename="authoragent-calendar.ics"');
     res.send(ics);
   });
 

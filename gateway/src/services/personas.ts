@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Author Personas Service
+ * AuthorAgent Author Personas Service
  * Manage pen names, writing styles, and author identities for multi-persona publishing.
  */
 

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Injection Detector
+ * AuthorAgent Injection Detector
  * Detects common prompt injection patterns.
  *
  * Severity model:

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Sleep-Time Consolidation Service
+ * AuthorAgent Sleep-Time Consolidation Service
  *
  * Chunk C of the Tiered Memory + Sleep-Time Consolidation design. This is the
  * background job that MATERIALIZES the CoreDigest ({projectId}-core.json) read

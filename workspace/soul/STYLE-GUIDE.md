@@ -1,6 +1,6 @@
 # Style Guide
 
-*This file is your project-level style guide. AuthorClaw reads it before drafting
+*This file is your project-level style guide. AuthorAgent reads it before drafting
 or revising prose so the output matches how you write.*
 
 *Edit this file (or replace it entirely) with your own rules. Below is a

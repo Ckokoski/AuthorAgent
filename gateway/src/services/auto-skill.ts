@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Auto-Skill Creator — Hermes-inspired automatic skill capture.
+ * AuthorAgent Auto-Skill Creator — Hermes-inspired automatic skill capture.
  *
  * When a project completes successfully (or a multi-step workflow finishes
  * cleanly), this service distills the steps + outcomes into a SKILL.md
@@ -62,7 +62,7 @@ interface PersistedState {
 // Prompt template
 // ═══════════════════════════════════════════════════════════
 
-const SKILL_DRAFT_PROMPT = `You are drafting a SKILL.md file for AuthorClaw — a YAML-frontmatter + Markdown document that captures a reusable workflow.
+const SKILL_DRAFT_PROMPT = `You are drafting a SKILL.md file for AuthorAgent — a YAML-frontmatter + Markdown document that captures a reusable workflow.
 
 You will be given a project's title, description, and an ordered list of its steps with their results. Distill that into a SKILL.md the next user can reuse for similar work.
 
@@ -290,7 +290,7 @@ export class AutoSkillService {
     await this.persist();
     return {
       success: true,
-      message: `Skill installed at skills/${category}/${draft.slug}/SKILL.md. Restart AuthorClaw to load it.`,
+      message: `Skill installed at skills/${category}/${draft.slug}/SKILL.md. Restart AuthorAgent to load it.`,
       finalPath: targetPath,
     };
   }

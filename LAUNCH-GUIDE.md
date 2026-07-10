@@ -1,6 +1,6 @@
-# AuthorClaw Launch Guide
+# AuthorAgent Launch Guide
 
-Quick reference for starting, stopping, and managing AuthorClaw.
+Quick reference for starting, stopping, and managing AuthorAgent.
 
 ---
 
@@ -8,7 +8,7 @@ Quick reference for starting, stopping, and managing AuthorClaw.
 
 ### Start the server
 ```bash
-cd C:\Users\chris\OneDrive\Documents\Automations\AuthorClaw\authorclaw
+cd C:\Users\chris\OneDrive\Documents\Automations\AuthorAgent\authoragent
 npm start
 ```
 
@@ -20,7 +20,7 @@ npm run dev
 ### Stop the server
 Press `Ctrl+C` in the terminal, or:
 ```bash
-taskkill /F /FI "WINDOWTITLE eq *authorclaw*"
+taskkill /F /FI "WINDOWTITLE eq *authoragent*"
 ```
 
 ### Dashboard
@@ -66,7 +66,7 @@ npm start
 ```
 
 ### Remote access (from your PC to VPS)
-AuthorClaw binds to `127.0.0.1` only — it's not exposed to the internet by default.
+AuthorAgent binds to `127.0.0.1` only — it's not exposed to the internet by default.
 Use an SSH tunnel to access it securely:
 ```bash
 # On your local PC — creates a secure tunnel
@@ -141,7 +141,7 @@ curl -X POST http://localhost:3847/api/projects/PROJECT_ID/resume
 
 | Service | Port | Binding |
 |---|---|---|
-| AuthorClaw | 3847 | localhost only |
+| AuthorAgent | 3847 | localhost only |
 | Ollama (if installed) | 11434 | localhost only |
 
 ## Security Checklist

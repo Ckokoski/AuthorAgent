@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Style Clone
+ * AuthorAgent Style Clone
  *
  * 47-marker voice analyzer adapted from the sibling Style Clone Pro project.
  * Extracts quantitative markers of writing style from a sample manuscript

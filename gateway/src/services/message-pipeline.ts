@@ -3,7 +3,7 @@
  * Socket.IO (webchat), and Telegram (via CommandHandlers) and the project
  * step-executor (goal-engine channel).
  *
- * Extracted VERBATIM from AuthorClawGateway.handleMessage (and its private
+ * Extracted VERBATIM from AuthorAgentGateway.handleMessage (and its private
  * helpers decideInjectionAction / classifyTask / buildSystemPrompt / getHistory)
  * as part of the Phase 2 god-file split (Phase 2 final, step 2).
  *

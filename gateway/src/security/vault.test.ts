@@ -16,7 +16,7 @@ describe('Vault (AES-256-GCM) — tmpdir roundtrip', () => {
   let originalKey: string | undefined;
 
   beforeEach(async () => {
-    vaultDir = await mkdtemp(join(tmpdir(), 'authorclaw-vault-test-'));
+    vaultDir = await mkdtemp(join(tmpdir(), 'authoragent-vault-test-'));
     originalKey = process.env.AUTHORCLAW_VAULT_KEY;
     process.env.AUTHORCLAW_VAULT_KEY = 'test-key-for-vitest-do-not-use-in-prod';
   });

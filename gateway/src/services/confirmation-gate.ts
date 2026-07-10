@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Confirmation Gate
+ * AuthorAgent Confirmation Gate
  *
  * Universal safety rail. EVERY irreversible action in Wave 3 (publish, send,
  * submit, purchase, bid change, delete, upload-to-store) must create a
@@ -193,7 +193,7 @@ export class ConfirmationGateService {
 
   /**
    * User approval — ONLY called from a dashboard endpoint authenticated
-   * against the local server (AuthorClaw binds to 127.0.0.1). Can't be
+   * against the local server (AuthorAgent binds to 127.0.0.1). Can't be
    * triggered from observed content.
    */
   async approve(id: string, decidedBy: string = 'user'): Promise<ConfirmationRequest | null> {

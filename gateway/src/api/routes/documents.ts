@@ -731,7 +731,7 @@ export function registerDocumentRoutes(ctx: ApiContext): void {
       // Get persona info for metadata
       const personaId = (project as any).personaId;
       const persona = personaId ? services.personas?.get(personaId) : null;
-      const authorName = persona?.penName || 'AuthorClaw';
+      const authorName = persona?.penName || 'AuthorAgent';
 
       const exportFiles = [`${outputBaseName}.md`];
 

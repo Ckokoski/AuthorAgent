@@ -1,7 +1,7 @@
 ---
 name: website-publisher
 description: Manage your author website — auto-publish books on completion, draft blog posts from your projects, render and deploy with one command
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - publish my site
@@ -30,11 +30,11 @@ permissions:
 
 # Website Publisher
 
-The management layer on top of AuthorClaw's static-site builder. Generates
+The management layer on top of AuthorAgent's static-site builder. Generates
 your site, keeps it in sync with your books, drafts blog posts from your
 project artifacts, and pushes the rendered site to your host.
 
-This skill is **deliberately not a CMS**. AuthorClaw is for producing books
+This skill is **deliberately not a CMS**. AuthorAgent is for producing books
 — shipping a working site is part of that, but maintaining a fully
 interactive web property isn't. Authors who need comments, forms, ESP
 integration UIs, or deep analytics should keep using the WordPress /
@@ -119,7 +119,7 @@ bundle them):
   - **none** — render only, no deploy
 
 Tokens are read from `process.env` at deploy time using a configured
-`tokenEnvVar` name. **Tokens are never stored in AuthorClaw config.**
+`tokenEnvVar` name. **Tokens are never stored in AuthorAgent config.**
 
 ## What this skill does NOT do
 
@@ -148,8 +148,8 @@ Tokens are read from `process.env` at deploy time using a configured
 ## When to NOT use this skill
 
 If you already have a working WordPress / Squarespace / Ghost / Wix site
-that fits your workflow, AuthorClaw can still complement it (cover gen,
+that fits your workflow, AuthorAgent can still complement it (cover gen,
 blog post drafts you paste into your CMS, etc.) — but you don't need this
 skill. Use it when you want a clean static site that auto-syncs with your
-AuthorClaw projects with minimal hosting cost ($0 on Netlify free tier
+AuthorAgent projects with minimal hosting cost ($0 on Netlify free tier
 for most authors).

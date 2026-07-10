@@ -1,5 +1,5 @@
 /**
- * AuthorClaw BookBub Featured Deal Submission Optimizer
+ * AuthorAgent BookBub Featured Deal Submission Optimizer
  *
  * Builds an optimized Featured Deal submission: BookBub-specific blurb
  * variant, why-this-time rationale, pricing + territory + genre selection.

@@ -1,7 +1,7 @@
 ---
 name: research
 description: Constrained internet research with source tracking for fiction and nonfiction projects
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "research"

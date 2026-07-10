@@ -58,6 +58,8 @@ AuthorAgent: "Pipeline created — 6 phases, 48 steps total"
 
 ## Quick Start
 
+> **Note:** The product is now **AuthorAgent**. The GitHub repository is still named `authorclaw` (repo rename pending), so clone URLs and the local directory keep that name for now.
+
 ```bash
 # 1. Clone and install
 git clone https://github.com/Ckokoski/authoragent.git
@@ -166,15 +168,15 @@ AuthorAgent: ✅ 1/2: Draft the intro (~400 words)
 AuthorAgent: 🎉 All 2 steps complete!
 
 You:        /novel a sci-fi thriller about rogue AI in aviation
-AuthorClaw: 📖 Novel pipeline created: 32 steps
+AuthorAgent: 📖 Novel pipeline created: 32 steps
             (premise → bible → outline → chapters → revision → assembly)
-AuthorClaw: ✅ 1/32: Develop premise (~800 words)
+AuthorAgent: ✅ 1/32: Develop premise (~800 words)
             ⏭ Next: Refine premise...
 You:        /stop
-AuthorClaw: ⏸ Paused at step 4/32. Say "continue" to resume.
+AuthorAgent: ⏸ Paused at step 4/32. Say "continue" to resume.
 
 You:        /clean
-AuthorClaw: 📊 Workspace Usage: 2.1 MB (67 files)
+AuthorAgent: 📊 Workspace Usage: 2.1 MB (67 files)
             📁 projects: 43 files (1.8 MB)
             📁 exports: 2 files (21 KB)
             🧹 /clean projects — delete all project files
@@ -196,7 +198,7 @@ Open `http://localhost:3847` to access the web dashboard — a sidebar-driven in
 
 ## Voice & Text-to-Speech
 
-AuthorClaw includes a built-in neural voice engine powered by Microsoft Edge TTS — no API keys, no binary installation, no cost.
+AuthorAgent includes a built-in neural voice engine powered by Microsoft Edge TTS — no API keys, no binary installation, no cost.
 
 **9 author-optimized voice presets:**
 
@@ -228,7 +230,7 @@ AuthorClaw includes a built-in neural voice engine powered by Microsoft Edge TTS
 
 ## Document Library & Large Manuscript Support
 
-AuthorClaw supports uploading manuscripts of any size — from short stories to 100K+ word novels.
+AuthorAgent supports uploading manuscripts of any size — from short stories to 100K+ word novels.
 
 **Two-tier upload system:**
 
@@ -254,7 +256,7 @@ AuthorClaw supports uploading manuscripts of any size — from short stories to 
 
 ## Dynamic Task Planning
 
-When you give AuthorClaw a task, it doesn't use hardcoded templates. Instead:
+When you give AuthorAgent a task, it doesn't use hardcoded templates. Instead:
 
 1. The AI receives a catalog of all available skills (with descriptions and triggers)
 2. The AI receives the list of Author OS tools
@@ -262,7 +264,7 @@ When you give AuthorClaw a task, it doesn't use hardcoded templates. Instead:
 4. Each step is executed with that skill's full content injected into the AI's context
 5. Results from earlier steps are chained into later steps for continuity
 
-If AI planning fails, the system falls back to template-based planning (6 project types with pre-built step sequences). For pipeline mode, AuthorClaw chains all 6 phases (Planning → Bible → Production → Revision → Format → Launch) into a single automated workflow, passing outputs forward between phases.
+If AI planning fails, the system falls back to template-based planning (6 project types with pre-built step sequences). For pipeline mode, AuthorAgent chains all 6 phases (Planning → Bible → Production → Revision → Format → Launch) into a single automated workflow, passing outputs forward between phases.
 
 ---
 
@@ -276,7 +278,7 @@ Skills are markdown files that teach the AI how to handle specific writing tasks
 
 **Marketing Skills (2):** blurb-writer, ad-copy
 
-**Tool Ingestion:** AuthorClaw can read source code of any tool and generate a new skill from it. Just say "create a skill from this code" or use `POST /api/tools/ingest`.
+**Tool Ingestion:** AuthorAgent can read source code of any tool and generate a new skill from it. Just say "create a skill from this code" or use `POST /api/tools/ingest`.
 
 Skills are automatically matched by keyword triggers and injected into the AI's context. A full reference with descriptions and example trigger keywords is available in `workspace/SKILLS.txt`.
 
@@ -285,7 +287,7 @@ Skills are automatically matched by keyword triggers and injected into the AI's 
 ## Project Structure
 
 ```
-authorclaw/
+authoragent/
 ├── gateway/src/          # Core application
 │   ├── index.ts          # Main entry point (gateway, handlers, bridges)
 │   ├── ai/router.ts      # Multi-provider AI routing
@@ -327,7 +329,7 @@ authorclaw/
 
 ## Security
 
-AuthorClaw security features:
+AuthorAgent security features:
 
 - **Vault**: AES-256-GCM encrypted credential storage (scrypt KDF)
 - **Sandbox**: Workspace-only file access enforcement
@@ -341,16 +343,16 @@ AuthorClaw security features:
 
 ## Deployment — Defense in Depth
 
-> **We strongly recommend running AuthorClaw inside a VM or VPS with Docker.** Your API keys, manuscripts, and creative work deserve real protection. Defense in depth means multiple security layers — not just application-level security.
+> **We strongly recommend running AuthorAgent inside a VM or VPS with Docker.** Your API keys, manuscripts, and creative work deserve real protection. Defense in depth means multiple security layers — not just application-level security.
 
 ### Recommended: VPS + Docker + VPN (Best Security)
 
 This is the gold standard for always-on, secure operation:
 
 1. **Rent a VPS** ($5-6/month) — Hetzner, DigitalOcean, or Linode
-2. **Install Docker** — containerizes AuthorClaw with strict resource limits
+2. **Install Docker** — containerizes AuthorAgent with strict resource limits
 3. **Install Tailscale** — free mesh VPN, no public ports exposed
-4. **Deploy AuthorClaw** — `docker compose up -d`
+4. **Deploy AuthorAgent** — `docker compose up -d`
 
 ```bash
 # On your VPS:
@@ -365,7 +367,7 @@ docker compose up -d
 ```
 
 **Why this matters:**
-- VPS isolates AuthorClaw from your personal machine
+- VPS isolates AuthorAgent from your personal machine
 - Docker containers limit file access and resource usage
 - Tailscale VPN means zero public ports — only your devices can connect
 - Telegram works 24/7 even when your computer is off
@@ -377,7 +379,7 @@ If you prefer running locally:
 
 1. **VirtualBox/UTM** — free VM software
 2. **Ubuntu 24.04** — lightweight Linux inside the VM
-3. **Run AuthorClaw natively** or with Docker inside the VM
+3. **Run AuthorAgent natively** or with Docker inside the VM
 
 ```bash
 # In your VM:
@@ -385,7 +387,7 @@ bash /media/sf_authorclaw-transfer/run.sh
 ```
 
 **Why a VM helps:**
-- Isolates AuthorClaw from your host OS
+- Isolates AuthorAgent from your host OS
 - If something goes wrong, the VM is disposable
 - Shared folders let you copy files in/out safely
 - Snapshots let you roll back to a known-good state
@@ -400,7 +402,7 @@ cd authorclaw && npm install
 npx tsx gateway/src/index.ts
 ```
 
-AuthorClaw binds to `localhost:3847` only — not exposed to the internet. But your API keys and manuscripts live on your main OS with no isolation layer.
+AuthorAgent binds to `localhost:3847` only — not exposed to the internet. But your API keys and manuscripts live on your main OS with no isolation layer.
 
 ### Security Layers Summary
 
@@ -431,7 +433,7 @@ It walks you through everything: OS detection, Node.js installation, Ollama setu
 
 ## Contributing
 
-AuthorClaw is open source and contributions are welcome! Whether you're an author with ideas for new skills, a developer who wants to improve the codebase, or a tinkerer who built a cool integration — we'd love your help.
+AuthorAgent is open source and contributions are welcome! Whether you're an author with ideas for new skills, a developer who wants to improve the codebase, or a tinkerer who built a cool integration — we'd love your help.
 
 ### Ways to Contribute
 
@@ -456,9 +458,9 @@ For new skills, create a folder in `skills/author/`, `skills/marketing/`, or `sk
 
 ## Disclaimer
 
-This software is provided "as is" without warranty of any kind. **Use at your own risk.** AuthorClaw is an experimental AI writing tool — some configuration and code tinkering may be required to get the agent working exactly the way you want it. AI outputs should always be reviewed by a human before publishing. The authors are not responsible for any content generated by the AI or any consequences of using this software.
+This software is provided "as is" without warranty of any kind. **Use at your own risk.** AuthorAgent is an experimental AI writing tool — some configuration and code tinkering may be required to get the agent working exactly the way you want it. AI outputs should always be reviewed by a human before publishing. The authors are not responsible for any content generated by the AI or any consequences of using this software.
 
-AuthorClaw relies on third-party AI providers (Gemini, Claude, OpenAI, DeepSeek, Ollama). Usage of those services is subject to their respective terms and pricing. API costs are your responsibility.
+AuthorAgent relies on third-party AI providers (Gemini, Claude, OpenAI, DeepSeek, Ollama). Usage of those services is subject to their respective terms and pricing. API costs are your responsibility.
 
 ## License
 

@@ -1,7 +1,7 @@
 ---
 name: after-action-review
 description: Structured post-goal reflection that extracts lessons, evaluates quality, and feeds the self-improvement loop
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "after action review"

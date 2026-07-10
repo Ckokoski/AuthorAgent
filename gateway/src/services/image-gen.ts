@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Image Generation Service
+ * AuthorAgent Image Generation Service
  * Supports Together AI (Flux models) and OpenAI (GPT Image) for book cover generation.
  * Uses native fetch — no external dependencies.
  */

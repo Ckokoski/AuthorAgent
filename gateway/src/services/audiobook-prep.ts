@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Audiobook Prep
+ * AuthorAgent Audiobook Prep
  *
  * Prepares a manuscript for narration (human or AI). Three passes:
  *
@@ -19,7 +19,7 @@
  *    (Amazon Polly, Google Cloud TTS, Microsoft Azure, ElevenLabs v3).
  *
  * Safety: projects must set `aiNarrationDisclosed: true` in their config
- * before AuthorClaw will generate SSML for AI narration. ACX, Apple Books,
+ * before AuthorAgent will generate SSML for AI narration. ACX, Apple Books,
  * Google Play, and Spotify all require disclosure of AI-narrated audio.
  */
 

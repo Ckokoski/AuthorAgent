@@ -1,7 +1,7 @@
 ---
 name: outline
 description: Create structured outlines using popular frameworks (Save the Cat, 3-Act, Hero's Journey, custom)
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "outline"

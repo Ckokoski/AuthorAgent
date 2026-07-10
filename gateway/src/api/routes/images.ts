@@ -52,7 +52,7 @@ export function registerImageRoutes(ctx: ApiContext): void {
     try {
       const result = await imageGen.generateBookCover({
         title: title || 'Untitled',
-        author: author || 'AuthorClaw',
+        author: author || 'AuthorAgent',
         genre: genre || 'fiction',
         description,
         style,
@@ -84,7 +84,7 @@ export function registerImageRoutes(ctx: ApiContext): void {
     try {
       const result = await imageGen.generateCoverSet({
         title: req.body.title || 'Untitled',
-        author: req.body.author || 'AuthorClaw',
+        author: req.body.author || 'AuthorAgent',
         genre: req.body.genre || 'fiction',
         description: req.body.description,
         style: req.body.style,
@@ -120,7 +120,7 @@ export function registerImageRoutes(ctx: ApiContext): void {
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     // Resolve author name from linked persona if present.
-    let authorName = 'AuthorClaw';
+    let authorName = 'AuthorAgent';
     if ((project as any).personaId && services.personas) {
       const persona = services.personas.get?.((project as any).personaId);
       if (persona?.penName) authorName = persona.penName;

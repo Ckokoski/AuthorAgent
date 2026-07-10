@@ -1,7 +1,7 @@
 ---
 name: style-clone
 description: Analyze and match the author's unique writing voice
-author: AuthorClaw
+author: AuthorAgent
 version: 1.1.0
 triggers:
   - "learn my style"
@@ -21,7 +21,7 @@ Analyze the author's writing to create a quantitative Voice Profile, then use it
 to match their style.
 
 > **Use the gateway's analyzer — do NOT hand-roll a freeform analysis.**
-> AuthorClaw already ships a 47-marker voice analyzer as a first-class service
+> AuthorAgent already ships a 47-marker voice analyzer as a first-class service
 > (`StyleCloneService`). It is deterministic, cheap (no AI call), and returns a
 > structured `StyleProfile` plus an AI system prompt you can apply to every
 > drafting/revision task. This skill's job is to CALL that service and save the

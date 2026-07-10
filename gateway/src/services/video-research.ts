@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Video Research
+ * AuthorAgent Video Research
  *
  * Extract research from video sources for fiction/nonfiction authors.
  * Inspired by claude-video, scoped tightly to the author use case:

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw TTS Service
+ * AuthorAgent TTS Service
  *
  * Multi-provider text-to-speech. Inspired by OpenClaw 2026.4.25's pluggable
  * TTS architecture but tightly scoped to author workflows.

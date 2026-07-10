@@ -1,11 +1,11 @@
 /**
- * AuthorClaw Lesson Store
+ * AuthorAgent Lesson Store
  * Manages improvement-log.jsonl — persistent lessons learned from
  * after-action reviews, user feedback, self-critique, and error recovery.
  *
  * Each lesson has a confidence score (0.0–1.0) that rises on acceptance
  * and decays on revision. High-confidence lessons are injected into
- * the system prompt so AuthorClaw gets smarter over time.
+ * the system prompt so AuthorAgent gets smarter over time.
  *
  * Ported from Sneakers, adapted for author workflows.
  */

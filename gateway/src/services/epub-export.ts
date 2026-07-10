@@ -1,5 +1,5 @@
 /**
- * AuthorClaw EPUB Export Utility
+ * AuthorAgent EPUB Export Utility
  * Generate valid EPUB3 files from markdown content
  * Uses adm-zip (already a dependency) to build the EPUB zip structure
  */
@@ -34,7 +34,7 @@ export async function generateEpubBuffer(options: EpubExportOptions): Promise<Bu
     language = 'en', isbn, authorBio, coverImageBuffer,
   } = options;
 
-  const bookId = isbn || `authorclaw-${Date.now()}`;
+  const bookId = isbn || `authoragent-${Date.now()}`;
   const chapters = splitIntoChapters(content);
   const zip = new AdmZip();
 
@@ -108,7 +108,7 @@ ${tocItems}
 </html>`, 'utf-8'));
 
   // ── 5. OEBPS/style.css ──
-  zip.addFile('OEBPS/style.css', Buffer.from(`/* AuthorClaw EPUB Stylesheet */
+  zip.addFile('OEBPS/style.css', Buffer.from(`/* AuthorAgent EPUB Stylesheet */
 body {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 1em;

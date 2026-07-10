@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Plot Promises
+ * AuthorAgent Plot Promises
  *
  * Sanderson's "promises and payoffs" framework, made concrete:
  *

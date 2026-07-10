@@ -9,10 +9,10 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <meta name="dashboard-version" content="5.0.0">
-<title>AuthorClaw Dashboard</title>
+<title>AuthorAgent Dashboard</title>
 <style>
 /* ================================================================
-   AuthorClaw Dashboard v4.0.0 — Single-file SPA
+   AuthorAgent Dashboard v4.0.0 — Single-file SPA
    ================================================================ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -687,7 +687,7 @@ textarea { resize: vertical; min-height: 60px; }
   <div class="sidebar-brand">
     <span class="brand-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span>
     <div>
-      <span class="brand-text">AuthorClaw</span>
+      <span class="brand-text">AuthorAgent</span>
       <span class="brand-ver">v4.0.0</span>
     </div>
   </div>
@@ -757,7 +757,7 @@ textarea { resize: vertical; min-height: 60px; }
     <h2 id="panelTitle">Home</h2>
     <div class="header-right">
       <span id="headerStatus"></span>
-      <button id="btnChatDrawerToggle" title="Chat with AuthorClaw">💬 <span>Chat</span></button>
+      <button id="btnChatDrawerToggle" title="Chat with AuthorAgent">💬 <span>Chat</span></button>
     </div>
   </div>
   <div class="main-body">
@@ -1374,7 +1374,7 @@ textarea { resize: vertical; min-height: 60px; }
       <!-- Quick-start banner — only shown when no providers are active -->
       <div class="card" id="quickStartBanner" style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-left:4px solid var(--accent);display:none;">
         <div class="card-title" style="color:#78350f;">Welcome — connect at least one AI provider to get started</div>
-        <p style="color:#78350f;margin-bottom:8px;font-size:14px;">AuthorClaw needs an API key (paid) or a local Ollama install (free) to write. Pick one:</p>
+        <p style="color:#78350f;margin-bottom:8px;font-size:14px;">AuthorAgent needs an API key (paid) or a local Ollama install (free) to write. Pick one:</p>
         <ul style="color:#78350f;margin-left:24px;margin-bottom:8px;font-size:14px;">
           <li><strong>Free + cloud:</strong> Get a Gemini API key from Google AI Studio (link below)</li>
           <li><strong>Free + local:</strong> Install Ollama and run <code>ollama serve</code> — auto-detected</li>
@@ -1401,7 +1401,7 @@ textarea { resize: vertical; min-height: 60px; }
       <!-- OpenRouter (model selector) — only useful when an OpenRouter key is configured -->
       <div class="card" id="openrouterCard">
         <div class="card-title">OpenRouter Model</div>
-        <p class="hint" style="margin-bottom:12px;">If you've added an OpenRouter API key above, pick which model AuthorClaw should use through it. Examples: <code>anthropic/claude-sonnet-4-5</code>, <code>openai/gpt-4o</code>, <code>meta-llama/llama-3.3-70b-instruct</code>, <code>google/gemini-2.5-flash</code>. Full list at <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>.</p>
+        <p class="hint" style="margin-bottom:12px;">If you've added an OpenRouter API key above, pick which model AuthorAgent should use through it. Examples: <code>anthropic/claude-sonnet-4-5</code>, <code>openai/gpt-4o</code>, <code>meta-llama/llama-3.3-70b-instruct</code>, <code>google/gemini-2.5-flash</code>. Full list at <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>.</p>
         <div class="form-group">
           <label>Model slug</label>
           <input type="text" id="openrouterModel" placeholder="anthropic/claude-sonnet-4-5">
@@ -1597,7 +1597,7 @@ textarea { resize: vertical; min-height: 60px; }
           <span>Lessons Learned</span>
           <button class="small danger" id="btnResetLessons" style="font-size:11px;padding:4px 10px;">Reset All</button>
         </div>
-        <p class="hint" style="margin-bottom:8px;">AuthorClaw learns from experience. High-confidence lessons are injected into every prompt.</p>
+        <p class="hint" style="margin-bottom:8px;">AuthorAgent learns from experience. High-confidence lessons are injected into every prompt.</p>
         <div id="lessonsList" style="max-height:300px;overflow-y:auto;">
           <div style="color:var(--muted);">Loading...</div>
         </div>
@@ -1658,7 +1658,7 @@ textarea { resize: vertical; min-height: 60px; }
 <div class="chat-drawer-overlay" id="chatDrawerOverlay"></div>
 <div class="chat-drawer" id="chatDrawer">
   <div class="chat-drawer-header">
-    <span class="card-title">Chat with AuthorClaw</span>
+    <span class="card-title">Chat with AuthorAgent</span>
     <div style="display:flex;align-items:center;gap:8px;">
       <button id="btnChatClear" class="small secondary" title="Clear chat history" style="font-size:11px;padding:4px 10px;">Clear</button>
       <button id="btnChatDrawerClose" class="small secondary" title="Close" style="font-size:11px;padding:4px 10px;">✕</button>
@@ -1667,7 +1667,7 @@ textarea { resize: vertical; min-height: 60px; }
   <div class="chat-drawer-body">
     <div class="chat-container">
       <div class="chat-messages" id="chatMessages">
-        <div class="chat-msg bot">Hello! I'm AuthorClaw, your AI writing partner. How can I help you today?</div>
+        <div class="chat-msg bot">Hello! I'm AuthorAgent, your AI writing partner. How can I help you today?</div>
       </div>
       <div class="chat-input-row">
         <input type="text" id="chatInput" placeholder="Type a message or /command... (Enter to send)">
@@ -2073,7 +2073,7 @@ function showTyping() {
   var ind = document.createElement('div');
   ind.className = 'typing-indicator';
   ind.id = 'typingIndicator';
-  ind.innerHTML = '<span>.</span><span>.</span><span>.</span> AuthorClaw is thinking';
+  ind.innerHTML = '<span>.</span><span>.</span><span>.</span> AuthorAgent is thinking';
   el.appendChild(ind);
   el.scrollTop = el.scrollHeight;
 }
@@ -2111,7 +2111,7 @@ document.getElementById('chatInput').addEventListener('keydown', function(e) {
 });
 document.getElementById('btnChatClear').addEventListener('click', function() {
   var el = document.getElementById('chatMessages');
-  el.innerHTML = '<div class="chat-msg bot">Hello! I\'m AuthorClaw, your AI writing partner. How can I help you today?</div>';
+  el.innerHTML = '<div class="chat-msg bot">Hello! I\'m AuthorAgent, your AI writing partner. How can I help you today?</div>';
   chatWaiting = false;
 });
 
@@ -4300,7 +4300,7 @@ function loadGettingStarted() {
       var doneBtn = document.getElementById('btnDismissGettingStarted');
       if (doneBtn) doneBtn.style.display = 'none';
       document.getElementById('gettingStartedList').innerHTML =
-        '<div style="color:var(--success);font-weight:600;">All set — AuthorClaw is ready to write with you.</div>';
+        '<div style="color:var(--success);font-weight:600;">All set — AuthorAgent is ready to write with you.</div>';
       card.style.display = 'block';
       return;
     }
@@ -4465,7 +4465,7 @@ document.getElementById('btnTestVoice').addEventListener('click', function() {
   var btn = document.getElementById('btnTestVoice');
   btn.textContent = 'Generating...';
   btn.disabled = true;
-  api('POST', '/api/audio/generate', { text: 'Hello! I am AuthorClaw, your AI writing partner. Let me help you create your next bestseller.', voice: voice }).then(function(data) {
+  api('POST', '/api/audio/generate', { text: 'Hello! I am AuthorAgent, your AI writing partner. Let me help you create your next bestseller.', voice: voice }).then(function(data) {
     if (data.success && data.filename) {
       var audio = new Audio('/api/audio/file/' + encodeURIComponent(data.filename));
       audio.play().then(function() {
@@ -4974,7 +4974,7 @@ function loadLessons() {
     var el = document.getElementById('lessonsList');
     var lessons = data.lessons || [];
     if (lessons.length === 0) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:13px;">No lessons yet. AuthorClaw will learn from experience over time.</div>';
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;">No lessons yet. AuthorAgent will learn from experience over time.</div>';
       return;
     }
     el.innerHTML = lessons.sort(function(a,b) { return b.confidence - a.confidence; }).map(function(l) {
@@ -6013,7 +6013,7 @@ function renderBookBubDraft(draft) {
     }).join('');
   }
 
-  html += '<div class="hint" style="margin-top:6px;">This is a draft to review and paste into partners.bookbub.com yourself. AuthorClaw never fabricates review quotes and never submits on your behalf.</div>';
+  html += '<div class="hint" style="margin-top:6px;">This is a draft to review and paste into partners.bookbub.com yourself. AuthorAgent never fabricates review quotes and never submits on your behalf.</div>';
   el.innerHTML = html;
 }
 

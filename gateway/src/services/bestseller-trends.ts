@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Bestseller Trends Provider (PLACEHOLDER)
+ * AuthorAgent Bestseller Trends Provider (PLACEHOLDER)
  *
  * This is the integration point for a forthcoming PAID data API — Chris's
  * own book-market data product ("Bestseller Trends"). The real API is not

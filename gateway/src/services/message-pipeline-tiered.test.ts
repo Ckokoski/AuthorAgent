@@ -39,7 +39,7 @@ let workspaceDir: string;
 let engine: ContextEngine;
 
 beforeEach(() => {
-  rootDir = mkdtempSync(join(tmpdir(), 'authorclaw-b2-'));
+  rootDir = mkdtempSync(join(tmpdir(), 'authoragent-b2-'));
   workspaceDir = join(rootDir, 'workspace');
   mkdirSync(workspaceDir, { recursive: true });
   engine = new ContextEngine(workspaceDir);

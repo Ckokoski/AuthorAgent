@@ -1,7 +1,7 @@
 /**
- * AuthorClaw Telegram Bridge
+ * AuthorAgent Telegram Bridge
  * Secure Telegram bot integration — acts as a command center
- * Users give orders via Telegram, AuthorClaw executes in the VM
+ * Users give orders via Telegram, AuthorAgent executes in the VM
  */
 
 interface TelegramConfig {
@@ -119,7 +119,7 @@ export class TelegramBridge {
     // ── /start and /help ──
     if (text.startsWith('/start') || text.startsWith('/help')) {
       await this.sendMessage(chatId,
-        `✍️ Hey ${userName}! I'm AuthorClaw.\n\n` +
+        `✍️ Hey ${userName}! I'm AuthorAgent.\n\n` +
         `Tell me what to do and I'll figure out the steps.\n\n` +
         `*Commands:*\n` +
         `/novel [idea] — Start a full novel pipeline\n` +
@@ -495,7 +495,7 @@ export class TelegramBridge {
       if (!args) {
         await this.sendMessage(chatId,
           `🔊 *Voice Messages:*\n\n` +
-          `/speak Hello, I am AuthorClaw\n` +
+          `/speak Hello, I am AuthorAgent\n` +
           `/speak narrator_deep In a world...\n` +
           `/speak 3 — Read file #3 aloud\n\n` +
           `*Voices:* narrator_female, narrator_male, narrator_deep, narrator_warm, british_male, british_female, storyteller, dramatic`);
@@ -680,7 +680,7 @@ export class TelegramBridge {
       const filename = basename(filePath);
 
       // Build multipart form data manually (no external dependency)
-      const boundary = '----AuthorClawVoice' + Date.now();
+      const boundary = '----AuthorAgentVoice' + Date.now();
       const parts: Buffer[] = [];
 
       // chat_id field

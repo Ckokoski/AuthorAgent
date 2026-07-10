@@ -98,7 +98,7 @@ async function loadSeed(ctx: ProjectContext): Promise<void> {
 }
 
 beforeEach(async () => {
-  workspaceDir = mkdtempSync(join(tmpdir(), 'authorclaw-sleep-'));
+  workspaceDir = mkdtempSync(join(tmpdir(), 'authoragent-sleep-'));
   contextEngine = new ContextEngine(workspaceDir);
   memoryTier = new MemoryTierService(contextEngine, null, workspaceDir);
   preferences = new PreferenceStore(join(workspaceDir, 'memory'));

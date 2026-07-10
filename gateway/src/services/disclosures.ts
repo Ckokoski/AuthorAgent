@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Disclosures Service
+ * AuthorAgent Disclosures Service
  *
  * Enforces legal + platform disclosure requirements before any AI-generated
  * content gets uploaded anywhere. Every Wave 3 service calls this to get
@@ -170,7 +170,7 @@ const RULES: DisclosureRequirement[] = [
     scope: 'financial_action',
     platform: 'Any',
     requirement: 'required',
-    whyItMatters: 'AuthorClaw must never execute paid transactions without the user having reviewed the final bid / spend / total in the confirmation card.',
+    whyItMatters: 'AuthorAgent must never execute paid transactions without the user having reviewed the final bid / spend / total in the confirmation card.',
     userVisibleText: 'You are authorizing a real-money transaction. Review the amount and payment source before confirming.',
   },
 ];
@@ -238,12 +238,12 @@ export class DisclosuresService {
 
   /**
    * Top-level universal disclaimer — shown once on any dashboard page that
-   * initiates external actions. Authors should be reminded that AuthorClaw
+   * initiates external actions. Authors should be reminded that AuthorAgent
    * doesn't provide legal advice.
    */
   universalDisclaimer(): string {
     return (
-      `AuthorClaw helps you comply with common platform and legal disclosure requirements, ` +
+      `AuthorAgent helps you comply with common platform and legal disclosure requirements, ` +
       `but it does not constitute legal advice. Rules change. Authors are solely responsible for ` +
       `the legality and accuracy of content they publish, upload, send, or submit. Review every ` +
       `action before approving.`

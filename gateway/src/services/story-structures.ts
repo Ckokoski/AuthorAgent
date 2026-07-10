@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Story Structures
+ * AuthorAgent Story Structures
  *
  * SMART-RECOMMEND, NOT FORCE. Different genres genuinely need different
  * structures (Save the Cat works for thrillers, fails for romance; Romancing
@@ -415,7 +415,7 @@ export class StoryStructureService {
       const noneStruct = STRUCTURES.find(s => s.id === 'none')!;
       additionalNotes.push(
         `For ${input.subgenre || input.genre}, "${noneStruct.name}" is also a legitimate choice. ` +
-        `Many literary novels deliberately break structure for effect. AuthorClaw won't force a beat sheet you didn't pick.`
+        `Many literary novels deliberately break structure for effect. AuthorAgent won't force a beat sheet you didn't pick.`
       );
     }
 
@@ -453,7 +453,7 @@ export class StoryStructureService {
         structureId, structureName: structure.name,
         totalBeats: 0, beatsFoundInRange: 0, beatsFoundMisplaced: 0, beatsMissing: 0,
         mustHaveMissing: 0, results: [],
-        summary: `No structure selected — beat checking skipped. AuthorClaw won't enforce structure on this project.`,
+        summary: `No structure selected — beat checking skipped. AuthorAgent won't enforce structure on this project.`,
         needsAttention: false,
       };
     }

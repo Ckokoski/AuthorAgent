@@ -37,7 +37,7 @@ describe('SkillLoader.loadAll + parsing', () => {
   let loader: SkillLoader;
 
   beforeEach(async () => {
-    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-skills-test-'));
+    skillsDir = await mkdtemp(join(tmpdir(), 'authoragent-skills-test-'));
     loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
   });
 
@@ -150,7 +150,7 @@ describe('SkillLoader.registerSynthetic', () => {
   let loader: SkillLoader;
 
   beforeEach(async () => {
-    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-skills-test-'));
+    skillsDir = await mkdtemp(join(tmpdir(), 'authoragent-skills-test-'));
     loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
     await loader.loadAll();
   });
@@ -200,7 +200,7 @@ describe('SkillLoader.matchSkills — ranking, cap, budget', () => {
   let loader: SkillLoader;
 
   beforeEach(async () => {
-    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-skills-test-'));
+    skillsDir = await mkdtemp(join(tmpdir(), 'authoragent-skills-test-'));
     loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
   });
 
@@ -360,7 +360,7 @@ describe('SkillLoader — usage logging', () => {
   let loader: SkillLoader;
 
   beforeEach(async () => {
-    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-usage-test-'));
+    skillsDir = await mkdtemp(join(tmpdir(), 'authoragent-usage-test-'));
     // No workspaceDir → in-memory-only usage (no disk writes to assert on).
     loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
   });

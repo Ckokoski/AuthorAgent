@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// AuthorClaw runs on tsx (ESM, NodeNext module resolution, Node 22+).
+// AuthorAgent runs on tsx (ESM, NodeNext module resolution, Node 22+).
 // Vitest's default esbuild-based transform already understands TS + ESM
 // without any extra config, so this stays intentionally minimal — just
 // pointed at the right environment and test locations.

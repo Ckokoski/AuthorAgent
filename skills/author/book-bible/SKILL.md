@@ -1,7 +1,7 @@
 ---
 name: book-bible
 description: Maintain world consistency - characters, timeline, locations, rules, items
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "book bible"

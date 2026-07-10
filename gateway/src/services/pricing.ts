@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Central Pricing Table
+ * AuthorAgent Central Pricing Table
  *
  * Single source of truth for hardcoded cost estimates used across services
  * (image generation, launch orchestration, ad planning, etc). Centralizing

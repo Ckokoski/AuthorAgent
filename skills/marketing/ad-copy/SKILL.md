@@ -1,7 +1,7 @@
 ---
 name: ad-copy
 description: Write ad copy for Amazon AMS, BookBub, Facebook, and other book advertising platforms
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "ad copy"

@@ -1,7 +1,7 @@
 ---
 name: marketing-research
 description: Research literary agents, podcasts, book bloggers, reviewers, and newsletters in your genre with verified citations
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - find literary agents
@@ -30,7 +30,7 @@ permissions:
 # Marketing Research
 
 Surfaces concrete book-marketing opportunities for an author's specific
-genre / subgenre / book. Built on top of AuthorClaw's existing
+genre / subgenre / book. Built on top of AuthorAgent's existing
 `research-lookup` (Perplexity Sonar Pro via direct or OpenRouter), so
 every result comes back with verified live-web citations the author can
 cross-check before pitching.
@@ -69,7 +69,7 @@ request:
    last 18 months. Agents close to submissions, podcasts go on hiatus,
    bloggers stop updating — stale sources are explicitly downranked.
 
-4. **Author is responsible for due diligence.** AuthorClaw is a research
+4. **Author is responsible for due diligence.** AuthorAgent is a research
    accelerator, not a vetting service. Always verify an agent before
    submitting (Writer Beware, Predators & Editors, AAR membership),
    and never pay for query review or "guaranteed publication."
@@ -112,7 +112,7 @@ skepticism."
 - Not a copywriter. The skill researches who/where; use the
   `book-launch` and `query-letter` skills to actually write your pitch.
 - Not a substitute for human judgment on which agent / venue is right
-  for you. AuthorClaw can find 30 thriller agents; choosing 3 to
+  for you. AuthorAgent can find 30 thriller agents; choosing 3 to
   approach is your call.
 
 ## Related skills

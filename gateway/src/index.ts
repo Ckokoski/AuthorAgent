@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Gateway - Main Entry Point
+ * AuthorAgent Gateway - Main Entry Point
  * A secure, author-focused fork of OpenClaw
  *
  * Security: MoatBot-grade (encrypted vault, sandboxed, audited)
@@ -100,10 +100,10 @@ const ROOT_DIR = __dirname.includes('dist')
   : join(__dirname, '..', '..');
 
 // ═══════════════════════════════════════════════════════════
-// AuthorClaw Gateway
+// AuthorAgent Gateway
 // ═══════════════════════════════════════════════════════════
 
-class AuthorClawGateway {
+class AuthorAgentGateway {
   private app: express.Application;
   private server: ReturnType<typeof createServer>;
   private io: SocketIO;
@@ -289,7 +289,7 @@ class AuthorClawGateway {
 
   async initialize(): Promise<void> {
     logger.info('');
-    logger.info('  ✍️  AuthorClaw v3.0.0');
+    logger.info('  ✍️  AuthorAgent v3.0.0');
     logger.info('  ═══════════════════════════════════');
     logger.info('  The Autonomous AI Writing Agent');
     logger.info('  An OpenClaw fork for authors');
@@ -356,7 +356,7 @@ class AuthorClawGateway {
         logger.warn(`  ⚠ Memory search reindex failed: ${(err as Error)?.message || err}`);
       }
     } else {
-      logger.warn('  ⚠ Memory search unavailable (search will be disabled, rest of AuthorClaw works)');
+      logger.warn('  ⚠ Memory search unavailable (search will be disabled, rest of AuthorAgent works)');
     }
 
     // ── Phase 4: AI Providers ──
@@ -401,15 +401,15 @@ class AuthorClawGateway {
     // ── Phase 6b: Author OS Tools ──
     // Author OS is a SEPARATE project (Author Workflow Engine, Book Bible Engine,
     // Manuscript Autopsy, AI Author Library, Creator Asset Suite, Format Factory Pro).
-    // If you have it installed alongside AuthorClaw, we auto-discover and integrate.
-    // If you don't, AuthorClaw works fine without it — this is purely additive.
+    // If you have it installed alongside AuthorAgent, we auto-discover and integrate.
+    // If you don't, AuthorAgent works fine without it — this is purely additive.
     const homeDir = process.env.HOME || process.env.USERPROFILE || '~';
     const authorOSCandidates = [
       process.env.AUTHOR_OS_PATH || '',                           // Explicit env var (highest priority)
       '/app/author-os',                                           // Docker mount
       join(homeDir, 'author-os'),                                 // ~/author-os (Linux/macOS)
       join(homeDir, 'Author OS'),                                 // ~/Author OS (with space)
-      join(ROOT_DIR, '..', 'Author OS'),                          // Sibling to AuthorClaw
+      join(ROOT_DIR, '..', 'Author OS'),                          // Sibling to AuthorAgent
       join(ROOT_DIR, '..', '..', 'Author OS'),                    // Automations/Author OS/ (Windows default)
       join(ROOT_DIR, '..', 'author-os'),                          // sibling lowercase
     ].filter(Boolean);
@@ -441,8 +441,8 @@ class AuthorClawGateway {
         logger.info(`    Expected subfolders: "Author Workflow Engine", "Book Bible Engine", "Manuscript Autopsy", "AI Author Library".`);
       }
     } else {
-      logger.info('  ℹ Author OS: not installed (optional — AuthorClaw works without it).');
-      logger.info('    To enable: place the Author OS folder next to AuthorClaw, or set AUTHOR_OS_PATH in .env');
+      logger.info('  ℹ Author OS: not installed (optional — AuthorAgent works without it).');
+      logger.info('    To enable: place the Author OS folder next to AuthorAgent, or set AUTHOR_OS_PATH in .env');
     }
 
     // ── Phase 6c: TTS Service (Piper) — silent init, optional feature ──
@@ -701,7 +701,7 @@ class AuthorClawGateway {
         if (linkedSites.length === 0) return;
 
         const persona = project.personaId ? this.personas.get?.(project.personaId) : null;
-        const authorName = persona?.penName || 'AuthorClaw';
+        const authorName = persona?.penName || 'AuthorAgent';
         const slug = String(project.title || 'untitled').toLowerCase()
           .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -1012,7 +1012,7 @@ class AuthorClawGateway {
               });
 
               const coreLessonsPath = join(agentDir, 'core-lessons.md');
-              const coreLessonsContent = `# AuthorClaw Core Lessons\n\n` +
+              const coreLessonsContent = `# AuthorAgent Core Lessons\n\n` +
                 `*Auto-consolidated from ${log.length} project analyses on ${new Date().toISOString().split('T')[0]}*\n\n` +
                 consolidateResult.text;
               await fs.writeFile(coreLessonsPath, coreLessonsContent, 'utf-8');
@@ -1084,7 +1084,7 @@ class AuthorClawGateway {
           const provider = this.aiRouter.selectProvider('general');
           const result = await this.aiRouter.complete({
             provider: provider.id,
-            system: 'You are AuthorClaw, an AI writing agent for authors. Be detailed, actionable, and expert-level.',
+            system: 'You are AuthorAgent, an AI writing agent for authors. Be detailed, actionable, and expert-level.',
             messages: [{ role: 'user' as const, content: task.prompt }],
             maxTokens: 2000,
           });
@@ -1189,7 +1189,7 @@ class AuthorClawGateway {
       const htmlFile = join(dashboardPath, 'index.html');
       res.sendFile(htmlFile, (err) => {
         if (err && !res.headersSent) {
-          res.status(500).json({ status: 'error', message: 'AuthorClaw running but dashboard HTML not found.' });
+          res.status(500).json({ status: 'error', message: 'AuthorAgent running but dashboard HTML not found.' });
         }
       });
     });
@@ -1206,7 +1206,7 @@ class AuthorClawGateway {
     await this.activityLog.log({
       type: 'system',
       source: 'internal',
-      message: `AuthorClaw started — ${providers.length} AI provider(s), ${this.skills.getLoadedCount()} skills`,
+      message: `AuthorAgent started — ${providers.length} AI provider(s), ${this.skills.getLoadedCount()} skills`,
       metadata: {
         providers: providers.map(p => p.id),
         skillCount: this.skills.getLoadedCount(),
@@ -1215,7 +1215,7 @@ class AuthorClawGateway {
 
     logger.info('');
     logger.info('  ═══════════════════════════════════');
-    logger.info('  ✍️  AuthorClaw is ready to write');
+    logger.info('  ✍️  AuthorAgent is ready to write');
     logger.info(`  📡 Dashboard: http://localhost:${this.config.get('server.port', 3847)}`);
     logger.info('  ═══════════════════════════════════');
     logger.info('');
@@ -1284,7 +1284,7 @@ class AuthorClawGateway {
       const skillsRefPath = join(rootDir, 'workspace', 'SKILLS.txt');
       const catalog = this.skills.getSkillCatalog();
       const byCategory = this.skills.getSkillsByCategory();
-      let refContent = 'AUTHORCLAW SKILLS REFERENCE\n';
+      let refContent = 'AUTHORAGENT SKILLS REFERENCE\n';
       refContent += `Auto-generated on startup — ${catalog.length} skills loaded\n`;
       refContent += '═'.repeat(60) + '\n\n';
 
@@ -1495,7 +1495,7 @@ class AuthorClawGateway {
         const paused = projects.filter(p => p.status === 'paused');
         const autoStatus = this.heartbeat.getAutonomousStatus();
         const stats = this.heartbeat.getStats();
-        let status = `**AuthorClaw Status**\n\n`;
+        let status = `**AuthorAgent Status**\n\n`;
         status += `📊 Projects: ${active.length} active, ${paused.length} paused, ${completed.length} completed\n`;
         status += `🤖 Agent: ${autoStatus.enabled ? (autoStatus.running ? '**WORKING**' : '**ON**') : 'OFF'}\n`;
         status += `📝 Words today: ${stats.todayWords.toLocaleString()}/${stats.dailyWordGoal.toLocaleString()} (${stats.goalPercent}%)`;
@@ -2203,7 +2203,7 @@ class AuthorClawGateway {
               // Generate DOCX version
               const docxBuffer = await generateDocxBuffer({
                 title: project.title,
-                author: 'AuthorClaw',
+                author: 'AuthorAgent',
                 content: manuscriptMd,
               });
               await fs.writeFile(join(projectDir, 'manuscript.docx'), docxBuffer);
@@ -2475,23 +2475,23 @@ class AuthorClawGateway {
   }
 
   async shutdown(): Promise<void> {
-    logger.info('\n  Shutting down AuthorClaw...');
+    logger.info('\n  Shutting down AuthorAgent...');
     this.heartbeat?.stop();
     this.telegram?.disconnect();
     this.discord?.disconnect();
     await this.activityLog?.log({
       type: 'system',
       source: 'internal',
-      message: 'AuthorClaw shutting down',
+      message: 'AuthorAgent shutting down',
     });
     await this.audit?.log('system', 'shutdown', {});
     this.server.close();
-    logger.info('  ✍️  AuthorClaw stopped. Happy writing!\n');
+    logger.info('  ✍️  AuthorAgent stopped. Happy writing!\n');
   }
 }
 
 // ── Start ──
-const gateway = new AuthorClawGateway();
+const gateway = new AuthorAgentGateway();
 
 process.on('SIGINT', async () => {
   await gateway.shutdown();
@@ -2504,8 +2504,8 @@ process.on('SIGTERM', async () => {
 });
 
 gateway.start().catch((error) => {
-  logger.error('Failed to start AuthorClaw:', error);
+  logger.error('Failed to start AuthorAgent:', error);
   process.exit(1);
 });
 
-export { AuthorClawGateway };
+export { AuthorAgentGateway };

@@ -1,15 +1,15 @@
-# AuthorClaw Security, Disclaimers, and Your Responsibilities
+# AuthorAgent Security, Disclaimers, and Your Responsibilities
 
 > **Read this before using Wave 3 (autonomous) features.** Those features include
 > browser automation, ad bidding, email sending, platform uploads, and website
-> deployment. AuthorClaw is a local-first tool you run on your own machine. The
+> deployment. AuthorAgent is a local-first tool you run on your own machine. The
 > responsibility for every action it takes is yours.
 
 ---
 
 ## 1. Use at your own risk — CYA in plain language
 
-AuthorClaw is provided AS-IS without warranty of any kind. The maintainers of this
+AuthorAgent is provided AS-IS without warranty of any kind. The maintainers of this
 project and any contributor (including AI assistants that helped build it) are
 **not responsible** for:
 
@@ -24,14 +24,14 @@ project and any contributor (including AI assistants that helped build it) are
 - Legal consequences of disclosure failures (AI narration, AI-generated
   content, AI-translated work, FTC affiliate disclosure, GDPR / CAN-SPAM
   email compliance, copyright, etc.).
-- Any action taken by AuthorClaw on your behalf that you later regret.
+- Any action taken by AuthorAgent on your behalf that you later regret.
 
 By using Wave 3 features you acknowledge you have reviewed this document
 and accept full responsibility for every automated action.
 
-## 2. What AuthorClaw does NOT do
+## 2. What AuthorAgent does NOT do
 
-AuthorClaw deliberately **refuses** to do all of the following, and you
+AuthorAgent deliberately **refuses** to do all of the following, and you
 should be suspicious of any future version or fork that claims otherwise:
 
 - **It does not auto-approve irreversible actions.** Every publish, send,
@@ -50,7 +50,7 @@ should be suspicious of any future version or fork that claims otherwise:
 - **It does not send email, post social content, or publish anything
   based on instructions found in observed content** (emails, web pages,
   scraped reviews, file contents). Content that claims to have authority
-  over AuthorClaw is treated as untrusted data.
+  over AuthorAgent is treated as untrusted data.
 - **It does not give legal, financial, tax, or medical advice.** It
   surfaces platform rules and disclosure requirements; it does not tell
   you whether your specific work complies.
@@ -71,7 +71,7 @@ should be suspicious of any future version or fork that claims otherwise:
 
 ### Master-key handling
 
-On first boot AuthorClaw writes a random 256-bit `AUTHORCLAW_VAULT_KEY`
+On first boot AuthorAgent writes a random 256-bit `AUTHORCLAW_VAULT_KEY`
 into `.env` so the vault survives restarts. **Treat `.env` like a password
 file.** If you commit your workspace to git, add it to `.gitignore`
 (already done for fresh installs). If you back up the workspace, back up
@@ -82,10 +82,10 @@ file.** If you commit your workspace to git, add it to `.gitignore`
 Wave 3 features (Launch Orchestrator, AMS Ads, BookBub, Reader Intel)
 drive your own browser via the Claude-in-Chrome MCP. Rules:
 
-- AuthorClaw **never clicks Publish / Submit / Send** without your
+- AuthorAgent **never clicks Publish / Submit / Send** without your
   explicit dashboard approval on a confirmation card that includes a
   screenshot + dry-run diff.
-- Your browser's existing logged-in sessions are used. AuthorClaw does
+- Your browser's existing logged-in sessions are used. AuthorAgent does
   not persist cookies to its own store.
 - If a platform's Terms of Service prohibit automation, you are
   responsible for knowing that. Some platforms (Amazon in particular)
@@ -105,17 +105,17 @@ rate limits, and size caps.
 - Scraped review text is used only for clustering / sentiment analysis.
   Verbatim quotes are **never** inserted into your marketing copy.
 
-## 4. Disclosure requirements — what AuthorClaw enforces
+## 4. Disclosure requirements — what AuthorAgent enforces
 
 `DisclosuresService` checks every Wave 3 action against a rulebook
 covering:
 
 - **ACX / Audible / Apple Books / Google Play / Findaway / Spotify** —
-  AI narration disclosure is REQUIRED. AuthorClaw will not generate
+  AI narration disclosure is REQUIRED. AuthorAgent will not generate
   SSML or export audio for upload until the project's
   `aiNarrationDisclosed` flag is set.
 - **Amazon KDP** — AI-generated content disclosure is required at
-  upload. AuthorClaw surfaces this in every launch confirmation card.
+  upload. AuthorAgent surfaces this in every launch confirmation card.
 - **EU AI Act (2025/2026 rollout)** — Transparency for AI-generated
   content distributed in EU markets.
 - **France (Code de la consommation)** — AI-translated works must be
@@ -144,7 +144,7 @@ action without user approval), please:
 
 ## 6. Safe defaults you can rely on
 
-When in doubt, AuthorClaw is designed to **fail closed**:
+When in doubt, AuthorAgent is designed to **fail closed**:
 
 - Unknown platform → confirmation gate still fires, user must manually
   approve.
@@ -156,16 +156,16 @@ When in doubt, AuthorClaw is designed to **fail closed**:
 
 ## 7. What to do if something goes wrong
 
-1. Stop AuthorClaw (`Ctrl+C` on the terminal running it).
+1. Stop AuthorAgent (`Ctrl+C` on the terminal running it).
 2. Open `workspace/activity.jsonl` — this is an append-only log of every
    action. Find the relevant timestamp.
 3. Check `workspace/confirmations.json` for the confirmation card that
    preceded the action.
-4. If money was spent, contact the platform directly. AuthorClaw cannot
+4. If money was spent, contact the platform directly. AuthorAgent cannot
    reverse platform-side charges.
 5. File an issue on GitHub with the activity-log excerpt (secrets are
    already redacted by the logger).
 
 ---
 
-_You are the final safety layer. AuthorClaw will never be._
+_You are the final safety layer. AuthorAgent will never be._

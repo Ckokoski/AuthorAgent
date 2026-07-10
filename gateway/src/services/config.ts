@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Configuration Service
+ * AuthorAgent Configuration Service
  */
 
 import { readFile, writeFile } from 'fs/promises';

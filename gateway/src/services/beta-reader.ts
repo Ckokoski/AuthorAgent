@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Beta Reader Service
+ * AuthorAgent Beta Reader Service
  *
  * Runs a manuscript (chapter by chapter) through a panel of simulated reader
  * personas and returns structured feedback: tension score, confusion flags,

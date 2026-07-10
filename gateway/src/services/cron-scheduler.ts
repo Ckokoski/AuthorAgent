@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Cron Scheduler
+ * AuthorAgent Cron Scheduler
  *
  * Hermes-inspired persistent scheduler for recurring tasks. More flexible
  * than the existing Heartbeat (which only runs on a fixed interval).

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Research Gate
+ * AuthorAgent Research Gate
  * Constrained internet access for research only
  * Domain allowlist prevents access to banking, social login, admin panels
  */
@@ -51,7 +51,7 @@ export class ResearchGate {
     this.allowedDomains = new Set(normalized);
     const sorted = Array.from(this.allowedDomains).sort();
     const data = {
-      description: 'Approved domains for AuthorClaw research. Add domains as needed for your writing projects.',
+      description: 'Approved domains for AuthorAgent research. Add domains as needed for your writing projects.',
       domains: sorted,
     };
     await writeFile(this.allowlistPath, JSON.stringify(data, null, 2), 'utf-8');
@@ -98,7 +98,7 @@ export class ResearchGate {
 
     try {
       const response = await globalThis.fetch(url, {
-        headers: { 'User-Agent': 'AuthorClaw-Research/1.0' },
+        headers: { 'User-Agent': 'AuthorAgent-Research/1.0' },
         signal: AbortSignal.timeout(15000),
       });
       const text = await response.text();

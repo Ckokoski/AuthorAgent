@@ -15,7 +15,7 @@ export function registerSystemRoutes(ctx: ApiContext): void {
     res.json({
       status: 'ok',
       version: '4.0.0',
-      name: 'AuthorClaw',
+      name: 'AuthorAgent',
       brand: 'Writing Secrets',
       uptime: process.uptime(),
       links: {
@@ -617,7 +617,7 @@ export function registerSystemRoutes(ctx: ApiContext): void {
       done: soulPresent,
       hint: soulPresent
         ? 'SOUL.md is present.'
-        : 'AuthorClaw ships with a default SOUL.md — customize it in workspace/soul/SOUL.md if you want a different personality.',
+        : 'AuthorAgent ships with a default SOUL.md — customize it in workspace/soul/SOUL.md if you want a different personality.',
     });
 
     // ── 4. At least one project created ──
@@ -660,7 +660,7 @@ export function registerSystemRoutes(ctx: ApiContext): void {
 
     // firstRun is driven by the CORE items only (provider + project). Voice
     // profile, soul, and Telegram are valuable but not required to start
-    // using AuthorClaw, so they don't gate the "first run" banner.
+    // using AuthorAgent, so they don't gate the "first run" banner.
     const coreDone = hasProvider && hasProject;
 
     res.json({

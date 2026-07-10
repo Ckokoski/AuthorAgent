@@ -1,7 +1,7 @@
 ---
 name: continuity-check
 description: Scan manuscript for inconsistencies in characters, timeline, settings, and names
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "continuity"

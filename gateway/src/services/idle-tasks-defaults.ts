@@ -1,5 +1,5 @@
 /**
- * Default idle tasks for AuthorClaw autonomous mode.
+ * Default idle tasks for AuthorAgent autonomous mode.
  * These are used as the initial set when no user-configured tasks exist.
  * Users can edit, delete, and add new tasks via the dashboard.
  */
@@ -78,14 +78,14 @@ Be specific with file paths and sizes. Format as an actionable checklist the aut
   {
     label: 'System health check',
     enabled: true,
-    prompt: `You are a system diagnostics specialist for AuthorClaw, an AI-powered writing agent. Perform a comprehensive health check of the workspace and system configuration:
+    prompt: `You are a system diagnostics specialist for AuthorAgent, an AI-powered writing agent. Perform a comprehensive health check of the workspace and system configuration:
 
 1. **Project Integrity**: Check all active and completed projects. Are there any projects stuck in "active" with no progress? Any failed steps that need attention? Any projects with missing output files?
 2. **Configuration Audit**: Review the current system configuration. Are AI providers properly configured? Are there any missing or invalid settings? Is the word count goal reasonable?
 3. **Persona Health**: List all configured personas. Check for incomplete profiles (missing genre, voice description, or bio). Suggest improvements for any weak profiles.
 4. **Workspace Disk Usage**: Estimate total workspace size. Flag any unusually large files (>10MB). Check for duplicate content across project directories.
 5. **Performance Observations**: Based on recent activity, are there patterns suggesting issues? (e.g., many failed steps, short AI responses, provider errors)
-6. **Recommendations**: Provide 3-5 specific actions the author should take to improve their AuthorClaw setup.
+6. **Recommendations**: Provide 3-5 specific actions the author should take to improve their AuthorAgent setup.
 
 Be specific and actionable. Format as a diagnostic report with severity levels (INFO, WARN, ACTION NEEDED).`,
   },

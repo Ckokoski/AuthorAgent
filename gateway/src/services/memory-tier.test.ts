@@ -138,7 +138,7 @@ async function loadSeed(ctx: ProjectContext): Promise<void> {
 }
 
 beforeEach(() => {
-  workspaceDir = mkdtempSync(join(tmpdir(), 'authorclaw-memtier-'));
+  workspaceDir = mkdtempSync(join(tmpdir(), 'authoragent-memtier-'));
   engine = new ContextEngine(workspaceDir);
   tier = new MemoryTierService(engine, null, workspaceDir);
 });

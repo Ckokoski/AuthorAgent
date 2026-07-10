@@ -1,7 +1,7 @@
 ---
 name: browser-automation
 description: Drive a browser through Wave 3 author actions (KDP, AMS, BookBub, ESP) safely via a confirmation-gated executor
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - open kdp
@@ -21,17 +21,17 @@ permissions:
 
 # Browser Automation
 
-AuthorClaw is a **planner-first** agent. It builds the plan, surfaces it
+AuthorAgent is a **planner-first** agent. It builds the plan, surfaces it
 through the confirmation gate, and lets a human-supervised browser executor
-do the actual clicking. AuthorClaw itself does NOT drive a browser
+do the actual clicking. AuthorAgent itself does NOT drive a browser
 directly — that responsibility lives in whichever browser MCP the user has
 connected (typically `Claude in Chrome`).
 
 ## How a real-world automation flow works
 
-1. User asks AuthorClaw to do something irreversible: "publish my book on
+1. User asks AuthorAgent to do something irreversible: "publish my book on
    KDP", "kick off the AMS campaign", "submit to BookBub"
-2. AuthorClaw plans the action and emits a **ConfirmationRequest** with:
+2. AuthorAgent plans the action and emits a **ConfirmationRequest** with:
    - Risk level + reversibility
    - Required disclosures (AI narration, AI content, FTC, etc.)
    - Dry-run preview of what will happen
@@ -40,13 +40,13 @@ connected (typically `Claude in Chrome`).
 4. The approved request is picked up by the connected browser MCP, which
    does the actual clicking inside the user's already-authenticated
    browser session
-5. The MCP records the outcome back to AuthorClaw via
+5. The MCP records the outcome back to AuthorAgent via
    `POST /api/confirmations/:id/outcome`
 
-## Safe-automation patterns AuthorClaw enforces
+## Safe-automation patterns AuthorAgent enforces
 
 - **No password storage.** Browser sessions reuse the user's existing
-  logins. AuthorClaw never types or stores a password.
+  logins. AuthorAgent never types or stores a password.
 - **No CAPTCHA bypass.** If a site asks a human to verify, a human must.
 - **24-hour confirmation expiry.** Approved requests that aren't executed
   within 24h transition to expired and have to be re-requested.
@@ -59,12 +59,12 @@ connected (typically `Claude in Chrome`).
 ## Diagnostic
 
 Run `/api/browser/doctor` to probe whether a browser MCP is detected and
-whether AuthorClaw can produce action plans for the major sites. The probe
+whether AuthorAgent can produce action plans for the major sites. The probe
 does NOT navigate anywhere or click anything — it just reports readiness.
 
 ## When this skill matches
 
-The skill activates when the user asks AuthorClaw to drive a site that
+The skill activates when the user asks AuthorAgent to drive a site that
 has a planner in Wave 3 (KDP, AMS, BookBub, ESPs). It tells the AI to:
 1. Use the launch-orchestrator / ams-ads / bookbub planners to build the
    action plan

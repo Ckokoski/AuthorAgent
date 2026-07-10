@@ -1,11 +1,11 @@
 /**
- * AuthorClaw Website Builder
+ * AuthorAgent Website Builder
  *
  * Builds a static author website from the author's personas, projects, and
  * blog posts. Generates HTML + CSS + JSON feeds on disk at
  * workspace/website/<slug>/. Designed to deploy to any static host
  * (Netlify, Vercel, Cloudflare Pages, GitHub Pages, S3 + CloudFront, etc.)
- * — AuthorClaw builds locally; the user deploys the output directory.
+ * — AuthorAgent builds locally; the user deploys the output directory.
  *
  * Pages produced:
  *   - index.html         (home / hero)
@@ -368,7 +368,7 @@ ${entries}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${this.esc(pageTitle)} — ${this.esc(config.siteName)}</title>
 ${config.tagline ? `<meta name="description" content="${this.esc(config.tagline)}">` : ''}
-<meta name="generator" content="AuthorClaw">
+<meta name="generator" content="AuthorAgent">
 <link rel="stylesheet" href="${pageTitle === 'Home' || pageTitle === 'About' || pageTitle === 'Books' || pageTitle === 'Contact' ? 'styles.css' : '../styles.css'}">
 <link rel="alternate" type="application/rss+xml" title="${this.esc(config.siteName)} RSS" href="${pageTitle === 'Home' || pageTitle === 'About' || pageTitle === 'Books' || pageTitle === 'Contact' ? 'feed.xml' : '../feed.xml'}">
 </head>
@@ -386,7 +386,7 @@ ${analyticsBlock}
   private buildCSS(config: WebsiteSiteConfig): string {
     const primary = config.primaryColor || '#2b4a6b';
     const font = config.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    return `/* AuthorClaw-generated theme */
+    return `/* AuthorAgent-generated theme */
 :root { --primary: ${primary}; --text: #1a1a1a; --muted: #666; --bg: #fafafa; --card: #fff; --border: #e5e5e5; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: ${font}; color: var(--text); background: var(--bg); line-height: 1.6; }
@@ -432,7 +432,7 @@ h1, h2, h3 { line-height: 1.25; }
   private buildDeployReadme(config: WebsiteSiteConfig, outputDir: string): string {
     return `# Deploy ${config.siteName}
 
-AuthorClaw generated this static site at:
+AuthorAgent generated this static site at:
 \`${outputDir}\`
 
 ## Deployment options
@@ -460,7 +460,7 @@ npx vercel
 ### S3 + CloudFront
 Upload the folder contents to an S3 bucket configured for static website hosting, point CloudFront at it.
 
-## Things AuthorClaw cannot do for you
+## Things AuthorAgent cannot do for you
 
 - Buy or configure the domain name.
 - Set up HTTPS certificates (your host will do this automatically on most modern platforms).
@@ -470,11 +470,11 @@ Upload the folder contents to an S3 bucket configured for static website hosting
 
 ## Regeneration
 
-Edit the site config in AuthorClaw and re-run the build. The output directory is overwritten each build. Back up any hand-edits to \`book/*.html\` or \`blog/*.html\` before regenerating — they will be lost.
+Edit the site config in AuthorAgent and re-run the build. The output directory is overwritten each build. Back up any hand-edits to \`book/*.html\` or \`blog/*.html\` before regenerating — they will be lost.
 
 ## Disclosures
 
-AuthorClaw automatically adds the FTC affiliate-link disclosure to any page whose content includes an affiliate link. Do not remove it.
+AuthorAgent automatically adds the FTC affiliate-link disclosure to any page whose content includes an affiliate link. Do not remove it.
 `;
   }
 

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Skill Curator (Hermes-pattern)
+ * AuthorAgent Skill Curator (Hermes-pattern)
  *
  * A consolidation pass that keeps the ~34-skill library healthy. It reads the
  * loaded skill catalog + the usage stats logged by SkillLoader.matchSkills and

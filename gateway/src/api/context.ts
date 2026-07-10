@@ -158,7 +158,7 @@ export const upload = multer({
  * website-builder routes.
  */
 export function addWaveDisclaimer(res: Response): void {
-  res.setHeader('X-AuthorClaw-Disclaimer', 'Wave 3 actions create confirmation requests but do not execute irreversible actions autonomously. You are responsible for every approved action. See SECURITY.md.');
+  res.setHeader('X-AuthorAgent-Disclaimer', 'Wave 3 actions create confirmation requests but do not execute irreversible actions autonomously. You are responsible for every approved action. See SECURITY.md.');
 }
 
 /**

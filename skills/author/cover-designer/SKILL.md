@@ -1,7 +1,7 @@
 ---
 name: cover-designer
 description: Generate a complete book cover set (ebook, print, audiobook, social) with a rich visual brief
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - design my cover

@@ -1,6 +1,6 @@
 /**
- * AuthorClaw Author OS Integration Service
- * Bridges AuthorClaw with the Author OS tool suite:
+ * AuthorAgent Author OS Integration Service
+ * Bridges AuthorAgent with the Author OS tool suite:
  *   - Author Workflow Engine (JSON writing templates)
  *   - Book Bible Engine (story planning & world-building)
  *   - Manuscript Autopsy (manuscript analysis)

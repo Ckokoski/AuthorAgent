@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Character Persona Agents
+ * AuthorAgent Character Persona Agents
  *
  * A QUALITY MOAT: each major character becomes a STANDING CRITIC of their own
  * dialogue. Given a chapter, the service extracts each character's spoken lines

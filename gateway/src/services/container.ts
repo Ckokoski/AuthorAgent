@@ -5,7 +5,7 @@
  * Extracted from gateway/src/index.ts as part of the Phase 2 god-file split
  * (Phase 2 final, step 1). Behavior-preserving: this file ONLY holds the
  * service field declarations and the getServices() projection that the former
- * AuthorClawGateway inlined. Construction ORDER and all cross-service wiring
+ * AuthorAgentGateway inlined. Construction ORDER and all cross-service wiring
  * (setMessageHandler, setStepServices, setContextEngine, setGate, setAI,
  * bridges, hooks) stay in initialize() in index.ts, because those closures
  * reference gateway-only members (io, telegram, handleMessage, etc.) and the

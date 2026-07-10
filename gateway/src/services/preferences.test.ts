@@ -29,7 +29,7 @@ async function seed(key: string, value: any, source: any, updatedAt: string): Pr
 }
 
 beforeEach(async () => {
-  memoryDir = mkdtempSync(join(tmpdir(), 'authorclaw-prefs-'));
+  memoryDir = mkdtempSync(join(tmpdir(), 'authoragent-prefs-'));
   store = new PreferenceStore(memoryDir);
   await store.initialize();
 });

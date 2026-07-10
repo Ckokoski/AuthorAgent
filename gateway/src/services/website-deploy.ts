@@ -1,8 +1,8 @@
 /**
- * AuthorClaw Website Deploy
+ * AuthorAgent Website Deploy
  *
  * Adapter pattern over the few static-site hosts authors actually use.
- * AuthorClaw's job is to produce the static site (WebsiteBuilder) and
+ * AuthorAgent's job is to produce the static site (WebsiteBuilder) and
  * track it (WebsiteSiteService). This service shells out to the host's
  * existing CLI to push the rendered files. We do NOT bundle these CLIs;
  * authors install Netlify / Vercel / etc. themselves. We probe at runtime
@@ -261,8 +261,8 @@ export class WebsiteDeployService {
       // Ensure identity is set for this repo so commit doesn't fail on a
       // machine with no global user.name/user.email configured. Harmless
       // if already set — local config always overrides.
-      await gitCmd(`config user.email "authorclaw@localhost"`);
-      await gitCmd(`config user.name "AuthorClaw"`);
+      await gitCmd(`config user.email "authoragent@localhost"`);
+      await gitCmd(`config user.name "AuthorAgent"`);
 
       const addRes = await gitCmd('add -A');
       output += addRes.stdout + addRes.stderr;
@@ -297,7 +297,7 @@ export class WebsiteDeployService {
       const authHint = /authentication|permission denied|could not read username|403/i.test(combined)
         ? '\n\nThis looks like a git authentication failure. github-pages deploy relies on YOUR ambient git ' +
           'credentials (SSH key in your agent, a stored credential helper, or a token baked into an HTTPS remote ' +
-          'URL) — AuthorClaw does not manage GitHub auth itself. Make sure `git push` to this repo already works ' +
+          'URL) — AuthorAgent does not manage GitHub auth itself. Make sure `git push` to this repo already works ' +
           'from a normal terminal on this machine before retrying here.'
         : '';
       return {

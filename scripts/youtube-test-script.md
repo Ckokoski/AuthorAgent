@@ -1,4 +1,4 @@
-# AuthorClaw v2.0.0 — YouTube Demo Testing Script
+# AuthorAgent v2.0.0 — YouTube Demo Testing Script
 
 Fast-paced testing sequence. Each test should take 30-60 seconds.
 Total demo time: ~15-20 minutes.
@@ -26,7 +26,7 @@ Total demo time: ~15-20 minutes.
 
 ### 2. Chat Test (1 min)
 - Type: `Hello, who are you?`
-- Show the AI responds with AuthorClaw personality
+- Show the AI responds with AuthorAgent personality
 - Type: `What skills do you have?`
 - Show skill list
 

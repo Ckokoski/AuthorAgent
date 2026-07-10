@@ -1,5 +1,5 @@
 /**
- * AuthorClaw API Routes
+ * AuthorAgent API Routes
  * REST API for the dashboard and external integrations
  *
  * This file used to be a ~5,500-line monolith registering all endpoints

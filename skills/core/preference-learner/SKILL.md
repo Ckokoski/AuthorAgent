@@ -1,7 +1,7 @@
 ---
 name: preference-learner
 description: Track and learn user preferences for writing style, communication, and workflow
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - my preferences

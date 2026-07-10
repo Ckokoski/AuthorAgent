@@ -41,7 +41,7 @@ describe('SkillCuratorService.curate', () => {
   let loader: SkillLoader;
 
   beforeEach(async () => {
-    skillsDir = await mkdtemp(join(tmpdir(), 'authorclaw-curator-test-'));
+    skillsDir = await mkdtemp(join(tmpdir(), 'authoragent-curator-test-'));
     // No workspaceDir → usage stays in-memory (no disk writes) for the tests.
     loader = new SkillLoader(skillsDir, new PermissionManager('standard'));
   });

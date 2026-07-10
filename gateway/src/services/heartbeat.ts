@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Heartbeat Service
+ * AuthorAgent Heartbeat Service
  * Writing session tracker, project monitor, deadline alerts, milestone celebrations
  *
  * v2.1: Autonomous mode — wakes up on schedule, checks for active projects,

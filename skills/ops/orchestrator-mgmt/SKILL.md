@@ -1,7 +1,7 @@
 ---
 name: orchestrator-mgmt
 description: Manage user scripts and automated processes — start, stop, restart, monitor, view logs
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - script
@@ -18,7 +18,7 @@ permissions:
 
 # Orchestrator Management
 
-Manage scripts and background processes through AuthorClaw's built-in orchestrator.
+Manage scripts and background processes through AuthorAgent's built-in orchestrator.
 
 ## Capabilities
 
@@ -37,7 +37,7 @@ Each managed script has:
 - `args`: Command-line arguments
 - `cwd`: Working directory (optional)
 - `env`: Environment variables (optional, sensitive vars are redacted)
-- `autoStart`: Start automatically when AuthorClaw boots
+- `autoStart`: Start automatically when AuthorAgent boots
 - `autoRestart`: Restart automatically on crash
 - `maxRestarts`: Maximum auto-restart attempts (default: 5)
 - `restartDelayMs`: Delay between restarts (default: 5000ms)

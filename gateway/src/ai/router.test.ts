@@ -56,7 +56,7 @@ describe('AIRouter provider selection and tiering (mocked vault/network)', () =>
   let costs: CostTracker;
 
   beforeEach(async () => {
-    vaultDir = await mkdtemp(join(tmpdir(), 'authorclaw-router-test-'));
+    vaultDir = await mkdtemp(join(tmpdir(), 'authoragent-router-test-'));
     process.env.AUTHORCLAW_VAULT_KEY = 'test-router-key';
     vault = new Vault(vaultDir);
     await vault.initialize();
@@ -250,7 +250,7 @@ describe('AIRouter provider selection and tiering (mocked vault/network)', () =>
     let workspaceDir: string;
 
     beforeEach(async () => {
-      workspaceDir = await mkdtemp(join(tmpdir(), 'authorclaw-modelcfg-test-'));
+      workspaceDir = await mkdtemp(join(tmpdir(), 'authoragent-modelcfg-test-'));
     });
 
     afterEach(async () => {

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Website Site Registry
+ * AuthorAgent Website Site Registry
  *
  * The management layer on top of WebsiteBuilderService. WebsiteBuilder
  * generates static HTML from a config + a books list + a blog list each

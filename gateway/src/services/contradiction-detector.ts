@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Contradiction Detector
+ * AuthorAgent Contradiction Detector
  *
  * ACTIVE CONTRADICTION DETECTION — a ConStory-style consistency checker that
  * diffs a single chapter against the project's persisted entity DB and the

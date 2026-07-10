@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Amazon Advertising (AMS) Campaign Architect
+ * AuthorAgent Amazon Advertising (AMS) Campaign Architect
  *
  * PLANNING + ANALYSIS only. Does not execute bids, launch campaigns, or
  * modify anything in AMS on its own. Every campaign change must pass through
@@ -17,7 +17,7 @@
  *     expand bids on, which to add as exact-match vs broad
  *   - Enforce a user-configured hard spend cap on any bid-change proposal
  *
- * Note: AuthorClaw never suggests ACoS targets that are obviously predatory
+ * Note: AuthorAgent never suggests ACoS targets that are obviously predatory
  * (e.g., below 5%) or escalates bids by more than 2x in a single confirmation.
  */
 

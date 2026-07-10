@@ -75,7 +75,7 @@ export function registerAuthorOSToolsRoutes(ctx: ApiContext): void {
 
     const content = await rf(resolvedInput, 'utf-8');
     const docTitle = title || bn(resolvedInput, '.md');
-    const docAuthor = author || 'AuthorClaw';
+    const docAuthor = author || 'AuthorAgent';
     const requestedFormats = formats || ['docx'];
     const results: string[] = [];
 
@@ -154,7 +154,7 @@ export function registerAuthorOSToolsRoutes(ctx: ApiContext): void {
     }
 
     const targetCategory = category || 'author';
-    const ingestPrompt = `You are analyzing source code to create an AuthorClaw SKILL.md file.
+    const ingestPrompt = `You are analyzing source code to create an AuthorAgent SKILL.md file.
 
 Tool name hint: ${toolName || '(infer from code)'}
 Target category: ${targetCategory}
@@ -164,7 +164,7 @@ Analyze the following source code and generate a complete SKILL.md file with:
 2. Detailed usage instructions
 3. Input/output documentation
 4. Example commands or workflows
-5. How AuthorClaw should invoke or reference the tool
+5. How AuthorAgent should invoke or reference the tool
 
 Return ONLY the complete SKILL.md content (starting with ---).
 
@@ -177,7 +177,7 @@ ${sourceCode.substring(0, 15000)}
       const provider = services.aiRouter.selectProvider('general');
       const result = await services.aiRouter.complete({
         provider: provider.id,
-        system: 'You are a technical documentation expert. Generate AuthorClaw SKILL.md files from source code analysis.',
+        system: 'You are a technical documentation expert. Generate AuthorAgent SKILL.md files from source code analysis.',
         messages: [{ role: 'user', content: ingestPrompt }],
         maxTokens: 4096,
         temperature: 0.3,

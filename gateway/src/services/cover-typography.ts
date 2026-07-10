@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Cover Typography
+ * AuthorAgent Cover Typography
  *
  * Generates an SVG cover file that composites title + author + optional
  * series badge over an existing AI-generated cover image. The SVG is

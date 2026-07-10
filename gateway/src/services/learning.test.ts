@@ -108,7 +108,7 @@ let store: LessonStore;
 let learning: LearningService;
 
 beforeEach(async () => {
-  memoryDir = mkdtempSync(join(tmpdir(), 'authorclaw-learning-'));
+  memoryDir = mkdtempSync(join(tmpdir(), 'authoragent-learning-'));
   store = new LessonStore(memoryDir);
   await store.initialize();
   learning = new LearningService(store);

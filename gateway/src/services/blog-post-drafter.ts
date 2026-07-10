@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Blog Post Drafter
+ * AuthorAgent Blog Post Drafter
  *
  * Drafts blog posts from project artifacts. Authors who don't blog regularly
  * tend not to update their websites at all — books ship, nothing goes up,

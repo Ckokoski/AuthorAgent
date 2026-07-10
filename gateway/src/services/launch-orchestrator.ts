@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Launch Orchestrator
+ * AuthorAgent Launch Orchestrator
  *
  * State machine for book launches. Given a finished manuscript + cover +
  * metadata, orchestrates the 90-day launch pipeline: KDP metadata → pre-order

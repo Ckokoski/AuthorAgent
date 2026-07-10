@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Reader Intelligence Engine
+ * AuthorAgent Reader Intelligence Engine
  *
  * Analyzes review data (provided by the user or fetched via the existing
  * ResearchGate with rate limits + robots.txt respect) to surface:

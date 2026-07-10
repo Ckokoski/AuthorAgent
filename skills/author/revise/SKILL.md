@@ -1,7 +1,7 @@
 ---
 name: revise
 description: Multi-pass revision - developmental editing, line editing, copy editing
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "revise"

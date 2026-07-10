@@ -1,7 +1,7 @@
 ---
 name: self-improve
-description: Continuous self-improvement loop — AuthorClaw learns from mistakes, successes, and user feedback to get better over time
-author: AuthorClaw
+description: Continuous self-improvement loop — AuthorAgent learns from mistakes, successes, and user feedback to get better over time
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "self improve"
@@ -20,7 +20,7 @@ permissions:
 
 # Self-Improvement Loop — Core Skill
 
-AuthorClaw gets better every time it works. This skill creates a persistent learning loop where the agent tracks what works, what fails, and what the user prefers — then applies those lessons to future tasks.
+AuthorAgent gets better every time it works. This skill creates a persistent learning loop where the agent tracks what works, what fails, and what the user prefers — then applies those lessons to future tasks.
 
 ## How It Works
 
@@ -162,7 +162,7 @@ Every lesson entry in `improvement-log.jsonl` contains:
 
 ## Applying Lessons
 
-Before each task, AuthorClaw should:
+Before each task, AuthorAgent should:
 
 1. **Load relevant lessons** from the improvement log
 2. **Filter by category** matching the current task type

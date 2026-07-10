@@ -1,7 +1,7 @@
 ---
 name: write
 description: Draft scenes, chapters, and passages matching the author's voice and style
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "write"

@@ -1,7 +1,7 @@
 ---
 name: blurb-writer
 description: Write compelling book blurbs and descriptions for Amazon, Goodreads, and back cover
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - "blurb"

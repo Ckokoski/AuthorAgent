@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Skill Loader
+ * AuthorAgent Skill Loader
  * Discovers, validates, and loads skills from the skills directory
  */
 

@@ -1,7 +1,7 @@
 ---
 name: decision-maker
 description: Structured decision-making framework — weigh options, evaluate trade-offs, deliver clear recommendations
-author: AuthorClaw
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - decide

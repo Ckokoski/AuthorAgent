@@ -1,9 +1,9 @@
 /**
- * AuthorClaw Orchestrator Service
+ * AuthorAgent Orchestrator Service
  * Manages user scripts/processes — start/stop/restart, health monitoring,
  * log capture, auto-restart on crash, config persistence.
  *
- * Lightweight PM2-like process manager built into AuthorClaw.
+ * Lightweight PM2-like process manager built into AuthorAgent.
  * Ported from Sneakers.
  */
 

@@ -1,5 +1,5 @@
 {
-  "description": "Approved domains for AuthorClaw research. Add domains as needed for your writing projects.",
+  "description": "Approved domains for AuthorAgent research. Add domains as needed for your writing projects.",
   "domains": [
     "en.wikipedia.org",
     "*.wikipedia.org",

@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Project Templates + core project types
+ * AuthorAgent Project Templates + core project types
  *
  * Extracted verbatim from projects.ts (Phase 2 refactor). Holds the pure,
  * data-only concerns of the project engine:

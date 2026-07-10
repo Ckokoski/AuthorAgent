@@ -1,5 +1,5 @@
 /**
- * AuthorClaw Translation + Foreign Rights Pipeline
+ * AuthorAgent Translation + Foreign Rights Pipeline
  *
  * Plans machine-translation of a manuscript and produces the rights-pitch
  * documents authors need to license foreign-language editions.
@@ -358,7 +358,7 @@ ${marketingAngle}
 [Author / agent contact here]
 
 ---
-_Prepared with AuthorClaw. Estimated market data is approximate._`;
+_Prepared with AuthorAgent. Estimated market data is approximate._`;
 
     return {
       targetLang: input.targetLang,

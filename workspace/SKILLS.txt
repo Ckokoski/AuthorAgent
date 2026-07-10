@@ -1,4 +1,4 @@
-AUTHORCLAW SKILLS REFERENCE
+AUTHORAGENT SKILLS REFERENCE
 Auto-generated on startup — 34 skills loaded
 ════════════════════════════════════════════════════════════
 
@@ -21,11 +21,11 @@ Auto-generated on startup — 34 skills loaded
     Keywords: optimize prompt, improve prompt, better prompt, prompt quality, test prompts, prompt a/b test, prompt lab
 
   self-improve
-    Continuous self-improvement loop — AuthorClaw learns from mistakes, successes, and user feedback to get better over time
+    Continuous self-improvement loop — AuthorAgent learns from mistakes, successes, and user feedback to get better over time
     Keywords: self improve, improve yourself, learn from, what did you learn, improvement log, get better, lessons learned, self reflection, review performance
 
   skill-acquisition
-    Research topics and create new skills for AuthorClaw to learn
+    Research topics and create new skills for AuthorAgent to learn
     Keywords: learn how to, add a skill for, find a tool for, go learn, research and create a skill, teach yourself, acquire skill, learn about
 
 ── Author Skills (20) ──
@@ -55,7 +55,7 @@ Auto-generated on startup — 34 skills loaded
     Keywords: format, export, epub, kindle, KDP, pdf, docx, manuscript format
 
   ingest-tool
-    Read source code of any tool and generate an AuthorClaw skill from it
+    Read source code of any tool and generate an AuthorAgent skill from it
     Keywords: ingest tool, create skill from, import tool, make a skill, convert to skill, read this code, analyze this tool
 
   manuscript-hub

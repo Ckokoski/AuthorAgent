@@ -1,7 +1,7 @@
 ---
 name: skill-acquisition
-description: Research topics and create new skills for AuthorClaw to learn
-author: AuthorClaw
+description: Research topics and create new skills for AuthorAgent to learn
+author: AuthorAgent
 version: 1.0.0
 triggers:
   - learn how to
@@ -20,7 +20,7 @@ permissions:
 
 # Skill Acquisition
 
-AuthorClaw's self-learning module. Research topics, draft new SKILL.md files,
+AuthorAgent's self-learning module. Research topics, draft new SKILL.md files,
 and present them for user review before saving.
 
 ## Workflow
