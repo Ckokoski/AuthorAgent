@@ -1,4 +1,4 @@
-# AuthorClaw
+# AuthorAgent
 
 **The Autonomous AI Writing Agent — Built for Authors**
 
@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org)
 [![Security](https://img.shields.io/badge/security-hardened-green.svg)](#security)
 
-AuthorClaw is a security-hardened AI agent purpose-built for fiction and nonfiction authors. It doesn't just write — it runs the entire book production pipeline autonomously, from first idea to KDP-ready manuscript.
+AuthorAgent is a security-hardened AI agent purpose-built for fiction and nonfiction authors. It doesn't just write — it runs the entire book production pipeline autonomously, from first idea to KDP-ready manuscript.
 
 **Give it an idea and a pen name. It plans, writes, revises, formats, and launches.** Pipeline mode chains 6 production phases automatically. Author personas manage multiple pen names with distinct voices. Deep revision runs 21 editing passes. Export produces professional DOCX and EPUB ready for self-publishing.
 
@@ -35,7 +35,7 @@ Tell it what you want. It figures out the steps, picks the right skills, and exe
 ## How It Works
 
 1. **You say what you want** — via Telegram, dashboard, or API
-2. **AuthorClaw plans the steps** — AI dynamically decomposes your task into executable steps
+2. **AuthorAgent plans the steps** — AI dynamically decomposes your task into executable steps
 3. **Skills are auto-selected** — 19 focused writing skills get injected into each step's context
 4. **Work happens autonomously** — each step runs through the AI, output saved to files
 5. **Everything is logged** — universal activity feed tracks all agent actions in real-time
@@ -43,7 +43,7 @@ Tell it what you want. It figures out the steps, picks the right skills, and exe
 ```
 User: "/novel a small-town romance under pen name Lily Hart"
 
-AuthorClaw: "Pipeline created — 6 phases, 48 steps total"
+AuthorAgent: "Pipeline created — 6 phases, 48 steps total"
   Phase 1: Book Planning    (6 steps)  — market analysis, premise, characters, outline, synopsis
   Phase 2: Book Bible       (5 steps)  — world-building, character bible, continuity, themes, style
   Phase 3: Book Production  (20 steps) — write + self-review per chapter
@@ -60,11 +60,11 @@ AuthorClaw: "Pipeline created — 6 phases, 48 steps total"
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/Ckokoski/authorclaw.git
-cd authorclaw
+git clone https://github.com/Ckokoski/authoragent.git
+cd authoragent
 npm install
 
-# 2. Start AuthorClaw (auto-generates vault key on first run)
+# 2. Start AuthorAgent (auto-generates vault key on first run)
 npx tsx gateway/src/index.ts
 
 # 3. Open dashboard: http://localhost:3847
@@ -75,7 +75,7 @@ npx tsx gateway/src/index.ts
 #    OR send /project to your Telegram bot
 ```
 
-> **First run?** AuthorClaw auto-generates a vault encryption key and saves it to `.env`.
+> **First run?** AuthorAgent auto-generates a vault encryption key and saves it to `.env`.
 > Your API keys will persist across restarts. For a guided setup, run `bash scripts/setup-wizard.sh`.
 
 See [QUICKSTART.md](QUICKSTART.md) for the full setup guide.
@@ -86,7 +86,7 @@ See [QUICKSTART.md](QUICKSTART.md) for the full setup guide.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AUTHORCLAW v4 ARCHITECTURE                │
+│                    AUTHORAGENT v4 ARCHITECTURE                │
 │                                                             │
 │  ┌───────────┐   ┌─────────────────┐   ┌────────────────┐  │
 │  │ Channels  │   │    Gateway       │   │  AI Router     │  │
@@ -121,7 +121,7 @@ See [QUICKSTART.md](QUICKSTART.md) for the full setup guide.
 
 ## AI Providers
 
-AuthorClaw supports 5 AI providers with tiered routing:
+AuthorAgent supports 5 AI providers with tiered routing:
 
 | Provider | Tier | Cost | Best For | Setup |
 |----------|------|------|----------|-------|
@@ -137,12 +137,12 @@ Task routing is automatic — planning and research use free models, creative wr
 
 ## Telegram Command Center
 
-Connect a Telegram bot to control AuthorClaw from your phone:
+Connect a Telegram bot to control AuthorAgent from your phone:
 
 | Command | What It Does |
 |---------|-------------|
 | `/novel [idea]` | Create a full novel pipeline (premise → characters → world → outline → chapters → revision → assembly) |
-| `/project [task]` | Plan & auto-execute any task — AuthorClaw figures out the steps |
+| `/project [task]` | Plan & auto-execute any task — AuthorAgent figures out the steps |
 | `/write [idea]` | Quick writing task (short-form content, scenes, intros) |
 | `/projects` | List all projects with status and progress |
 | `/status` | Quick status check on what's running |
@@ -160,10 +160,10 @@ Connect a Telegram bot to control AuthorClaw from your phone:
 
 ```
 You:        /write a short snarky YouTube intro for my channel
-AuthorClaw: 📝 On it. Planning "a short snarky YouTube intro"...
-AuthorClaw: ✅ Planned 2 steps. Running autonomously...
-AuthorClaw: ✅ 1/2: Draft the intro (~400 words)
-AuthorClaw: 🎉 All 2 steps complete!
+AuthorAgent: 📝 On it. Planning "a short snarky YouTube intro"...
+AuthorAgent: ✅ Planned 2 steps. Running autonomously...
+AuthorAgent: ✅ 1/2: Draft the intro (~400 words)
+AuthorAgent: 🎉 All 2 steps complete!
 
 You:        /novel a sci-fi thriller about rogue AI in aviation
 AuthorClaw: 📖 Novel pipeline created: 32 steps
