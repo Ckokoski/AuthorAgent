@@ -36,6 +36,7 @@ import {
   TASK_TYPE_MAP,
   buildNovelPipelineSteps,
   buildBookProductionSteps,
+  deriveDependencies,
   type Project,
   type ProjectStep,
   type ProjectType,
@@ -136,6 +137,8 @@ export class ProjectEngine {
     const enginePort: EnginePort = {
       getProject: (id) => this.getProject(id),
       completeStep: (projectId, stepId, result) => this.completeStep(projectId, stepId, result),
+      completeStepBare: (projectId, stepId, result) => this.completeStepBare(projectId, stepId, result),
+      activateStep: (projectId, stepId) => this.activateStep(projectId, stepId),
       failStep: (projectId, stepId, error) => this.failStep(projectId, stepId, error),
       buildProjectContext: (project, step) => this.buildProjectContext(project, step),
     };
@@ -426,6 +429,8 @@ Description: ${description}`;
 
         // Enhance with Author OS
         const enhancedSteps = this.authorOS ? this.enhanceWithAuthorOS(steps) : steps;
+        // Derive conductor dependencies (dynamic plans are linear → sequential).
+        deriveDependencies(enhancedSteps);
 
         const project: Project = {
           id,
@@ -533,6 +538,10 @@ Description: ${description}`;
       steps = this.enhanceWithAuthorOS(steps);
     }
 
+    // Derive conductor dependencies so this project can run under the parallel
+    // supervisor (sequential fallback keeps single-step templates in order).
+    deriveDependencies(steps);
+
     const project: Project = {
       id,
       type,
@@ -636,6 +645,58 @@ Description: ${description}`;
     }
     this.persistState();
     return null;
+  }
+
+  /**
+   * Conductor variant of completeStep: mark the step completed + persist, but
+   * do NOT auto-advance/activate a "next" step — the conductor supervisor owns
+   * dispatch (it activates steps whose dependencies are satisfied). Still fires
+   * the project-completion hooks + sets 'completed' status when no pending/active
+   * steps remain, so completion semantics match completeStep for the last step.
+   */
+  completeStepBare(projectId: string, stepId: string, result: string): void {
+    const project = this.projects.get(projectId);
+    if (!project) return;
+
+    const step = project.steps.find(s => s.id === stepId);
+    if (step) {
+      step.status = 'completed';
+      step.result = result;
+    }
+
+    const done = project.steps.filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    project.progress = Math.round((done / project.steps.length) * 100);
+    project.updatedAt = new Date().toISOString();
+
+    const remaining = project.steps.filter(s => s.status === 'pending' || s.status === 'active');
+    if (remaining.length === 0) {
+      project.status = 'completed';
+      project.completedAt = new Date().toISOString();
+      try {
+        for (const fn of this.completionHooks) {
+          Promise.resolve(fn(project)).catch(err => log.error('[project-completion-hook] error:', err));
+        }
+      } catch (err) {
+        logger.debug('project-completion hook dispatch failed', err);
+      }
+    }
+    this.persistState();
+  }
+
+  /**
+   * Conductor helper: mark a specific pending step 'active' and enrich its
+   * prompt with prior results (mirrors the activation the sequential completeStep
+   * does for the "next" step). Called by the conductor at dispatch time.
+   */
+  activateStep(projectId: string, stepId: string): ProjectStep | null {
+    const project = this.projects.get(projectId);
+    if (!project) return null;
+    const step = project.steps.find(s => s.id === stepId);
+    if (!step) return null;
+    step.status = 'active';
+    step.prompt = this.enrichWithPriorResults(step.prompt, project);
+    project.updatedAt = new Date().toISOString();
+    return step;
   }
 
   /** Callbacks invoked when a project transitions to 'completed' status. */

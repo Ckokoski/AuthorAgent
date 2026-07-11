@@ -230,6 +230,8 @@ describe('StepExecutor full-manuscript allowlist (Chunk B1)', () => {
   const port: EnginePort = {
     getProject: () => undefined,
     completeStep: () => null,
+    completeStepBare: () => {},
+    activateStep: () => null,
     failStep: () => {},
     buildProjectContext: async () => '',
   };

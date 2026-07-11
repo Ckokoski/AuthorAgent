@@ -208,7 +208,17 @@ export function registerProjectRoutes(ctx: ApiContext): void {
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    res.json({ project });
+    // `activeSteps`: convenience list of every currently-running step so the
+    // orchestra view can show 1–N live worker cards under the conductor engine
+    // (multiple steps can be 'active' concurrently now). Truthful mirror of
+    // project.steps[status==='active'].
+    const activeSteps = project.steps
+      .filter((s: any) => s.status === 'active')
+      .map((s: any) => ({
+        id: s.id, label: s.label, phase: s.phase,
+        chapterNumber: s.chapterNumber, taskType: s.taskType,
+      }));
+    res.json({ project, activeSteps });
   });
 
   app.post('/api/projects/:id/start', (req: Request, res: Response) => {
@@ -360,10 +370,19 @@ export function registerProjectRoutes(ctx: ApiContext): void {
     const workspaceDir = join(baseDir, 'workspace');
     const { results } = await engine.autoExecuteLoop(req.params.id, { workspaceDir });
 
+    const finalProject = engine.getProject(req.params.id);
+    const activeSteps = (finalProject?.steps || [])
+      .filter((s: any) => s.status === 'active')
+      .map((s: any) => ({
+        id: s.id, label: s.label, phase: s.phase,
+        chapterNumber: s.chapterNumber, taskType: s.taskType,
+      }));
+
     res.json({
       success: true,
       results,
-      project: engine.getProject(req.params.id),
+      project: finalProject,
+      activeSteps,
     });
   });
 
