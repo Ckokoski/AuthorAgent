@@ -43,6 +43,7 @@ import { UserModelService } from './user-model.js';
 import { CronSchedulerService } from './cron-scheduler.js';
 import { AutoSkillService } from './auto-skill.js';
 import { SkillCuratorService } from './skill-curator.js';
+import { ReaderFeedbackService } from './reader-feedback.js';
 import { WritingJudgeService } from './writing-judge.js';
 import { ProseEvolverService } from './prose-evolver.js';
 import { ReaderPanelService } from './reader-panel.js';
@@ -111,6 +112,7 @@ export interface GatewayServices {
   cronScheduler: CronSchedulerService;
   autoSkill: AutoSkillService;
   skillCurator: SkillCuratorService;
+  readerFeedback: ReaderFeedbackService;
   writingJudge: WritingJudgeService;
   proseEvolver: ProseEvolverService;
   readerPanel: ReaderPanelService;
@@ -192,6 +194,7 @@ export class ServiceContainer {
   cronScheduler!: CronSchedulerService;
   autoSkill!: AutoSkillService;
   skillCurator!: SkillCuratorService;
+  readerFeedback!: ReaderFeedbackService;
   writingJudge!: WritingJudgeService;
   proseEvolver!: ProseEvolverService;
   readerPanel!: ReaderPanelService;
@@ -262,6 +265,7 @@ export class ServiceContainer {
       cronScheduler: this.cronScheduler,
       autoSkill: this.autoSkill,
       skillCurator: this.skillCurator,
+      readerFeedback: this.readerFeedback,
       writingJudge: this.writingJudge,
       proseEvolver: this.proseEvolver,
       readerPanel: this.readerPanel,

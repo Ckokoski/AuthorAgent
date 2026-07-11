@@ -43,6 +43,7 @@ import { ContextEngine } from './services/context-engine.js';
 import { MemorySearchService } from './services/memory-search.js';
 import { MemoryTierService } from './services/memory-tier.js';
 import { SleepConsolidationService } from './services/sleep-consolidation.js';
+import { ReaderFeedbackService } from './services/reader-feedback.js';
 import { UserModelService } from './services/user-model.js';
 import { CronSchedulerService } from './services/cron-scheduler.js';
 import { AutoSkillService } from './services/auto-skill.js';
@@ -180,6 +181,8 @@ class AuthorAgentGateway {
   private set autoSkill(v: AutoSkillService) { this.services.autoSkill = v; }
   private get skillCurator(): SkillCuratorService { return this.services.skillCurator; }
   private set skillCurator(v: SkillCuratorService) { this.services.skillCurator = v; }
+  private get readerFeedback(): ReaderFeedbackService { return this.services.readerFeedback; }
+  private set readerFeedback(v: ReaderFeedbackService) { this.services.readerFeedback = v; }
   private get writingJudge(): WritingJudgeService { return this.services.writingJudge; }
   private set writingJudge(v: WritingJudgeService) { this.services.writingJudge = v; }
   private get proseEvolver(): ProseEvolverService { return this.services.proseEvolver; }
@@ -544,6 +547,11 @@ class AuthorAgentGateway {
     // later in initialize() (after SeriesBible), so this handler reads it
     // lazily and guards on it being ready — mirrors how the reindex handler
     // reads this.memorySearch.
+    // Reader-feedback weekly sync — lazy-guarded like the handlers above.
+    this.cronScheduler.registerHandler('reader-feedback-sync', async () => {
+      if (!this.readerFeedback) return { success: false, message: 'Reader feedback not initialized' };
+      return this.readerFeedback.syncAll();
+    });
     this.cronScheduler.registerHandler('sleep-consolidation', async (payload) => {
       if (!this.sleepConsolidation) return { success: false, message: 'Sleep consolidation not initialized' };
       return this.sleepConsolidation.run(payload || {});
@@ -800,6 +808,18 @@ class AuthorAgentGateway {
       workspaceDir: join(ROOT_DIR, 'workspace'),
     });
     logger.info('  ✓ Sleep consolidation: CoreDigest materialization + free-tier passes ready');
+
+    // ── Reader-feedback moat ──
+    // Ingests public Royal Road stats/comments (polite, rate-limited) and
+    // distills free-tier comment themes so future chapters can be drafted
+    // with real reader-reaction data. Wattpad is an honest stub.
+    this.readerFeedback = new ReaderFeedbackService({
+      workspaceDir: join(ROOT_DIR, 'workspace'),
+      aiComplete: (request) => this.aiRouter.complete(request),
+      aiSelectProvider: (taskType: string) => this.aiRouter.selectProvider(taskType),
+    });
+    await this.readerFeedback.initialize();
+    logger.info('  ✓ Reader-feedback moat: Royal Road ingestion + free-tier comment themes ready');
 
     this.craftCritic = new CraftCriticService();
     this.audiobookPrep = new AudiobookPrepService();
