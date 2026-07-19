@@ -62,6 +62,16 @@ The unsolved problem of AI writing is book-length consistency. AuthorAgent ships
 - **Telegram bridge** — run your whole pipeline from your phone
 - **Writing momentum** — streaks and word counts tracked automatically as the agent writes
 
+### Optional X/Twitter Launch Signals
+
+Authors who run AuthorAgent beside OpenClaw can install
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) with
+`openclaw plugins install @xquik/tweetclaw`. Use it to research public
+launch signals, then bring reviewed summaries, tweet URLs or IDs, audience
+notes, and follow-up decisions into AuthorAgent projects.
+
+Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
+
 ---
 
 ## Quick Start

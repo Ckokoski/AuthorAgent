@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'path';
 import { resolveWithin, safeResolveWithin, sanitizeSegment } from './paths.js';
 
 describe('resolveWithin', () => {
-  const base = resolve('C:\\workspace\\project');
+  const base = resolve('workspace', 'project');
 
   it('joins a normal single segment inside the base', () => {
     const result = resolveWithin(base, 'file.txt');
@@ -46,7 +46,7 @@ describe('resolveWithin', () => {
   });
 
   it('blocks a sibling directory that shares a string prefix with base', () => {
-    // e.g. base = C:\workspace\project, sibling = C:\workspace\project-evil
+    // For example, base "workspace/project" and sibling "workspace/project-evil".
     // A naive `startsWith(base)` check (without separator) would wrongly allow this.
     const sibling = base + '-evil';
     expect(() => resolveWithin(base, '..', 'project-evil', 'file.txt')).toThrow();
@@ -182,7 +182,7 @@ describe('sanitizeSegment', () => {
   });
 
   it('does not reject names that merely contain a reserved word', () => {
-    // "console.txt" base name before first dot is "console", not "con" — must NOT be rejected.
+    // "console.txt" base name before first dot is "console", not "con" - must NOT be rejected.
     expect(sanitizeSegment('console.txt')).toBe('console.txt');
   });
 
