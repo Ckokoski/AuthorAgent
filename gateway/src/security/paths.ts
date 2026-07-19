@@ -46,7 +46,7 @@ function normalizeForCompare(p: string): string {
  */
 export function resolveWithin(baseDir: string, ...segments: string[]): string {
   const base = resolve(baseDir);
-  // Reject null bytes outright — they can truncate paths in native fs calls.
+  // Reject null bytes outright - they can truncate paths in native fs calls.
   for (const seg of segments) {
     if (typeof seg !== 'string') {
       throw new Error('Path segment must be a string');
@@ -56,7 +56,10 @@ export function resolveWithin(baseDir: string, ...segments: string[]): string {
     }
   }
 
-  const resolved = resolve(base, ...segments);
+  const normalizedSegments = segments.map((segment) =>
+    segment.replace(/[\\/]/g, sep),
+  );
+  const resolved = resolve(base, ...normalizedSegments);
 
   const baseCmp = normalizeForCompare(base);
   const resolvedCmp = normalizeForCompare(resolved);
@@ -84,7 +87,7 @@ export function safeResolveWithin(baseDir: string, ...segments: string[]): strin
 
 /**
  * Sanitize a single path segment (a filename or a single directory name) so it
- * is safe to use as a leaf component. This does NOT permit sub-paths — every
+ * is safe to use as a leaf component. This does NOT permit sub-paths - every
  * separator is stripped. Use for filenames coming from user input.
  *
  * Handles: path separators, `..` / dots-only names, null bytes and control

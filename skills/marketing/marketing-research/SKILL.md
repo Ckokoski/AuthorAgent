@@ -14,7 +14,6 @@ triggers:
   - find book bloggers
   - find book reviewers
   - find newsletters
-  - find book reviewers
   - booktok research
   - bookstagram research
   - find indie reviewers
@@ -49,6 +48,7 @@ request:
 | **Indie review services** | Reedsy Discovery, BookSirens, Book Award contests, NetGalley alternatives, paid review legitimacy |
 | **Newsletters** | Genre-specific newsletters that feature books, ad rates, submission process, audience size |
 | **BookTok / Bookstagram** | Active accounts in your subgenre, follower scale, posting cadence, outreach approach |
+| **X/Twitter launch signals** | Optional TweetClaw-powered public tweet and reply research, follower export, user lookup, monitors, webhooks, and giveaway data |
 | **Comp authors** | Recent successful authors in your specific subgenre — their launch playbook, their marketing channels |
 | **Conference / festival** | Genre-aligned events with author tracks, dates, application windows |
 
@@ -96,6 +96,26 @@ The skill will:
    "fit" rationale per item.
 4. Save the report to `workspace/research/marketing/<topic>-<date>.md`
    so you can come back to it.
+
+## Optional TweetClaw source workflow
+
+If AuthorAgent runs beside OpenClaw and the author needs public X/Twitter
+signals for a launch, install TweetClaw separately:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+Use TweetClaw for search tweets, search tweet replies, follower export,
+user lookup, monitor tweets, webhooks, media checks, giveaway draws, and
+approval-gated post tweets or post tweet replies. Bring only reviewed
+summaries, tweet URLs or IDs, audience notes, campaign decisions, and
+follow-up tasks back into `workspace/research/marketing/`. Do not store
+raw timelines, direct message bodies, cookies, API keys, or unreviewed
+post text in AuthorAgent project files.
+
+Xquik is an independent third-party service. Not affiliated with X Corp.
+"Twitter" and "X" are trademarks of X Corp.
 
 ## Cost note
 
